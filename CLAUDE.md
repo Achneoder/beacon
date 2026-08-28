@@ -64,9 +64,16 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
 - **The API is the only contract.** Shared types live in `packages/shared` and are imported by
   both sides as `@beacon/shared`. Never redeclare a DTO in the frontend. All HTTP goes through
   `apps/web/src/lib/api/client.ts`.
-- **Multi-tenant by organization.** `Organization` is the tenant root. Tenant-owned entities
-  extend `OrganizationScopedEntity` (`apps/api/src/common/entities/`), and every query must be
-  scoped by organization — there is no global view of employees, attendance or documents.
+- **One organization per installation.** Beacon is deployed on-premise for a single company.
+  `POST /auth/register` installs the instance — organization, built-in roles, owner — and 409s
+  ever after; `OrganizationService.createWithOwner` enforces that under an advisory lock, and
+  `GET /auth/setup` tells the auth screens whether there is anything left to install. Everyone
+  else joins by invitation.
+- **Still scoped by organization.** `Organization` remains the root: entities extend
+  `OrganizationScopedEntity` (`apps/api/src/common/entities/`) and every query is scoped by
+  organization. There is exactly one today, but nothing may read across it — that scoping is
+  what keeps the door open to multi-tenant hosting and what stops a client-supplied id ever
+  being trusted.
 - **Check permissions, never role names.** Roles are customizable per organization.
   Handlers declare `@RequirePermissions(...)` from `apps/api/src/common/auth/`; the permission
   union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`.
@@ -94,9 +101,9 @@ is nullable and hashing sits behind `PasswordService` rather than calling `@node
 - **The access token carries the permission set**, so authorizing costs no query — the trade-off is
   that a permission change only takes effect when the token expires. `/auth/me` re-reads from the
   database, so the UI is not stale.
-- **Users are scoped to one organization**, and email is unique *per organization*, not globally.
-  One address may therefore exist in several tenants; `AuthService.login` picks the account whose
-  password matches rather than asking which organization up front.
+- **Users are scoped to one organization**, and email is unique *per organization*. Since an
+  installation holds exactly one organization, an address identifies at most one account and
+  `AuthService.login` is a single lookup.
 - **Web guards are UX only.** The redirects in `src/routes/(app)/+layout.svelte` are convenience;
   the API re-checks every request. `session.can()` decides what to *offer*, never what to allow.
 
@@ -158,9 +165,13 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
   running dev stack is never touched. `apps/web/tests/services.mjs` starts them, builds the
   API and migrates before Playwright launches either server; the ports and the API's
   environment live in `apps/web/tests/environment.mjs`.
-- **Every spec creates its own organization**, through `POST /auth/register`. Beacon is
-  multi-tenant and signup is open, so a fresh tenant per test is both the cheapest and the
-  most faithful fixture there is — and nothing needs cleaning up.
+- **One organization for the whole run, one person per test.** Registration installs the
+  instance and then 409s, so a tenant per spec is not available. Playwright's `setup`
+  project (`apps/web/tests/instance.setup.ts`) installs it; each test then invites its own
+  account through `POST /invitations`, which is what keeps one spec's clock-ins and absences
+  out of another's. The API e2e specs instead reset the database in `beforeAll`
+  (`apps/api/test/instance.ts`, guarded to databases named `*_e2e`) and run one file at a
+  time — `fileParallelism` is off in `vitest.config.e2e.ts`.
 - **Rate limits are raised, not disabled.** A dozen parallel browsers sign in faster than any
   human; `THROTTLE_LIMIT` and `AUTH_THROTTLE_LIMIT` (see
   `apps/api/src/common/auth/throttle.ts`) are read from the real process environment, because

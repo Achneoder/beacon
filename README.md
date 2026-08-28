@@ -156,9 +156,12 @@ Signing in returns a short-lived JWT access token, which the SPA keeps in memory
 long-lived refresh token in an `HttpOnly` cookie. Refreshing rotates the token: the presented one is
 spent, and replaying it revokes every session the user has, on the assumption it leaked.
 
-Registration is self-service — `POST /api/auth/register` creates the organization, seeds its four
-built-in roles and makes the caller its owner, in one transaction. Set `AUTH_ALLOW_SIGNUP=false` to
-close it once the first organization exists.
+Beacon is installed for a single organization, on the company's own infrastructure — it is not a
+multi-tenant service. `POST /api/auth/register` is therefore a first-run installer: it creates the
+organization, seeds its four built-in roles and makes the caller its owner, in one transaction, and
+then refuses every later attempt with `409`. Everyone after the owner arrives by invitation.
+`GET /api/auth/setup` reports whether the instance still needs installing, so the login and register
+screens can stop offering a form that can only fail.
 
 ### Additional services
 
