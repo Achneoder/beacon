@@ -42,7 +42,7 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | Design tokens, theme switching, base UI components | shipped |
 | Shared time formatters (`H:MM`, `HH:MM:SS`) | shipped |
 | App shell (sidebar, status card, appearance, user card) | shipped |
-| Users | entity + login only — no CRUD, no invitations |
+| People (users, invitations, departments, teams) | shipped |
 | Attendance, absence, employee data, documents | not started |
 | Storage (`StorageService` → MinIO) | interface + implementation, no callers |
 | Search, notifications, monitoring | not started |
@@ -72,7 +72,7 @@ Extract from the canvas while doing this: `StatusDot` (already exists) driven by
 `filter:brightness` on hover). Keyboard reachability and a focus ring on every nav item and pill —
 the canvas uses hover-only affordances and must not be copied literally there.
 
-## Phase 1 — People: users, invitations, departments, teams
+## Phase 1 — People: users, invitations, departments, teams — **done**
 
 Everything else scopes to a person, so this comes first.
 
@@ -113,8 +113,19 @@ card (phase 2 fills its numbers), *Reports to*, and *Access* — the user's role
 Undesigned but required: `/people` (list, department filter, invite dialog), `/people/:id`,
 `/settings/organization` (name, locale, timezone, roles), and `/invite/:token` under `(auth)`.
 
-**Decide here, once** — deleting a user with attendance history: soft-delete via
-`UserStatus.Disabled`, never a hard delete.
+**Decided here, once** — deleting a user with attendance history: soft-delete via
+`UserStatus.Disabled`, never a hard delete. `DELETE /users/:id` disables and returns the user;
+disabling your own account is refused.
+
+Two things settled while building, worth knowing before phase 2:
+
+- **`SessionUser` now carries `timezone` and `jobTitle`.** The page header converts at the edge
+  from the user's own zone, falling back to the browser's; the sidebar's user card prefers the job
+  title and falls back to the primary role.
+- **Invitation acceptance signs the invitee in.** `POST /invitations/accept` is `@Public()`,
+  throttled like `/auth/*`, and returns the same `AuthResponse` + refresh cookie as registration.
+  The token is shown exactly once at creation — only its SHA-256 hash is stored — and
+  `CreatedInvitation.acceptUrl` is the link to paste into an email until notifications exist.
 
 ## Phase 2 — Attendance and time tracking
 
