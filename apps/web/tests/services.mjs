@@ -7,7 +7,8 @@
  * output belongs in the terminal rather than a test report.
  *
  * Usage: `node tests/services.mjs` (or `pnpm --filter web test:e2e`, which chains it).
- * Set `E2E_SKIP_DOCKER=1` to reuse containers you already have up.
+ * Set `E2E_SKIP_DOCKER=1` to reuse containers you already have up — the database is
+ * still reset, because a suite that installs an organization cannot start on one.
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -43,6 +44,32 @@ if (process.env.E2E_SKIP_DOCKER !== '1') {
 		'--wait'
 	]);
 }
+
+/**
+ * Beacon installs one organization and then refuses every other, so both e2e suites need
+ * an *uninstalled* instance to start from. The containers survive between runs — only
+ * `pnpm e2e:down` disposes of them — so the schema is dropped rather than assumed empty.
+ *
+ * Only ever aimed at the throwaway compose project on port 55432; see environment.mjs.
+ */
+run('resetting the e2e database', [
+	'docker',
+	'compose',
+	'-f',
+	COMPOSE_FILE,
+	'exec',
+	'-T',
+	'postgres',
+	'psql',
+	'-v',
+	'ON_ERROR_STOP=1',
+	'-U',
+	'beacon',
+	'-d',
+	'beacon_e2e',
+	'-c',
+	'drop schema public cascade; create schema public;'
+]);
 
 // The API runs from dist/ rather than through `nest start`, so Playwright's shutdown
 // kills the server itself and not a compiler wrapping it.

@@ -35,7 +35,15 @@ export default defineConfig({
 		video: 'retain-on-failure'
 	},
 
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	projects: [
+		// Installs the single organization the whole run shares — see tests/fixtures.ts.
+		{ name: 'setup', testMatch: /instance\.setup\.ts$/ },
+		{
+			name: 'chromium',
+			use: { ...devices['Desktop Chrome'] },
+			dependencies: ['setup']
+		}
+	],
 
 	webServer: [
 		{

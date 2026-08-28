@@ -34,7 +34,6 @@ export const API_ENV = {
 	AUTH_COOKIE_NAME: 'beacon_refresh',
 	AUTH_COOKIE_SAME_SITE: 'lax',
 	AUTH_COOKIE_SECURE: 'false',
-	AUTH_ALLOW_SIGNUP: 'true',
 
 	// Parallel browsers sign in faster than any human, and the real limits would spend
 	// the run returning 429. See apps/api/src/common/auth/throttle.ts.

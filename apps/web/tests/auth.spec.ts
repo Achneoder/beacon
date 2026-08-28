@@ -6,21 +6,34 @@ import { expect, signIn, test } from './fixtures.js';
  * does on start-up.
  */
 test.describe('authentication', () => {
-	test('creates an organization and lands in the app', async ({ page, account }) => {
+	/**
+	 * The organization was installed by the setup project; Beacon holds one per
+	 * deployment, so the register screen has nothing left to offer and says so rather
+	 * than showing a form whose only possible answer is 409.
+	 */
+	test('closes the register screen once the instance is installed', async ({ page }) => {
 		await page.goto('/register');
 
-		await page.getByLabel('Organization name').fill(account.organizationName);
-		await page.getByLabel('First name').fill(account.firstName);
-		await page.getByLabel('Last name').fill(account.lastName);
-		await page.getByLabel('Email address').fill(account.email);
-		await page.getByLabel('Password', { exact: true }).fill(account.password);
-		await page.getByLabel('Confirm password').fill(account.password);
-		await page.getByRole('button', { name: 'Create organization' }).click();
+		await expect(
+			page.getByRole('heading', { level: 1, name: 'Beacon is already set up' })
+		).toBeVisible();
+		await expect(page.getByLabel('Organization name')).toBeHidden();
+		await page.getByRole('link', { name: 'Sign in' }).click();
+		await expect(page).toHaveURL('/login');
+	});
 
-		await expect(page).toHaveURL('/');
-		await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
-		// The owner's own tenant, read back from the session the API issued.
-		await expect(page.getByText(account.organizationName)).toBeVisible();
+	test('stops offering to create an organization', async ({ page }) => {
+		await page.goto('/login');
+
+		await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
+		await expect(page.getByRole('link', { name: 'Create one' })).toBeHidden();
+	});
+
+	/** An invited member signs in with the password they set when accepting. */
+	test('signs an invited member in', async ({ page, owner }) => {
+		await signIn(page, owner);
+
+		await expect(page.getByText(owner.organizationName)).toBeVisible();
 	});
 
 	test('refuses a wrong password', async ({ page, owner }) => {
@@ -31,12 +44,6 @@ test.describe('authentication', () => {
 
 		await expect(page.getByText('That email and password do not match an account.')).toBeVisible();
 		await expect(page).toHaveURL('/login');
-	});
-
-	test('signs an existing owner in', async ({ page, owner }) => {
-		await signIn(page, owner);
-
-		await expect(page.getByText(owner.organizationName)).toBeVisible();
 	});
 
 	/**
