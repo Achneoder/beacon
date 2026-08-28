@@ -7,6 +7,7 @@ import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { createOrmConfig } from './mikro-orm.config.js';
 import { MailModule } from './common/mail/mail.module.js';
 import { StorageModule } from './common/storage/storage.module.js';
+import { SearchModule } from './common/search/search.module.js';
 import { PermissionsGuard } from './common/auth/permissions.guard.js';
 import { DEFAULT_THROTTLE_LIMIT } from './common/auth/throttle.js';
 import { HealthModule } from './modules/health/health.module.js';
@@ -20,6 +21,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module.js';
 import { AttendanceModule } from './modules/attendance/attendance.module.js';
 import { AbsencesModule } from './modules/absences/absences.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
+import { SearchModule as SearchFeatureModule } from './modules/search/search.module.js';
 
 @Module({
   imports: [
@@ -34,6 +36,9 @@ import { DocumentsModule } from './modules/documents/documents.module.js';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: DEFAULT_THROTTLE_LIMIT }]),
     MailModule,
     StorageModule,
+    // The seam only. The feature that uses it is `SearchFeatureModule`, last in the
+    // list — it imports DocumentsModule and UsersModule, which inject this one.
+    SearchModule,
     HealthModule,
     AuthModule,
     OrganizationModule,
@@ -44,6 +49,7 @@ import { DocumentsModule } from './modules/documents/documents.module.js';
     AttendanceModule,
     AbsencesModule,
     DocumentsModule,
+    SearchFeatureModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

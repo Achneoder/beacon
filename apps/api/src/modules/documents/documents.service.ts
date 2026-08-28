@@ -148,6 +148,24 @@ export class DocumentsService {
     return document;
   }
 
+  /**
+   * The visible subset of a set of ids, in no particular order.
+   *
+   * Search is the caller: the index answers "what matched", and this answers "and
+   * which of those may you see" — through the same `accessContext()` every other
+   * read path uses, so the rule stays in one place and a hit the caller has no claim
+   * to simply does not come back. Never 404s: an id that resolves to nothing is a
+   * result that quietly disappears, not an error, because a search over a set the
+   * caller only partly owns is a normal thing to do.
+   */
+  async findVisibleByIds(caller: DocumentCaller, ids: string[]): Promise<Document[]> {
+    if (ids.length === 0) return [];
+
+    const { where } = await this.accessContext(caller);
+
+    return this.em.find(Document, { id: { $in: ids }, ...where }, { populate: ['category'] });
+  }
+
   /** May this caller write a new version into an already-visible document. Writing
    *  still needs `document:manage`, ownership, or an explicit `write` grant — an
    *  organization-wide document reads for everyone but is not writable by everyone,
