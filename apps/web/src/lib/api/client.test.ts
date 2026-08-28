@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
-import { ApiError, api, apiSend, setAccessToken } from './client';
+import { ApiError, api, apiSend, apiUpload, setAccessToken } from './client';
 
 /** Builds a fetch stub that answers each call from a queue of responses. */
 function stubFetch(...responses: Response[]) {
@@ -153,5 +153,38 @@ describe('apiSend', () => {
 		await apiSend('/auth/refresh', 'POST');
 
 		expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
+	});
+});
+
+describe('apiUpload', () => {
+	it('sends the FormData body without setting its own Content-Type', async () => {
+		const fetchMock = stubFetch(json({ id: 'doc-1' }));
+		const form = new FormData();
+		form.set('title', 'Contract');
+
+		await apiUpload('/documents', form);
+
+		const [, init] = fetchMock.mock.calls[0];
+		expect(init.body).toBe(form);
+		expect((init.headers as Headers).has('Content-Type')).toBe(false);
+	});
+
+	it('retries the same FormData instance after a token refresh', async () => {
+		setAccessToken('expired');
+		const fetchMock = stubFetch(
+			unauthorized(),
+			json({ accessToken: 'fresh' }),
+			json({ id: 'doc-1' })
+		);
+		const form = new FormData();
+		form.set('title', 'Contract');
+
+		await expect(apiUpload('/documents', form)).resolves.toEqual({ id: 'doc-1' });
+
+		expect(fetchMock.mock.calls[0][1].body).toBe(form);
+		expect(fetchMock.mock.calls[2][1].body).toBe(form);
+		expect((fetchMock.mock.calls[2][1].headers as Headers).get('Authorization')).toBe(
+			'Bearer fresh'
+		);
 	});
 });

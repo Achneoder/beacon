@@ -74,18 +74,14 @@ run('resetting the e2e database', [
 // The bucket's tmpfs volume survives between runs the same way Postgres's does —
 // `pnpm e2e:down` is what actually discards it — so a run against containers left
 // up from a previous one (or E2E_SKIP_DOCKER=1) must not see another run's uploads.
-run(
-	'resetting the e2e object store',
-	['pnpm', '--filter', 'api', 'test:reset-storage'],
-	{
-		STORAGE_ENDPOINT: API_ENV.STORAGE_ENDPOINT,
-		STORAGE_PORT: API_ENV.STORAGE_PORT,
-		STORAGE_USE_SSL: API_ENV.STORAGE_USE_SSL,
-		STORAGE_ACCESS_KEY: API_ENV.STORAGE_ACCESS_KEY,
-		STORAGE_SECRET_KEY: API_ENV.STORAGE_SECRET_KEY,
-		STORAGE_BUCKET: API_ENV.STORAGE_BUCKET
-	}
-);
+run('resetting the e2e object store', ['pnpm', '--filter', 'api', 'test:reset-storage'], {
+	STORAGE_ENDPOINT: API_ENV.STORAGE_ENDPOINT,
+	STORAGE_PORT: API_ENV.STORAGE_PORT,
+	STORAGE_USE_SSL: API_ENV.STORAGE_USE_SSL,
+	STORAGE_ACCESS_KEY: API_ENV.STORAGE_ACCESS_KEY,
+	STORAGE_SECRET_KEY: API_ENV.STORAGE_SECRET_KEY,
+	STORAGE_BUCKET: API_ENV.STORAGE_BUCKET
+});
 
 // The API runs from dist/ rather than through `nest start`, so Playwright's shutdown
 // kills the server itself and not a compiler wrapping it.

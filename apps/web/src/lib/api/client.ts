@@ -72,7 +72,10 @@ async function toApiError(response: Response, path: string, method: string): Pro
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
-	const headers = new Headers({ 'Content-Type': 'application/json', ...init.headers });
+	// A FormData body must set no Content-Type of its own — only the browser knows the
+	// multipart boundary it generated, and setting one here would corrupt every upload.
+	const headers = new Headers(init.headers);
+	if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
 	if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
 
 	const response = await fetch(`${BASE_URL}${path}`, {
@@ -107,4 +110,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 /** Convenience for the JSON bodies every mutation sends. */
 export function apiSend<T>(path: string, method: string, body?: unknown): Promise<T> {
 	return api<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+}
+
+/**
+ * Multipart uploads — documents, so far. Same auth, refresh-and-retry and error
+ * mapping as every other call; `FormData` is re-serialized per `fetch`, so a 401
+ * retry replays the same instance safely.
+ */
+export function apiUpload<T>(path: string, form: FormData, method = 'POST'): Promise<T> {
+	return api<T>(path, { method, body: form });
 }
