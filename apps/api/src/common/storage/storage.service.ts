@@ -20,4 +20,6 @@ export abstract class StorageService {
   abstract get(key: string): Promise<Readable>;
   abstract delete(key: string): Promise<void>;
   abstract signedUrl(key: string, expiresInSeconds: number): Promise<string>;
+  /** Whether `put` actually encrypts objects at rest — what the dropzone may claim. */
+  abstract encryptedAtRest(): boolean;
 }
