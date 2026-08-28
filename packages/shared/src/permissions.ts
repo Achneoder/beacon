@@ -31,6 +31,7 @@ export const DEFAULT_ROLES = {
     'attendance:approve',
     'holiday:approve',
     'document:read',
+    'document:write',
     'document:manage',
     'report:read',
   ],
@@ -41,7 +42,7 @@ export const DEFAULT_ROLES = {
     'holiday:approve',
     'report:read',
   ],
-  employee: ['attendance:read', 'attendance:write', 'holiday:request', 'document:read'],
+  employee: ['attendance:read', 'attendance:write', 'holiday:request', 'document:read', 'document:write'],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type DefaultRole = keyof typeof DEFAULT_ROLES;
