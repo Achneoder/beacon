@@ -162,8 +162,14 @@ export interface AcceptInvitationRequest {
 export interface CreatedInvitation extends InvitationSummary {
   /** Stored only as a SHA-256 hash, so this is never retrievable again. */
   token: string;
-  /** Ready to paste into an email until the notification seam exists. */
+  /** Emailed to the invitee, and shown once so it can be passed on by hand as well. */
   acceptUrl: string;
+  /**
+   * Whether the invitation email was handed to a mail transport. False when the
+   * deployment configures no SMTP host, or the relay rejected it — the invitation is
+   * valid either way, and the link is the fallback.
+   */
+  emailSent: boolean;
 }
 
 const EMPLOYEE_NUMBER_DIGITS = 4;
