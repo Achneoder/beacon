@@ -43,6 +43,7 @@ http://localhost:5173, create an organization, and you are signed in as its owne
 | Web | http://localhost:5173 | — |
 | Postgres | `localhost:5432` | `beacon` / `beacon` |
 | MinIO console | http://localhost:9001 | `beacon` / `beacon-secret` |
+| Meilisearch | http://localhost:7700 | key `beacon-search-key` |
 | Mailpit | http://localhost:8025 | — |
 | Grafana | http://localhost:3001 | `admin` / `admin` |
 | Prometheus | http://localhost:9090 | — |
@@ -82,7 +83,7 @@ apps/web         SvelteKit + Svelte 5 + TailwindCSS — client-only SPA
 apps/api         NestJS + MikroORM + PostgreSQL
 packages/shared  @beacon/shared — permissions and tenant types shared by both apps
 packages/config  @beacon/config — shared TypeScript base config
-infra            docker-compose: Postgres, MinIO, Mailpit, Prometheus, Loki, Alloy, Grafana
+infra            docker-compose: Postgres, MinIO, Meilisearch, Mailpit, Prometheus, Loki, Alloy, Grafana
 ```
 
 `apps/mobile` and `apps/desktop` are planned; their frameworks are not yet chosen.
@@ -182,9 +183,11 @@ the API so the implementation can be swapped without touching feature code.
   identify and address issues before they impact users. Out of the box, Beacon provides a
   **Prometheus, Loki, Alloy and Grafana** setup.
 - **Search engine** — integrate with an external search engine such as Elasticsearch or Algolia for
-  advanced search over documents and other data. Out of the box, Beacon would provide
-  **Meilisearch** as a self-hosted alternative. **This is still to be decided**, and nothing is
-  wired up for it yet.
+  advanced search over documents and other data. Out of the box, Beacon provides **Meilisearch** as
+  a self-hosted alternative. Leave `SEARCH_HOST` empty and Beacon runs with no search at all rather
+  than a broken one: indexing becomes a no-op and the web app hides its search field. The index
+  holds no permission data — who may see a result is decided against the database on every query —
+  so it is derived state that can be rebuilt at any time from **Settings → Organization**.
 
 ## License
 
