@@ -64,6 +64,17 @@ export class UsersService {
   }
 
   /**
+   * Several users by id, scoped by organization — search's post-filter, which turns
+   * a set of index hits back into rows. Missing ids are simply absent rather than an
+   * error: an id the caller cannot reach is a result that disappears, not a 404.
+   */
+  async findByIds(organizationId: string, ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return [];
+
+    return this.em.find(User, { id: { $in: ids }, organization: organizationId });
+  }
+
+  /**
    * Every query is scoped by organization, so an id from another tenant reads as a
    * missing user rather than leaking that it exists.
    */
