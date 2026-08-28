@@ -11,6 +11,10 @@ import { AttendanceDay } from './modules/attendance/attendance-day.entity.js';
 import { WorkSchedule } from './modules/attendance/work-schedule.entity.js';
 import { OvertimeBalance } from './modules/attendance/overtime-balance.entity.js';
 import { AttendanceCorrection } from './modules/attendance/attendance-correction.entity.js';
+import { AbsenceType } from './modules/absences/absence-type.entity.js';
+import { AbsenceRequest } from './modules/absences/absence-request.entity.js';
+import { LeaveBalance } from './modules/absences/leave-balance.entity.js';
+import { Holiday } from './modules/absences/holiday.entity.js';
 
 /**
  * Explicit entity registry. MikroORM's glob-based discovery would need to require()
@@ -31,4 +35,8 @@ export const ENTITIES = [
   WorkSchedule,
   OvertimeBalance,
   AttendanceCorrection,
+  AbsenceType,
+  AbsenceRequest,
+  LeaveBalance,
+  Holiday,
 ];

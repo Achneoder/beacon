@@ -26,6 +26,7 @@ import {
   type WorkScheduleSummary,
 } from '@beacon/shared';
 import { localDate, offsetMinutes, resolveTimezone } from '../../common/time/zone.js';
+import { AbsencesService } from '../absences/absences.service.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
@@ -58,6 +59,7 @@ export class AttendanceService {
   constructor(
     private readonly em: EntityManager,
     private readonly users: UsersService,
+    private readonly absences: AbsencesService,
   ) {}
 
   // ---------------------------------------------------------------- the clock
@@ -184,6 +186,14 @@ export class AttendanceService {
       localDate: { $gte: monday, $lte: dates[6] },
     });
     const pendingDates = new Set(pending.map((correction) => correction.localDate));
+    // The absence tag and the credited flag are one decision, made in one place —
+    // the calendar tints a cell from the same rows this reads.
+    const coverage = await this.absences.coverageOf(
+      caller.organizationId,
+      subjectId,
+      monday,
+      dates[6],
+    );
 
     const days: TimesheetDay[] = [];
     for (const date of dates) {
@@ -196,6 +206,8 @@ export class AttendanceService {
         .map((entry) => entry.startedAt.getTime())
         .sort((left, right) => left - right);
 
+      const absence = coverage.get(date) ?? null;
+
       days.push({
         date,
         weekday: weekdayOf(date),
@@ -203,11 +215,9 @@ export class AttendanceService {
         endedAt: closingInstant(forDay),
         ...totals,
         targetMinutes,
-        // Phase 3 supplies the absence, and with it the credited days. Until then
-        // every day balances on worked time alone.
-        balanceMinutes: totals.workedMinutes - targetMinutes,
-        absenceTag: null,
-        credited: false,
+        balanceMinutes: dayBalance(totals.workedMinutes, targetMinutes, absence?.credited ?? false),
+        absenceTag: absence?.tag ?? null,
+        credited: absence?.credited ?? false,
         hasPendingCorrection: pendingDates.has(date),
       });
     }
@@ -515,8 +525,15 @@ export class AttendanceService {
     const { workedMinutes } = totalsOf(entries.flatMap((entry) => toSegments(entry)));
     const schedule = await this.scheduleFor(caller.organizationId, caller.id, date);
     const targetMinutes = targetMinutesFor(schedule, weekdayOf(date));
-    // Phase 3 supplies credited absence days; until then nothing is credited.
-    const balanceMinutes = dayBalance(workedMinutes, targetMinutes, false);
+    // A credited day met its target through the absence, not through worked time, so
+    // it must not book a full day of negative balance against the person who was off.
+    const coverage = await this.absences.coverageOf(
+      caller.organizationId,
+      caller.id,
+      date,
+      date,
+    );
+    const balanceMinutes = dayBalance(workedMinutes, targetMinutes, coverage.get(date)?.credited ?? false);
 
     let day = await this.em.findOne(AttendanceDay, {
       organization: caller.organizationId,

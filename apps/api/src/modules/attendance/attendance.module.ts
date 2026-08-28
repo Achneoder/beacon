@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { UsersModule } from '../users/users.module.js';
+import { AbsencesModule } from '../absences/absences.module.js';
 import { AttendanceCorrection } from './attendance-correction.entity.js';
 import { AttendanceDay } from './attendance-day.entity.js';
 import { AttendanceEntry } from './attendance-entry.entity.js';
@@ -22,6 +23,8 @@ import { AttendanceService } from './attendance.service.js';
     ]),
     // For `subordinateIdsOf` — "the people I approve for" is read in one place.
     UsersModule,
+    // For `coverageOf` — a timesheet row's absence tag and its credited flag.
+    AbsencesModule,
   ],
   controllers: [AttendanceController],
   providers: [AttendanceService],
