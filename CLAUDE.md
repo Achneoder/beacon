@@ -40,6 +40,8 @@ pnpm --filter api test -- permissions.guard.spec.ts
 pnpm --filter api test -- -t "requires every declared permission"
 
 pnpm --filter api test:e2e                     # needs infra up + apps/api/.env
+pnpm e2e                                       # browser e2e: SPA + real API + real db
+pnpm e2e:down                                  # drop the e2e containers and their data
 pnpm --filter api mikro-orm migration:create   # add --initial for the first one
 pnpm --filter api mikro-orm migration:up
 
@@ -128,6 +130,35 @@ Schema changes ship as migrations; auto-synchronisation is off.
 `$env/dynamic/public` only exists inside the Kit runtime, so `apps/web/vite.config.ts` aliases it
 to `src/testing/env-dynamic-public.ts` under `test.alias`. Web and api must stay on the same
 Vitest major — Vitest 3 bundles Vite 7 types that conflict with Vite 8 and break `svelte-check`.
+
+There are **three** suites, and they prove different things:
+
+| Suite | Command | What it covers |
+| --- | --- | --- |
+| Unit / component | `pnpm -r test` | Vitest. Web mounts components in jsdom against a mocked client. |
+| API e2e | `pnpm --filter api test:e2e` | Supertest against a booted Nest app and the dev database. |
+| Browser e2e | `pnpm e2e` | Playwright: the built SPA against a real API and a throwaway database. |
+
+The browser suite lives in `apps/web/tests` and exists to catch what the other two cannot —
+CORS, the `HttpOnly` refresh cookie crossing ports, the permission set inside the access
+token, and the `@beacon/shared` shapes actually agreeing at runtime.
+
+- **It runs the *built* SPA**, previewed by `adapter-static`, not `vite dev` — that is the
+  artefact that ships. `PUBLIC_API_URL` is baked in at build time, so it is set for `build`
+  as well as `preview`.
+- **Its backing services are throwaway.** `infra/docker-compose.e2e.yml` is a separate
+  compose project on separate ports (Postgres 55432, MinIO 59000) with tmpfs volumes, so a
+  running dev stack is never touched. `apps/web/tests/services.mjs` starts them, builds the
+  API and migrates before Playwright launches either server; the ports and the API's
+  environment live in `apps/web/tests/environment.mjs`.
+- **Every spec creates its own organization**, through `POST /auth/register`. Beacon is
+  multi-tenant and signup is open, so a fresh tenant per test is both the cheapest and the
+  most faithful fixture there is — and nothing needs cleaning up.
+- **Rate limits are raised, not disabled.** A dozen parallel browsers sign in faster than any
+  human; `THROTTLE_LIMIT` and `AUTH_THROTTLE_LIMIT` (see
+  `apps/api/src/common/auth/throttle.ts`) are read from the real process environment, because
+  `@Throttle(...)` is evaluated before `ConfigModule` runs and cannot see `.env`.
+- **Playwright needs its browser**: `pnpm --filter web exec playwright install chromium`.
 
 ## Commits
 

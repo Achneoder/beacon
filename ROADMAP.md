@@ -3,8 +3,8 @@
 The path from what ships today — authentication, organizations, roles — to the product
 [`README.md`](README.md) describes. Each phase is a vertical slice: entities and migration, API
 module, shared types, web module, tests. A phase is done when `pnpm -r build | lint | typecheck |
-test` and `pnpm --filter api test:e2e` are green, the copy exists in `en` **and** `de`, and the
-feature is reachable from the app shell.
+test`, `pnpm --filter api test:e2e` and `pnpm e2e` are green, the copy exists in `en` **and**
+`de`, and the feature is reachable from the app shell.
 
 Phases 1–6 are ordered by dependency; everything after phase 6 is genuinely parallelizable.
 
@@ -391,7 +391,8 @@ client-supplied idempotency key when this phase starts.
 Not tied to a feature phase, but needed before a real user exists: production `Dockerfile`s for API
 and web, a compose or Helm target, migrations as a release step, secret management for
 `JWT_SECRET` and the database URL, backups for Postgres and the object store, and CI running the
-same four checks plus e2e against a throwaway database.
+same four checks plus both e2e suites. The browser suite (`pnpm e2e`) already brings its own
+throwaway database up; CI needs Docker and `playwright install --with-deps chromium`.
 
 ---
 

@@ -61,6 +61,9 @@ pnpm --filter web test -- src/lib/api/client.test.ts
 pnpm --filter api test -- -t "requires every declared permission"
 pnpm --filter api test:e2e                      # needs infra up
 
+pnpm e2e                                        # browser e2e: the built SPA against a
+pnpm e2e:down                                   # real API and a throwaway database
+
 pnpm --filter api mikro-orm migration:create
 pnpm --filter api mikro-orm migration:up
 
