@@ -44,7 +44,8 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | App shell (sidebar, status card, appearance, user card) | shipped |
 | People (users, invitations, departments, teams) | shipped |
 | Attendance (clock, timesheet, corrections) | shipped |
-| Absence, employee data, documents | not started |
+| Absence (calendar, quota, approvals, public holidays) | shipped |
+| Employee data, documents | not started |
 | Storage (`StorageService` → MinIO) | interface + implementation, no callers |
 | Search, notifications, monitoring | not started |
 | Mobile, desktop | not created; frameworks undecided |
@@ -200,10 +201,11 @@ Four things settled while building, worth knowing before phase 3:
   until Monday 09:00" has to mean nine in the morning where the person works. Phase 3's
   approval deadlines should take the same offset rather than assuming UTC.
 
-`TimesheetDay` already carries `absenceTag` and `credited`; both are inert until phase 3
-fills them, and `dayBalance()` in `packages/shared` already honours the credited rule.
+`TimesheetDay.absenceTag` and `credited` are filled by phase 3: attendance asks
+`AbsencesService.coverageOf` for them, so the tag on a timesheet row and the tint on a
+calendar cell are one decision made in one place.
 
-## Phase 3 — Absence and the holiday calendar
+## Phase 3 — Absence and the holiday calendar — **done**
 
 **Entities**
 
@@ -247,6 +249,32 @@ Undesigned but required: `/approvals` (shared with phase 2), and the absence-typ
 `/settings`. Reuse `organization:manage` for both rather than adding an `absence:manage`
 permission, unless a customer asks.
 
+Five things settled while building, worth knowing before phase 4:
+
+- **A request's cost is frozen when it is raised.** `AbsenceRequest.costDays` is
+  computed against the public holidays in force that day and then stored. Recomputing
+  it on every read would let a holiday declared in November silently rewrite an August
+  absence that has already been taken and paid.
+- **A year boundary spends two quotas.** `absenceCostByYear` in `packages/shared`
+  splits a request across the years it touches, and approval commits to each year's
+  `LeaveBalance` separately. Charging the whole thing to the year it started in is the
+  bug that helper exists to prevent.
+- **`taken` is settled lazily, on read.** An approved absence becomes `taken` the
+  first time someone looks at it after its last day. A nightly job that had not run
+  yet would show a finished holiday as still upcoming.
+- **`takenDays` counts approved *and* taken.** An approved week in December is spent
+  the moment it is granted, not the moment it arrives; pending days are counted from
+  the requests themselves, so a withdrawal needs no compensating write.
+- **Absence types are seeded on first read, not at registration.** The unique key on
+  `(organization, key)` makes a concurrent double-seed a conflict rather than a
+  duplicate list, and organizations created before this phase fill themselves in.
+
+Two rules the phase left in place rather than inventing around: the calendar's default
+scope is *your own days* — widening to reports and then the organization needs
+`holiday:approve`, because a calendar is the easiest place to leak who is off sick —
+and every day cell is a real `<button>`, since the canvas's two-click range selection
+is hover-only and would otherwise be unreachable by keyboard.
+
 ## Phase 4 — Documents
 
 The first consumer of `StorageService`. Feature code injects the abstract class; the `minio` SDK
@@ -280,8 +308,9 @@ the allowlist and cap in the controller and turn on server-side encryption on th
 scanning is a later hook on the same seam.
 
 **Sick notes tie back to phase 3.** The canvas lists "Sick note 12 Aug 2026.pdf" as a category and
-the same date is a Sick leave day, so `AbsenceRequest.documentId` should let a request carry its
-evidence. Build it here, once documents exist.
+the same date is a Sick leave day, so `AbsenceRequest.documentId` lets a request carry its
+evidence. The column already exists — phase 3 added it as a bare `uuid` so the link needs no
+migration — and it is unenforced until `Document` does.
 
 **Web** — `/documents`: the category filter chip row (with `All` selected by default), a table of
 `icon · name + category · date · size · Open`, and the dashed dropzone below. Version history and
@@ -370,7 +399,7 @@ same four checks plus e2e against a throwaway database.
 
 ```
 0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Clients
-                       └─ 3  Absence ────┘
+                       └─ 3  Absence ────┘   (0–3 done)
                        └─ 4  Documents ── 5  Search
 Cross-cutting: notifications + audit log after 3; auth expansion any time; hardening before launch.
 ```
