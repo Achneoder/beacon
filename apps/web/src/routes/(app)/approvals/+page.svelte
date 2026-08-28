@@ -17,6 +17,7 @@
 	} from '$lib/attendance/labels';
 	import { approveCorrection, listCorrections, rejectCorrection } from '$lib/api/attendance';
 	import { approveAbsence, listAbsences, rejectAbsence } from '$lib/api/absences';
+	import { absenceErrorKey } from '$lib/absence/errors';
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
 
@@ -78,7 +79,8 @@
 			const updated = approved ? await approveAbsence(id) : await rejectAbsence(id);
 			absences = absences.map((item) => (item.id === id ? updated : item));
 		} catch (error) {
-			loadErrorKey = errorKey(error);
+			// "You cannot decide your own request" is a rule, not a malfunction.
+			loadErrorKey = absenceErrorKey(error);
 		} finally {
 			decidingId = null;
 		}

@@ -99,7 +99,14 @@
 		"organizationTooShort": "Verwenden Sie mindestens 2 Zeichen.",
 		"notFound": "Das konnten wir nicht finden.",
 		"forbidden": "Dafür fehlt Ihnen die Berechtigung.",
-		"inviteInvalid": "Dieser Einladungslink ist nicht mehr gültig."
+		"inviteInvalid": "Dieser Einladungslink ist nicht mehr gültig.",
+		"absenceOverlap": "An diesen Tagen liegt bereits eine Abwesenheit. Zieh sie zurück oder wähle einen anderen Zeitraum.",
+		"absenceNoWorkingDays": "In diesem Zeitraum liegt kein Arbeitstag.",
+		"absenceBackwards": "Der letzte Tag kann nicht vor dem ersten liegen.",
+		"absenceDecided": "Über diesen Antrag wurde bereits entschieden.",
+		"absenceOwnDecision": "Du kannst nicht über deinen eigenen Antrag entscheiden.",
+		"absencePendingOnly": "Nur ein noch nicht entschiedener Antrag kann zurückgezogen werden.",
+		"absenceNotYours": "Dieser Antrag gehört jemand anderem."
 	},
 	"org": {
 		"label": "Organisation",

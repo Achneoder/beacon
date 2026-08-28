@@ -282,6 +282,13 @@ Five things settled while building, worth knowing before phase 4:
   resolves whatever the caller holds. `absences.e2e-spec.ts` now signs in as a real
   `manager` and walks the screens, which is the only layer where a permission
   mismatch is visible.
+- **Business-rule refusals are named, not swallowed.** `errorKey` maps every 400 onto
+  "Something went wrong", which is useless advice when the fix is "those days are
+  already booked". `$lib/absence/errors.ts` maps the API's known refusals onto real
+  copy in both locales. It matches on message *text*, which is the weak part, and it
+  is weak because the API has no machine-readable error code to match on instead —
+  **adding one is the durable fix** and the reason that map lives in a single file
+  with a test pinning every string it depends on.
 
 Two rules the phase left in place rather than inventing around: the calendar's default
 scope is *your own days* — widening to reports and then the organization needs

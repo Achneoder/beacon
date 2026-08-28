@@ -2,7 +2,6 @@
 	import { _, locale } from 'svelte-i18n';
 	import {
 		absenceCostDays,
-		formatDays,
 		type AbsenceCalendar,
 		type AbsenceRequestSummary,
 		type AbsenceTypeSummary,
@@ -29,6 +28,7 @@
 		withdrawAbsence
 	} from '$lib/api/absences';
 	import { session } from '$lib/auth/session.svelte';
+	import { absenceErrorKey } from '$lib/absence/errors';
 	import { errorKey } from '$lib/auth/errors';
 
 	/**
@@ -154,7 +154,9 @@
 			notice = 'calendar.requestSent';
 			await load(month, scope);
 		} catch (error) {
-			requestErrorKey = errorKey(error);
+			// A refusal here is nearly always a rule the person can act on — which days
+			// are already booked, which range has no working day in it.
+			requestErrorKey = absenceErrorKey(error);
 		} finally {
 			sending = false;
 		}
@@ -168,7 +170,7 @@
 			notice = 'calendar.withdrawn';
 			await load(month, scope);
 		} catch (error) {
-			loadErrorKey = errorKey(error);
+			loadErrorKey = absenceErrorKey(error);
 		} finally {
 			busyId = null;
 		}
@@ -260,7 +262,9 @@
 			<Card variant="panel" as="section">
 				<h2 class="text-base font-bold tracking-tight">{$_('calendar.newRequest')}</h2>
 				<p class="mt-1 font-mono text-2xs text-ink-muted">
-					{formatRange(range.startsOn, range.endsOn, lang)} · {formatDays(cost)}
+					{formatRange(range.startsOn, range.endsOn, lang)} · {$_('absence.days', {
+						values: { count: cost }
+					})}
 				</p>
 
 				<form class="mt-4 flex flex-col gap-4" onsubmit={send}>
