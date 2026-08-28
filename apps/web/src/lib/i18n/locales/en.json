@@ -21,6 +21,23 @@
 			"out": "Clocked out"
 		}
 	},
+	"search": {
+		"label": "Search documents and people",
+		"placeholder": "Search…",
+		"searching": "Searching…",
+		"noResults": "No matches",
+		"resultCount": "{count} results",
+		"group": {
+			"document": "Documents",
+			"employee": "People"
+		},
+		"reindex": "Rebuild the search index",
+		"reindexHint": "Search is rebuilt from the database. Run this after restoring a backup or starting a new search container.",
+		"reindexing": "Rebuilding…",
+		"reindexed": "Indexed {documents} documents and {employees} people.",
+		"reindexFailed": "The search index could not be rebuilt.",
+		"unavailable": "No search backend is configured for this installation."
+	},
 	"today": {
 		"kicker": "Overview",
 		"title": "Today",

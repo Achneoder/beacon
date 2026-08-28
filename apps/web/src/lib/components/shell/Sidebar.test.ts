@@ -66,6 +66,23 @@ describe('Sidebar', () => {
 		expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
 	});
 
+	it('offers search to anyone who may read either documents or people', () => {
+		renderSidebar(['document:read']);
+		expect(
+			screen.getByRole('combobox', { name: 'Search documents and people' })
+		).toBeInTheDocument();
+	});
+
+	it('hides search from an account that may read neither', () => {
+		// A box that could only ever come back empty — the same reasoning that filters
+		// the nav entries above.
+		renderSidebar(['attendance:read']);
+
+		expect(
+			screen.queryByRole('combobox', { name: 'Search documents and people' })
+		).not.toBeInTheDocument();
+	});
+
 	it('always offers Profile — nothing gates your own account', () => {
 		renderSidebar([]);
 
