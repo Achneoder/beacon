@@ -3,7 +3,10 @@
 		"name": "Beacon"
 	},
 	"nav": {
-		"today": "Today"
+		"today": "Today",
+		"people": "People",
+		"profile": "Profile",
+		"settings": "Settings"
 	},
 	"shell": {
 		"navLabel": "Main navigation",
@@ -61,7 +64,10 @@
 		"network": "Could not reach the server. Check your connection.",
 		"unexpected": "Something went wrong. Please try again.",
 		"checkFields": "Check the highlighted fields.",
-		"organizationTooShort": "Use at least 2 characters."
+		"organizationTooShort": "Use at least 2 characters.",
+		"notFound": "We could not find that.",
+		"forbidden": "You do not have access to that.",
+		"inviteInvalid": "This invitation link is no longer valid."
 	},
 	"org": {
 		"label": "Organization",
@@ -73,5 +79,112 @@
 		"admin": "Administrator",
 		"manager": "Manager",
 		"employee": "Employee"
+	},
+	"profile": {
+		"kicker": "Your account",
+		"title": "Profile",
+		"details": "Employment details",
+		"employeeNumber": "Employee ID",
+		"email": "Email",
+		"department": "Department",
+		"team": "Team",
+		"startDate": "Start date",
+		"contract": "Contract",
+		"location": "Location",
+		"phone": "Phone",
+		"timezone": "Time zone",
+		"language": "Language",
+		"workModel": "Work model",
+		"workModelPending": "Your schedule and hours appear here once time tracking is switched on.",
+		"reportsTo": "Reports to",
+		"noManager": "No manager is recorded for you.",
+		"access": "Access",
+		"accessHint": "Your roles decide what you can reach. Only an administrator can change them.",
+		"edit": "Edit your details",
+		"editable": "You can change your phone number, language and time zone. Everything else is maintained by your organization.",
+		"save": "Save changes",
+		"saving": "Saving…",
+		"saved": "Your profile has been updated.",
+		"cancel": "Cancel"
+	},
+	"people": {
+		"kicker": "Organization",
+		"title": "People",
+		"subtitle": "Everyone in {organization}.",
+		"search": "Search by name or email",
+		"allDepartments": "All departments",
+		"count": "{count, plural, one {# person} other {# people}}",
+		"empty": "Nobody matches that filter yet.",
+		"loading": "Loading people…",
+		"columnName": "Name",
+		"columnRole": "Job title",
+		"columnDepartment": "Department",
+		"columnStatus": "Status",
+		"openProfile": "Open profile",
+		"backToPeople": "Back to people",
+		"invite": "Invite someone",
+		"inviteTitle": "Invite a colleague",
+		"inviteHint": "They receive a link that lets them set a password. It expires in 14 days.",
+		"inviteSend": "Create invitation",
+		"inviteSending": "Creating…",
+		"inviteDone": "Invitation created. Send this link to {email} — it is shown only once.",
+		"inviteCopy": "Copy link",
+		"inviteCopied": "Copied",
+		"pending": "Pending invitations",
+		"pendingEmpty": "No invitations are waiting.",
+		"expiresOn": "Expires {date}",
+		"expired": "Expired",
+		"accepted": "Accepted",
+		"revoke": "Revoke",
+		"disable": "Disable account",
+		"disableConfirm": "Disable {name}? Their history is kept and they can be re-enabled later.",
+		"roles": "Roles",
+		"manager": "Manager",
+		"status": {
+			"invited": "Invited",
+			"active": "Active",
+			"disabled": "Disabled"
+		},
+		"contract": {
+			"permanent-full-time": "Permanent · Full-time",
+			"permanent-part-time": "Permanent · Part-time",
+			"fixed-term-full-time": "Fixed-term · Full-time",
+			"fixed-term-part-time": "Fixed-term · Part-time"
+		},
+		"workLocation": {
+			"on-site": "On-site",
+			"hybrid": "Hybrid",
+			"remote": "Remote"
+		},
+		"notSet": "Not set"
+	},
+	"invite": {
+		"title": "Accept your invitation",
+		"subtitle": "Choose a password and your account is ready.",
+		"checking": "Checking your invitation…",
+		"invalid": "This invitation link is no longer valid. Ask whoever invited you for a new one.",
+		"submit": "Create my account",
+		"submitting": "Creating your account…"
+	},
+	"settings": {
+		"kicker": "Organization",
+		"title": "Settings",
+		"general": "General",
+		"generalHint": "The organization name, language and time zone everyone falls back to.",
+		"name": "Organization name",
+		"save": "Save",
+		"saving": "Saving…",
+		"saved": "Settings saved.",
+		"departments": "Departments",
+		"departmentsHint": "Departments group people for filtering and reporting.",
+		"departmentName": "Department name",
+		"addDepartment": "Add department",
+		"noDepartments": "No departments yet.",
+		"members": "{count, plural, one {# member} other {# members}}",
+		"delete": "Delete",
+		"roles": "Roles",
+		"rolesHint": "Built-in roles cannot be edited yet. A role editor arrives with the manager screens.",
+		"systemRole": "Built-in",
+		"permissionCount": "{count, plural, one {# permission} other {# permissions}}"
 	}
 }

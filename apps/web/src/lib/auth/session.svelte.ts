@@ -1,5 +1,6 @@
 import { locale } from 'svelte-i18n';
 import type {
+	AcceptInvitationRequest,
 	AuthResponse,
 	LoginRequest,
 	Permission,
@@ -58,6 +59,14 @@ class SessionState {
 		this.adopt(await apiSend<AuthResponse>('/auth/register', 'POST', registration));
 	}
 
+	/**
+	 * Finishes an invitation. The token in the link is the credential, so this needs
+	 * no existing session — and acceptance signs the newcomer straight in.
+	 */
+	async acceptInvitation(request: AcceptInvitationRequest): Promise<void> {
+		this.adopt(await apiSend<AuthResponse>('/invitations/accept', 'POST', request));
+	}
+
 	async logout(): Promise<void> {
 		try {
 			await api('/auth/logout', { method: 'POST' });
@@ -65,6 +74,11 @@ class SessionState {
 			// Even if the call fails, drop the local session — the user asked to leave.
 			this.clear();
 		}
+	}
+
+	/** Keeps the sidebar and header current after the user edits their own profile. */
+	patch(changes: Partial<SessionUser>): void {
+		if (this.#user) this.#user = { ...this.#user, ...changes };
 	}
 
 	private adopt(response: AuthResponse): void {

@@ -11,6 +11,8 @@ const user: SessionUser = {
 	firstName: 'Ada',
 	lastName: 'Lovelace',
 	locale: 'en',
+	timezone: null,
+	jobTitle: null,
 	roleKeys: ['owner'],
 	organizationName: 'Acme',
 	organizationSlug: 'acme'

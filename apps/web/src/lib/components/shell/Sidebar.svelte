@@ -22,7 +22,11 @@
 	 * link the API would refuse — a convenience, not enforcement.
 	 */
 	const NAV: { href: string; key: string; permission?: Permission }[] = [
-		{ href: '/', key: 'nav.today', permission: 'attendance:read' }
+		{ href: '/', key: 'nav.today', permission: 'attendance:read' },
+		{ href: '/people', key: 'nav.people', permission: 'employee:read' },
+		{ href: '/settings/organization', key: 'nav.settings', permission: 'organization:manage' },
+		// Everyone has a profile — no permission gates your own account.
+		{ href: '/profile', key: 'nav.profile' }
 	];
 
 	const items = $derived(NAV.filter((item) => !item.permission || session.can(item.permission)));

@@ -16,6 +16,8 @@ const user: SessionUser = {
 	firstName: 'Lena',
 	lastName: 'Hartmann',
 	locale: 'en',
+	timezone: null,
+	jobTitle: null,
 	roleKeys: ['employee'],
 	organizationName: 'Acme GmbH',
 	organizationSlug: 'acme'
@@ -52,6 +54,24 @@ describe('Sidebar', () => {
 		renderSidebar([]);
 
 		expect(screen.queryByRole('link', { name: 'Today' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: 'People' })).not.toBeInTheDocument();
+		expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+	});
+
+	it('always offers Profile — nothing gates your own account', () => {
+		renderSidebar([]);
+
+		expect(screen.getByRole('link', { name: 'Profile' })).toHaveAttribute('href', '/profile');
+	});
+
+	it('adds People and Settings for the permissions that make them useful', () => {
+		renderSidebar(['employee:read', 'organization:manage']);
+
+		expect(screen.getByRole('link', { name: 'People' })).toHaveAttribute('href', '/people');
+		expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute(
+			'href',
+			'/settings/organization'
+		);
 	});
 
 	it('shows the clock state, the appearance setting and the user', () => {
@@ -60,8 +80,22 @@ describe('Sidebar', () => {
 		expect(screen.getByText('Clocked out')).toBeInTheDocument();
 		expect(screen.getByRole('group', { name: 'Appearance' })).toBeInTheDocument();
 		expect(screen.getByText('Lena Hartmann')).toBeInTheDocument();
-		// `jobTitle` arrives in phase 1; the primary role stands in for it.
+		// No job title is recorded, so the primary role stands in for it.
 		expect(screen.getByText('Employee')).toBeInTheDocument();
+	});
+
+	it('prefers the job title over the role once one is recorded', () => {
+		vi.spyOn(session, 'can').mockReturnValue(true);
+		render(Sidebar, {
+			props: {
+				user: { ...user, jobTitle: 'Product Designer' },
+				clockState: 'out',
+				onSignOut: () => {}
+			}
+		});
+
+		expect(screen.getByText('Product Designer')).toBeInTheDocument();
+		expect(screen.queryByText('Employee')).not.toBeInTheDocument();
 	});
 
 	it('signs out through the caller', async () => {

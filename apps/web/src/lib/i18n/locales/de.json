@@ -3,7 +3,10 @@
 		"name": "Beacon"
 	},
 	"nav": {
-		"today": "Heute"
+		"today": "Heute",
+		"people": "Personen",
+		"profile": "Profil",
+		"settings": "Einstellungen"
 	},
 	"shell": {
 		"navLabel": "Hauptnavigation",
@@ -61,7 +64,10 @@
 		"network": "Der Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung.",
 		"unexpected": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
 		"checkFields": "Bitte prüfen Sie die markierten Felder.",
-		"organizationTooShort": "Verwenden Sie mindestens 2 Zeichen."
+		"organizationTooShort": "Verwenden Sie mindestens 2 Zeichen.",
+		"notFound": "Das konnten wir nicht finden.",
+		"forbidden": "Dafür fehlt Ihnen die Berechtigung.",
+		"inviteInvalid": "Dieser Einladungslink ist nicht mehr gültig."
 	},
 	"org": {
 		"label": "Organisation",
@@ -73,5 +79,112 @@
 		"admin": "Administrator",
 		"manager": "Manager",
 		"employee": "Mitarbeiter"
+	},
+	"profile": {
+		"kicker": "Ihr Konto",
+		"title": "Profil",
+		"details": "Beschäftigungsdaten",
+		"employeeNumber": "Personalnummer",
+		"email": "E-Mail",
+		"department": "Abteilung",
+		"team": "Team",
+		"startDate": "Eintrittsdatum",
+		"contract": "Vertrag",
+		"location": "Standort",
+		"phone": "Telefon",
+		"timezone": "Zeitzone",
+		"language": "Sprache",
+		"workModel": "Arbeitszeitmodell",
+		"workModelPending": "Ihr Arbeitszeitmodell und Ihre Stunden erscheinen hier, sobald die Zeiterfassung aktiv ist.",
+		"reportsTo": "Vorgesetzte Person",
+		"noManager": "Für Sie ist keine vorgesetzte Person hinterlegt.",
+		"access": "Zugriff",
+		"accessHint": "Ihre Rollen bestimmen, worauf Sie zugreifen können. Nur eine Administratorin oder ein Administrator kann sie ändern.",
+		"edit": "Angaben bearbeiten",
+		"editable": "Telefonnummer, Sprache und Zeitzone können Sie selbst ändern. Alles Weitere pflegt Ihre Organisation.",
+		"save": "Änderungen speichern",
+		"saving": "Wird gespeichert…",
+		"saved": "Ihr Profil wurde aktualisiert.",
+		"cancel": "Abbrechen"
+	},
+	"people": {
+		"kicker": "Organisation",
+		"title": "Personen",
+		"subtitle": "Alle Personen in {organization}.",
+		"search": "Nach Name oder E-Mail suchen",
+		"allDepartments": "Alle Abteilungen",
+		"count": "{count, plural, one {# Person} other {# Personen}}",
+		"empty": "Zu diesem Filter passt noch niemand.",
+		"loading": "Personen werden geladen…",
+		"columnName": "Name",
+		"columnRole": "Position",
+		"columnDepartment": "Abteilung",
+		"columnStatus": "Status",
+		"openProfile": "Profil öffnen",
+		"backToPeople": "Zurück zu Personen",
+		"invite": "Person einladen",
+		"inviteTitle": "Kollegin oder Kollegen einladen",
+		"inviteHint": "Die Person erhält einen Link, über den sie ein Passwort setzt. Er gilt 14 Tage.",
+		"inviteSend": "Einladung erstellen",
+		"inviteSending": "Wird erstellt…",
+		"inviteDone": "Einladung erstellt. Senden Sie diesen Link an {email} – er wird nur einmal angezeigt.",
+		"inviteCopy": "Link kopieren",
+		"inviteCopied": "Kopiert",
+		"pending": "Offene Einladungen",
+		"pendingEmpty": "Es sind keine Einladungen offen.",
+		"expiresOn": "Gültig bis {date}",
+		"expired": "Abgelaufen",
+		"accepted": "Angenommen",
+		"revoke": "Zurückziehen",
+		"disable": "Konto deaktivieren",
+		"disableConfirm": "{name} deaktivieren? Die Historie bleibt erhalten und das Konto kann später wieder aktiviert werden.",
+		"roles": "Rollen",
+		"manager": "Vorgesetzte Person",
+		"status": {
+			"invited": "Eingeladen",
+			"active": "Aktiv",
+			"disabled": "Deaktiviert"
+		},
+		"contract": {
+			"permanent-full-time": "Unbefristet · Vollzeit",
+			"permanent-part-time": "Unbefristet · Teilzeit",
+			"fixed-term-full-time": "Befristet · Vollzeit",
+			"fixed-term-part-time": "Befristet · Teilzeit"
+		},
+		"workLocation": {
+			"on-site": "Vor Ort",
+			"hybrid": "Hybrid",
+			"remote": "Remote"
+		},
+		"notSet": "Nicht hinterlegt"
+	},
+	"invite": {
+		"title": "Einladung annehmen",
+		"subtitle": "Wählen Sie ein Passwort – dann ist Ihr Konto fertig.",
+		"checking": "Ihre Einladung wird geprüft…",
+		"invalid": "Dieser Einladungslink ist nicht mehr gültig. Bitten Sie um einen neuen.",
+		"submit": "Konto erstellen",
+		"submitting": "Konto wird erstellt…"
+	},
+	"settings": {
+		"kicker": "Organisation",
+		"title": "Einstellungen",
+		"general": "Allgemein",
+		"generalHint": "Name, Sprache und Zeitzone, auf die alle zurückfallen.",
+		"name": "Name der Organisation",
+		"save": "Speichern",
+		"saving": "Wird gespeichert…",
+		"saved": "Einstellungen gespeichert.",
+		"departments": "Abteilungen",
+		"departmentsHint": "Abteilungen gruppieren Personen für Filter und Auswertungen.",
+		"departmentName": "Name der Abteilung",
+		"addDepartment": "Abteilung hinzufügen",
+		"noDepartments": "Noch keine Abteilungen.",
+		"members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+		"delete": "Löschen",
+		"roles": "Rollen",
+		"rolesHint": "Die eingebauten Rollen sind noch nicht bearbeitbar. Ein Rolleneditor kommt mit den Manager-Ansichten.",
+		"systemRole": "Eingebaut",
+		"permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}"
 	}
 }

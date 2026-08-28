@@ -12,8 +12,8 @@
 
 	let { kicker, title }: Props = $props();
 
-	// Phase 1 adds `User.timezone`; until then this is the browser's own zone.
-	const timezone = $derived(resolveTimezone(null));
+	// The user's own zone when they have set one, the browser's otherwise.
+	const timezone = $derived(resolveTimezone(session.user?.timezone));
 	const lang = $derived($locale ?? session.user?.locale ?? 'en');
 
 	// Read once per render rather than ticking — the header shows a date, not a clock.
