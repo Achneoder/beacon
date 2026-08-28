@@ -1,0 +1,69 @@
+{
+  "name": "api",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint": "oxlint src/ test/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
+    "mikro-orm": "tsx node_modules/@mikro-orm/cli/esm.js"
+  },
+  "dependencies": {
+    "@beacon/shared": "workspace:*",
+    "@mikro-orm/core": "^6.4.2",
+    "@mikro-orm/migrations": "^6.4.2",
+    "@mikro-orm/nestjs": "^6.0.2",
+    "@mikro-orm/postgresql": "^6.4.2",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^12.0.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "minio": "^8.0.4",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@mikro-orm/cli": "^6.4.2",
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/schematics": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-local": "^1.0.38",
+    "@types/supertest": "^7.0.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "oxlint": "^1.58.0",
+    "prettier": "^3.4.2",
+    "source-map-support": "^0.5.21",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.2",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.1.2"
+  },
+  "mikro-orm": {
+    "configPaths": [
+      "./src/mikro-orm.cli.ts",
+      "./dist/mikro-orm.cli.js"
+    ]
+  }
+}
