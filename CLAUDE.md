@@ -8,8 +8,8 @@ Beacon is an attendance / time-tracking, holiday-planning, employee-data and doc
 application for organizations. `README.md` holds the product spec; this file holds the working
 rules.
 
-The monorepo is scaffolded and green (build, lint, typecheck, unit tests, e2e) but holds no
-feature code yet — `Organization` is the only entity and `/api/health` the only endpoint.
+The monorepo is green (build, lint, typecheck, unit tests, e2e). Authentication and organization
+setup are implemented; attendance, holidays, employee data and documents are not.
 
 ## Layout
 
@@ -68,6 +68,11 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
 - **Check permissions, never role names.** Roles are customizable per organization.
   Handlers declare `@RequirePermissions(...)` from `apps/api/src/common/auth/`; the permission
   union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`.
+- **Requests are authenticated by default.** `JwtAuthGuard` and `PermissionsGuard` are registered
+  as `APP_GUARD`s in `app.module.ts`, in that order — 401 then 403. A new controller is protected
+  unless it opts out with `@Public()` (`apps/api/src/modules/auth/public.decorator.ts`). Read the
+  caller with `@CurrentUser()`, and resolve the tenant from `user.organizationId` — **never** take
+  an organization id from the client. `/api/organizations/current` is the shape to copy.
 - **Optional services sit behind interfaces.** Documents go through the abstract `StorageService`
   (`apps/api/src/common/storage/`), implemented by `MinioStorageService`. Inject `StorageService`;
   never import the `minio` SDK — or any other vendor SDK — from feature code. The same rule will
@@ -75,13 +80,38 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
   (`apps/web/src/lib/i18n/`, locales `en` + `de`). No hardcoded strings. Target WCAG 2.1.
 
+## Auth
+
+Email/password today; passkeys, social login and SSO are planned, which is why `User.passwordHash`
+is nullable and hashing sits behind `PasswordService` rather than calling `@node-rs/argon2` directly.
+
+- **Two tokens.** A 15-minute JWT access token (the SPA holds it in memory, never in
+  `localStorage`) and a 30-day opaque refresh token in an `HttpOnly` cookie. Only the SHA-256 hash
+  of the refresh token is stored. Refreshing rotates; replaying a spent token revokes the user's
+  whole token family.
+- **The access token carries the permission set**, so authorizing costs no query — the trade-off is
+  that a permission change only takes effect when the token expires. `/auth/me` re-reads from the
+  database, so the UI is not stale.
+- **Users are scoped to one organization**, and email is unique *per organization*, not globally.
+  One address may therefore exist in several tenants; `AuthService.login` picks the account whose
+  password matches rather than asking which organization up front.
+- **Web guards are UX only.** The redirects in `src/routes/(app)/+layout.svelte` are convenience;
+  the API re-checks every request. `session.can()` decides what to *offer*, never what to allow.
+
 ## MikroORM specifics
 
 Three non-obvious constraints, each of which caused a real failure during setup:
 
+- **A derived property must be named in `OptionalProps`.** `BaseEntity<Optional>` takes a type
+  parameter for this — `class User extends OrganizationScopedEntity<'permissions'>` keeps
+  `em.create()` from demanding the getter as input. The timestamps are already covered.
 - **Entities are registered explicitly** in `apps/api/src/entities.ts`, not by glob. Glob
   discovery would need to `require()` `.ts` sources, which breaks under ESM and Vitest. Add every
   new entity to `ENTITIES`.
+- **`@beacon/shared` is compiled.** It emits to `packages/shared/dist` (a `prepare` script builds
+  it on install) because `apps/api` imports runtime values from it — `DEFAULT_ROLES` — and plain
+  `node dist/main` cannot load `.ts`. The app scripts that execute Node rebuild it first. Type-only
+  imports never needed this; runtime ones do.
 - **Always declare property types explicitly** (`@Property({ type: 'string' })`). The CLI runs
   through `tsx`/esbuild, which does not emit decorator metadata, so reflection-based type
   inference is unavailable.

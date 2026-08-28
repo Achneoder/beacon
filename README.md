@@ -4,10 +4,11 @@ A web application for organizations and employees — or users in general — to
 time, manage breaks, plan holidays, maintain basic employee data, and store contracts and other
 documents.
 
-> **Status: scaffold.** The monorepo is set up and green (build, lint, typecheck, unit and e2e
-> tests), and the API runs against Postgres and MinIO. No feature code exists yet — `Organization`
-> is the only entity and `/api/health` the only endpoint. Everything under
-> [Features](#features) describes the intended product, not what ships today.
+> **Status: early.** The monorepo is green (build, lint, typecheck, unit and e2e tests) and the
+> first vertical slice ships: an organization can be created, its owner signs in, and every API
+> request is authenticated and permission-checked. Attendance, holidays, employee data and
+> documents are still to come — everything under [Features](#features) describes the intended
+> product, not what ships today.
 
 ## Quick start
 
@@ -31,7 +32,8 @@ pnpm --filter api start:dev   # http://localhost:3000/api
 pnpm --filter web dev         # http://localhost:5173
 ```
 
-`curl http://localhost:3000/api/health` should return `{"status":"ok","database":"up"}`.
+`curl http://localhost:3000/api/health` should return `{"status":"ok","database":"up"}`. Open
+http://localhost:5173, create an organization, and you are signed in as its owner.
 
 ### Local services
 
@@ -143,8 +145,17 @@ and authorization is checked against permissions rather than role names, so orga
 their own roles.
 
 Authentication supports multiple methods — email/password, passkeys, social login, and single sign-on
-(SSO) via OAuth2 or SAML — with two-factor authentication (2FA) for added security. *(Dependencies
-are in place; no strategies are implemented yet.)*
+(SSO) via OAuth2 or SAML — with two-factor authentication (2FA) for added security. *(Email/password
+is implemented; the rest are planned. `User.passwordHash` is nullable so an account can authenticate
+another way.)*
+
+Signing in returns a short-lived JWT access token, which the SPA keeps in memory only, plus a
+long-lived refresh token in an `HttpOnly` cookie. Refreshing rotates the token: the presented one is
+spent, and replaying it revokes every session the user has, on the assumption it leaked.
+
+Registration is self-service — `POST /api/auth/register` creates the organization, seeds its four
+built-in roles and makes the caller its owner, in one transaction. Set `AUTH_ALLOW_SIGNUP=false` to
+close it once the first organization exists.
 
 ### Additional services
 
