@@ -3,10 +3,21 @@
 		"name": "Beacon"
 	},
 	"nav": {
-		"dashboard": "Übersicht",
-		"attendance": "Anwesenheit",
-		"holidays": "Urlaub",
-		"documents": "Dokumente"
+		"today": "Heute"
+	},
+	"shell": {
+		"navLabel": "Hauptnavigation",
+		"skipToContent": "Zum Inhalt springen",
+		"status": {
+			"in": "Eingestempelt",
+			"break": "In der Pause",
+			"out": "Ausgestempelt"
+		}
+	},
+	"today": {
+		"kicker": "Übersicht",
+		"title": "Heute",
+		"empty": "Die Zeiterfassung kommt im nächsten Release. Ihre Uhr, der Tagesfortschritt und Ihre Zeitabschnitte erscheinen hier."
 	},
 	"theme": {
 		"label": "Darstellung",

@@ -3,10 +3,21 @@
 		"name": "Beacon"
 	},
 	"nav": {
-		"dashboard": "Dashboard",
-		"attendance": "Attendance",
-		"holidays": "Holidays",
-		"documents": "Documents"
+		"today": "Today"
+	},
+	"shell": {
+		"navLabel": "Main navigation",
+		"skipToContent": "Skip to content",
+		"status": {
+			"in": "Clocked in",
+			"break": "On break",
+			"out": "Clocked out"
+		}
+	},
+	"today": {
+		"kicker": "Overview",
+		"title": "Today",
+		"empty": "Time tracking arrives in the next release. Your clock, day progress and segments will show up here."
 	},
 	"theme": {
 		"label": "Appearance",
