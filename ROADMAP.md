@@ -43,7 +43,8 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | Shared time formatters (`H:MM`, `HH:MM:SS`) | shipped |
 | App shell (sidebar, status card, appearance, user card) | shipped |
 | People (users, invitations, departments, teams) | shipped |
-| Attendance, absence, employee data, documents | not started |
+| Attendance (clock, timesheet, corrections) | shipped |
+| Absence, employee data, documents | not started |
 | Storage (`StorageService` → MinIO) | interface + implementation, no callers |
 | Search, notifications, monitoring | not started |
 | Mobile, desktop | not created; frameworks undecided |
@@ -127,7 +128,7 @@ Two things settled while building, worth knowing before phase 2:
   The token is shown exactly once at creation — only its SHA-256 hash is stored — and
   `CreatedInvitation.acceptUrl` is the link to paste into an email until notifications exist.
 
-## Phase 2 — Attendance and time tracking
+## Phase 2 — Attendance and time tracking — **done**
 
 The canvas's Today and Timesheet screens, and the biggest expansion over the original plan.
 
@@ -181,6 +182,26 @@ The live counter ticks client-side from a server-supplied `startedAt` — never 
 count, or a sleeping laptop silently under-reports. Re-read `/attendance/me/today` on focus.
 
 Undesigned but required: `/approvals` for correction requests.
+
+Four things settled while building, worth knowing before phase 3:
+
+- **The overtime balance accrues past its cap.** `OvertimeSummary` reports
+  `capMinutes`, `overCap` and `overCapMinutes` rather than clamping. Minutes that were
+  genuinely worked are never dropped from the record — the cap is a signal for a
+  manager to act on, not a shredder.
+- **The balance is maintained through a day ledger.** `AttendanceDay` holds what one
+  finished day last contributed, so an amended day moves the running total by the
+  *difference* it made. An incremental `+= worked` would double-count the moment a
+  correction landed on a day already counted.
+- **Every entry stores its own local calendar date**, resolved from the user's zone
+  when the clock started. A week query would otherwise convert every row in SQL, and an
+  entry begun at 23:30 must not migrate to another day if the user later changes zone.
+- **The week lock is zone-aware.** `weekLocksAt(monday, offsetMinutes)` — "unlocked
+  until Monday 09:00" has to mean nine in the morning where the person works. Phase 3's
+  approval deadlines should take the same offset rather than assuming UTC.
+
+`TimesheetDay` already carries `absenceTag` and `credited`; both are inert until phase 3
+fills them, and `dayBalance()` in `packages/shared` already honours the credited rule.
 
 ## Phase 3 — Absence and the holiday calendar
 
