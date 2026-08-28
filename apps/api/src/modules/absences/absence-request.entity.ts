@@ -3,6 +3,7 @@ import type { AbsenceStatus } from '@beacon/shared';
 import { ABSENCE_STATUSES } from '@beacon/shared';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
 import { User } from '../users/user.entity.js';
+import { Document } from '../documents/document.entity.js';
 import { AbsenceType } from './absence-type.entity.js';
 
 /**
@@ -69,9 +70,11 @@ export class AbsenceRequest extends OrganizationScopedEntity {
   note: string | null = null;
 
   /**
-   * The sick note. Phase 4 owns `Document`, so this stays a bare id until then —
-   * the column exists now so the link does not need a migration later.
+   * The sick note. `set null` rather than `cascade`: a document tidied away by its
+   * owner must not silently strip the evidence from an approved absence — deletion is
+   * soft in `DocumentsService`, so this FK only fires on a hard delete that does not
+   * happen today.
    */
-  @Property({ type: 'uuid', nullable: true })
-  documentId: string | null = null;
+  @ManyToOne(() => Document, { ref: true, nullable: true, deleteRule: 'set null', fieldName: 'document_id' })
+  document: Ref<Document> | null = null;
 }

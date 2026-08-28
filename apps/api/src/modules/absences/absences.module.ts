@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { UsersModule } from '../users/users.module.js';
+import { DocumentsModule } from '../documents/documents.module.js';
 import { AbsenceRequest } from './absence-request.entity.js';
 import { AbsenceType } from './absence-type.entity.js';
 import { Holiday } from './holiday.entity.js';
@@ -14,6 +15,8 @@ import { AbsencesService } from './absences.service.js';
     MikroOrmModule.forFeature([AbsenceType, AbsenceRequest, LeaveBalance, Holiday]),
     // For `subordinateIdsOf` — "the people I approve for" is read in one place.
     UsersModule,
+    // For `findVisible` — a sick note's visibility is enforced in exactly one place.
+    DocumentsModule,
   ],
   controllers: [AbsencesController, AbsenceSettingsController],
   providers: [AbsencesService],

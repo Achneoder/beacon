@@ -46,4 +46,10 @@ export class CreateAbsenceDto implements CreateAbsenceRequest {
   @ValidateIf((_, value) => value !== null)
   @IsUUID()
   userId?: string | null;
+
+  /** The sick note — must already belong to whoever the absence is for. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  documentId?: string | null;
 }

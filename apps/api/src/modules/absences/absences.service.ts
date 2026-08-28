@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { ref } from '@mikro-orm/core';
+import { ref, type Ref } from '@mikro-orm/core';
 import {
   DEFAULT_ABSENCE_TYPES,
   absenceCostByYear,
@@ -28,6 +28,8 @@ import { localDate, resolveTimezone } from '../../common/time/zone.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
+import { DocumentsService } from '../documents/documents.service.js';
+import type { Document } from '../documents/document.entity.js';
 import { AbsenceRequest } from './absence-request.entity.js';
 import { AbsenceType } from './absence-type.entity.js';
 import { Holiday } from './holiday.entity.js';
@@ -61,6 +63,7 @@ export class AbsencesService {
   constructor(
     private readonly em: EntityManager,
     private readonly users: UsersService,
+    private readonly documents: DocumentsService,
   ) {}
 
   // ---------------------------------------------------------------- types
@@ -196,6 +199,21 @@ export class AbsencesService {
       throw new BadRequestException('that range contains no working days');
     }
 
+    // An invisible document is a 404 — that 404 *is* the enforcement. A manager
+    // cannot staple their own file to an employee's request: the document must
+    // belong to whoever the absence is for, not to whoever is raising it.
+    let document: Ref<Document> | null = null;
+    if (dto.documentId) {
+      const found = await this.documents.findVisible(
+        { id: caller.id, organizationId: caller.organizationId, canManage: false },
+        dto.documentId,
+      );
+      if (found.owner?.id !== subjectId) {
+        throw new BadRequestException('the document belongs to someone else');
+      }
+      document = ref(found);
+    }
+
     const user = await this.users.findEntity(caller.organizationId, subjectId);
     const absence = this.em.create(AbsenceRequest, {
       organization: this.em.getReference(Organization, caller.organizationId, { wrapped: true }),
@@ -206,10 +224,11 @@ export class AbsencesService {
       costDays: type.deductsFromQuota ? absenceCostDays(request, holidays) : 0,
       approver: user.manager,
       note: dto.note ?? null,
+      document,
     });
 
     await this.em.flush();
-    await this.em.populate(absence, ['user', 'type', 'approver']);
+    await this.em.populate(absence, ['user', 'type', 'approver', 'document']);
 
     return toAbsenceSummary(absence, holidays);
   }
@@ -235,7 +254,7 @@ export class AbsencesService {
     if (filter.status) where.status = filter.status;
 
     const requests = await this.em.find(AbsenceRequest, where, {
-      populate: ['user', 'type', 'approver'],
+      populate: ['user', 'type', 'approver', 'document'],
       orderBy: { startsOn: 'desc' },
     });
 
@@ -274,7 +293,7 @@ export class AbsencesService {
     const request = await this.em.findOne(
       AbsenceRequest,
       { id: requestId, organization: caller.organizationId },
-      { populate: ['user', 'type', 'approver'] },
+      { populate: ['user', 'type', 'approver', 'document'] },
     );
     if (!request) throw new NotFoundException('request not found');
     if (request.status !== 'pending') {
@@ -321,7 +340,7 @@ export class AbsencesService {
         startsOn: { $lte: to },
         endsOn: { $gte: from },
       },
-      { populate: ['user', 'type', 'approver'], orderBy: { startsOn: 'asc' } },
+      { populate: ['user', 'type', 'approver', 'document'], orderBy: { startsOn: 'asc' } },
     );
     await this.settleTaken(caller.organizationId, requests);
 
@@ -661,6 +680,7 @@ export function toAbsenceSummary(
   const user = request.user.getEntity();
   const type = request.type.getEntity();
   const approver = request.approver?.getEntity() ?? null;
+  const document = request.document?.getEntity() ?? null;
 
   return {
     id: request.id,
@@ -686,7 +706,8 @@ export function toAbsenceSummary(
     decidedAt: request.decidedAt?.toISOString() ?? null,
     decisionNote: request.decisionNote,
     note: request.note,
-    documentId: request.documentId,
+    documentId: document?.id ?? null,
+    documentTitle: document?.title ?? null,
     createdAt: request.createdAt.toISOString(),
   };
 }
