@@ -1,3 +1,4 @@
+import { raw } from '@mikro-orm/core';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { DepartmentSummary } from '@beacon/shared';
@@ -85,10 +86,14 @@ export class DepartmentsService {
   private async memberCounts(organizationId: string): Promise<Map<string, number>> {
     const rows = await this.em
       .createQueryBuilder(User, 'u')
-      .select(['u.department_id as department_id', 'count(*) as count'])
+      // Raw fragments: `select()` treats a plain string as a property name and
+      // would quote the aggregate into "u"."count(*)", which is not a column.
+      .select([raw('u.department_id as department_id'), raw('count(*) as count')])
       .where({ organization: organizationId, department: { $ne: null } })
       .groupBy('u.department_id')
-      .execute<{ department_id: string; count: string }[]>();
+      // `mapResults: false` keeps the SQL aliases: the default maps rows back onto
+      // entity property names and the aggregate is lost on the way.
+      .execute<{ department_id: string; count: string }[]>('all', false);
 
     return new Map(rows.map((row) => [row.department_id, Number(row.count)]));
   }

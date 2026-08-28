@@ -195,6 +195,35 @@ describe('People (e2e)', () => {
     });
   });
 
+  /**
+   * The member count is a grouped aggregate, and the query builder quotes a plain
+   * select string as a property name — so `count(*)` only breaks when the *list*
+   * endpoints run. Creating a department never touched that SQL, which is how a 500
+   * on the settings screen went unnoticed.
+   */
+  describe('department and team listings', () => {
+    it('counts the people filed under each', async () => {
+      const departments = await request(app.getHttpServer())
+        .get('/api/departments')
+        .set(auth())
+        .expect(200);
+
+      // Grace was filed under Engineering / Platform above.
+      expect(departments.body).toContainEqual(
+        expect.objectContaining({ id: departmentId, name: 'Engineering', memberCount: 1 }),
+      );
+
+      const teams = await request(app.getHttpServer())
+        .get('/api/teams')
+        .set(auth())
+        .expect(200);
+
+      expect(teams.body).toContainEqual(
+        expect.objectContaining({ id: teamId, name: 'Platform', memberCount: 1 }),
+      );
+    });
+  });
+
   describe('invitations', () => {
     let token: string;
     let invitationId: string;
