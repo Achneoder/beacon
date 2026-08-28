@@ -72,3 +72,13 @@ export interface OrganizationSummary {
   defaultLocale: string;
   timezone: string;
 }
+
+/**
+ * Beacon is installed for one organization, not run as a multi-tenant service: the
+ * first registration creates it and closes the door behind itself. The login and
+ * register screens ask for this before offering to create anything.
+ */
+export interface SetupState {
+  /** True only while no organization exists — that is, while registration would succeed. */
+  setupRequired: boolean;
+}
