@@ -15,6 +15,9 @@ export const API_URL = `http://localhost:${API_PORT}/api`;
 export const MAILPIT_SMTP_PORT = 51025;
 export const MAILPIT_URL = 'http://localhost:58025';
 
+export const SEARCH_PORT = 57700;
+export const SEARCH_URL = `http://localhost:${SEARCH_PORT}`;
+
 export const DATABASE_URL = 'postgresql://beacon:beacon@localhost:55432/beacon_e2e';
 
 export const COMPOSE_FILE = '../../infra/docker-compose.e2e.yml';
@@ -50,6 +53,16 @@ export const API_ENV = {
 	STORAGE_SECRET_KEY: 'beacon-secret',
 	STORAGE_BUCKET: 'beacon-e2e',
 	STORAGE_ENCRYPTION: 'none',
+
+	// The throwaway Meilisearch. The index name has to end in -e2e or the reset guard
+	// in apps/api/test/search.ts refuses to run — the same rail the bucket and the
+	// database each have, and for the same reason: a stray apps/api/.env would
+	// otherwise aim a suite that wipes an index at the developer's own.
+	SEARCH_HOST: 'localhost',
+	SEARCH_PORT: String(SEARCH_PORT),
+	SEARCH_USE_SSL: 'false',
+	SEARCH_API_KEY: 'beacon-search-key',
+	SEARCH_INDEX: 'beacon-e2e',
 
 	// The throwaway Mailpit. Every invitation the suite creates lands there instead of
 	// a real inbox, and MAILPIT_URL is how a spec reads it back.
