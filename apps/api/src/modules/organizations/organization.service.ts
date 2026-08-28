@@ -1,0 +1,124 @@
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { EntityManager } from '@mikro-orm/postgresql';
+import { DEFAULT_ROLES, type OrganizationSummary, type RoleSummary } from '@beacon/shared';
+import { Organization } from './organization.entity.js';
+import { Role } from '../roles/role.entity.js';
+import { User, UserStatus } from '../users/user.entity.js';
+import { slugify, uniqueSlug } from './slug.js';
+import type { UpdateOrganizationDto } from './dto/update-organization.dto.js';
+
+export interface CreateOrganizationInput {
+  organizationName: string;
+  slug?: string;
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  locale?: string;
+  timezone?: string;
+}
+
+/** The role every founder gets — it is the only one holding organization:manage. */
+const OWNER_ROLE_KEY = 'owner';
+
+@Injectable()
+export class OrganizationService {
+  constructor(private readonly em: EntityManager) {}
+
+  /**
+   * Bootstraps a tenant: the organization, its four built-in roles, and the owner —
+   * all or nothing, because an organization without an owner is unreachable.
+   */
+  async createWithOwner(input: CreateOrganizationInput): Promise<{ organization: Organization; user: User }> {
+    return this.em.transactional(async (em) => {
+      const requested = input.slug ?? slugify(input.organizationName);
+
+      if (input.slug && (await em.count(Organization, { slug: input.slug })) > 0) {
+        throw new ConflictException('slug already taken');
+      }
+
+      const slug = await uniqueSlug(
+        requested,
+        async (candidate) => (await em.count(Organization, { slug: candidate })) > 0,
+      );
+
+      const organization = em.create(Organization, {
+        name: input.organizationName,
+        slug,
+        defaultLocale: input.locale ?? 'en',
+        timezone: input.timezone ?? 'UTC',
+      });
+
+      const roles = Object.entries(DEFAULT_ROLES).map(([key, permissions]) =>
+        em.create(Role, {
+          organization,
+          key,
+          name: key,
+          permissions: [...permissions],
+          isSystem: true,
+        }),
+      );
+
+      const owner = em.create(User, {
+        organization,
+        email: input.email.toLowerCase(),
+        passwordHash: input.passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        status: UserStatus.Active,
+        locale: input.locale ?? organization.defaultLocale,
+      });
+
+      const ownerRole = roles.find((role) => role.key === OWNER_ROLE_KEY);
+      if (ownerRole) owner.roles.add(ownerRole);
+
+      return { organization, user: owner };
+    });
+  }
+
+  async findById(organizationId: string): Promise<Organization> {
+    const organization = await this.em.findOne(Organization, { id: organizationId });
+    if (!organization) throw new NotFoundException('organization not found');
+
+    return organization;
+  }
+
+  async update(organizationId: string, changes: UpdateOrganizationDto): Promise<Organization> {
+    const organization = await this.findById(organizationId);
+
+    if (changes.name !== undefined) organization.name = changes.name;
+    if (changes.defaultLocale !== undefined) organization.defaultLocale = changes.defaultLocale;
+    if (changes.timezone !== undefined) organization.timezone = changes.timezone;
+
+    await this.em.flush();
+
+    return organization;
+  }
+
+  /** Always scoped by organization — there is no cross-tenant role listing. */
+  async listRoles(organizationId: string): Promise<RoleSummary[]> {
+    const roles = await this.em.find(
+      Role,
+      { organization: organizationId },
+      { orderBy: { key: 'asc' } },
+    );
+
+    return roles.map((role) => ({
+      id: role.id,
+      key: role.key,
+      name: role.name,
+      permissions: role.permissions,
+      isSystem: role.isSystem,
+    }));
+  }
+}
+
+export function toOrganizationSummary(organization: Organization): OrganizationSummary {
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    defaultLocale: organization.defaultLocale,
+    timezone: organization.timezone,
+  };
+}

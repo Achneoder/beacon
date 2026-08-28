@@ -1,6 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
+import { Public } from '../auth/public.decorator.js';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly orm: MikroORM) {}
