@@ -108,7 +108,17 @@
 		"absenceDecided": "That request has already been decided.",
 		"absenceOwnDecision": "You cannot decide your own request.",
 		"absencePendingOnly": "Only a request nobody has decided yet can be withdrawn.",
-		"absenceNotYours": "That request belongs to someone else."
+		"absenceNotYours": "That request belongs to someone else.",
+		"documentType": "Only PDF, DOCX and JPG files are accepted.",
+		"documentTooLarge": "That file is over the 20 MB limit.",
+		"documentFileRequired": "Choose a file to upload.",
+		"documentNotFound": "We could not find that document.",
+		"documentNotWritable": "You do not have permission to add a version to this document.",
+		"documentNotYours": "That belongs to someone else's documents.",
+		"documentRetained": "This document is under retention and cannot be deleted yet.",
+		"documentStorageDown": "The document store is unavailable. Try again shortly.",
+		"documentVersionRace": "Another version was uploaded at the same time. Try again.",
+		"documentCategoryKey": "That key is already in use."
 	},
 	"org": {
 		"label": "Organization",

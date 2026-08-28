@@ -108,7 +108,17 @@
 		"absenceDecided": "Über diesen Antrag wurde bereits entschieden.",
 		"absenceOwnDecision": "Du kannst nicht über deinen eigenen Antrag entscheiden.",
 		"absencePendingOnly": "Nur ein noch nicht entschiedener Antrag kann zurückgezogen werden.",
-		"absenceNotYours": "Dieser Antrag gehört jemand anderem."
+		"absenceNotYours": "Dieser Antrag gehört jemand anderem.",
+		"documentType": "Es werden nur PDF-, DOCX- und JPG-Dateien akzeptiert.",
+		"documentTooLarge": "Diese Datei überschreitet das Limit von 20 MB.",
+		"documentFileRequired": "Wählen Sie eine Datei zum Hochladen aus.",
+		"documentNotFound": "Wir konnten dieses Dokument nicht finden.",
+		"documentNotWritable": "Sie haben keine Berechtigung, diesem Dokument eine Version hinzuzufügen.",
+		"documentNotYours": "Das gehört zu den Dokumenten einer anderen Person.",
+		"documentRetained": "Dieses Dokument unterliegt einer Aufbewahrungsfrist und kann noch nicht gelöscht werden.",
+		"documentStorageDown": "Der Dokumentenspeicher ist nicht erreichbar. Versuchen Sie es in Kürze erneut.",
+		"documentVersionRace": "Es wurde gleichzeitig eine weitere Version hochgeladen. Versuchen Sie es erneut.",
+		"documentCategoryKey": "Dieser Schlüssel wird bereits verwendet."
 	},
 	"org": {
 		"label": "Organisation",
