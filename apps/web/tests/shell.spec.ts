@@ -9,6 +9,7 @@ const NAV = [
 	{ label: 'Today', url: '/', heading: 'Today' },
 	{ label: 'Timesheet', url: '/timesheet', heading: 'Timesheet' },
 	{ label: 'Calendar', url: '/calendar', heading: 'Calendar' },
+	{ label: 'Documents', url: '/documents', heading: 'Documents' },
 	{ label: 'Approvals', url: '/approvals', heading: 'Approvals' },
 	{ label: 'People', url: '/people', heading: 'People' },
 	{ label: 'Settings', url: '/settings/organization', heading: 'Settings' },

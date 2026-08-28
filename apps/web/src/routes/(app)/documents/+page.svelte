@@ -101,7 +101,12 @@
 	async function submitUpload(event: SubmitEvent) {
 		event.preventDefault();
 
-		if (!pendingFile || !uploadTitle.trim() || !uploadCategoryId) {
+		// Falls back to the first category rather than trusting uploadCategoryId alone
+		// — it is set once, when the file is chosen, and categories can still be
+		// loading at that moment.
+		const categoryId = uploadCategoryId || categories[0]?.id || '';
+
+		if (!pendingFile || !uploadTitle.trim() || !categoryId) {
 			uploadErrorKey = 'errors.checkFields';
 			return;
 		}
@@ -112,7 +117,7 @@
 		try {
 			await uploadDocument(pendingFile, {
 				title: uploadTitle.trim(),
-				categoryId: uploadCategoryId
+				categoryId
 			});
 			notice = 'documents.upload.done';
 			pendingFile = null;
@@ -320,7 +325,7 @@
 	</Card>
 {/if}
 
-{#if canWrite}
+{#if canWrite && categories.length > 0}
 	<Card variant="panel" as="section" class="mt-5">
 		{#if pendingFile}
 			<h2 class="text-sm font-bold">{$_('documents.upload.title')}</h2>
