@@ -4,9 +4,15 @@ import { waitLocale } from 'svelte-i18n';
 import '$lib/i18n';
 import RegisterPage from './+page.svelte';
 import { session } from '$lib/auth/session.svelte';
+import { ApiError } from '$lib/api/client';
 
 const goto = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto }));
+
+// The screen asks the API whether this installation still needs an organization; these
+// specs are about the form, so it answers "yes" unless a test says otherwise.
+const setupRequired = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+vi.mock('$lib/auth/setup', () => ({ setupRequired }));
 
 const VALID = {
 	'Organization name': 'Acme',
@@ -19,6 +25,7 @@ const VALID = {
 
 beforeEach(async () => {
 	goto.mockClear();
+	setupRequired.mockResolvedValue(true);
 	await waitLocale('en');
 });
 afterEach(() => vi.restoreAllMocks());
@@ -130,6 +137,32 @@ describe('register page validation', () => {
 		await submit();
 
 		expect(await screen.findByRole('alert')).toBeInTheDocument();
+		expect(goto).not.toHaveBeenCalled();
+	});
+});
+
+describe('register page once the instance is installed', () => {
+	it('replaces the form with an explanation', async () => {
+		setupRequired.mockResolvedValue(false);
+		render(RegisterPage);
+
+		expect(await screen.findByText('Beacon is already set up')).toBeInTheDocument();
+		expect(screen.queryByLabelText('Organization name')).not.toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+	});
+
+	/**
+	 * The check is a courtesy — the API is what refuses. Somebody who submits before the
+	 * answer lands, or against an instance claimed a second ago, gets the same screen.
+	 */
+	it('closes when the API answers 409 mid-submit', async () => {
+		vi.spyOn(session, 'register').mockRejectedValue(new ApiError(409, 'already installed'));
+		render(RegisterPage);
+
+		await fill(VALID);
+		await submit();
+
+		expect(await screen.findByText('Beacon is already set up')).toBeInTheDocument();
 		expect(goto).not.toHaveBeenCalled();
 	});
 });

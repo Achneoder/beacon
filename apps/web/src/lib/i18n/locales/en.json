@@ -82,7 +82,10 @@
 		"lastName": "Last name",
 		"passwordHint": "At least 12 characters.",
 		"submit": "Create organization",
-		"submitting": "Creating…"
+		"submitting": "Creating…",
+		"closedTitle": "Beacon is already set up",
+		"closedSubtitle": "This installation has its organization.",
+		"closedBody": "Beacon runs one organization per installation, and this one has been created. Ask an administrator to invite you, then sign in with the link in your invitation."
 	},
 	"errors": {
 		"required": "This field is required.",
@@ -90,7 +93,6 @@
 		"passwordTooShort": "Use at least 12 characters.",
 		"passwordMismatch": "The passwords do not match.",
 		"invalidCredentials": "That email and password do not match an account.",
-		"signupDisabled": "Self-service signup is turned off for this deployment.",
 		"conflict": "That name is already taken.",
 		"rateLimited": "Too many attempts. Wait a minute and try again.",
 		"network": "Could not reach the server. Check your connection.",

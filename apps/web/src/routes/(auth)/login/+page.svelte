@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
 	import { Alert, Button, Card, Eyebrow, TextField } from '$lib/components/ui';
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
+	import { setupRequired } from '$lib/auth/setup';
 	import { validateLogin, type LoginFields } from '$lib/auth/validation';
 
 	const FIELD_IDS: Record<keyof LoginFields, string> = {
@@ -17,6 +19,16 @@
 	let submitting = $state(false);
 	/** Hidden until the first submit, so a half-typed address is not called wrong. */
 	let showErrors = $state(false);
+	/**
+	 * Only an unclaimed installation can create an organization, and only its very first
+	 * visitor ever sees this. Everyone else joins by invitation, so the link stays hidden
+	 * until the API says the instance still needs an owner.
+	 */
+	let offerSetup = $state(false);
+
+	onMount(async () => {
+		offerSetup = await setupRequired();
+	});
 
 	const errors = $derived(validateLogin({ email, password }));
 
@@ -95,10 +107,12 @@
 		</Button>
 	</form>
 
-	<p class="mt-5 text-sm text-ink-muted">
-		{$_('auth.noAccount')}
-		<a href="/register" class="font-semibold text-accent-on-soft hover:underline">
-			{$_('auth.createOrganization')}
-		</a>
-	</p>
+	{#if offerSetup}
+		<p class="mt-5 text-sm text-ink-muted">
+			{$_('auth.noAccount')}
+			<a href="/register" class="font-semibold text-accent-on-soft hover:underline">
+				{$_('auth.createOrganization')}
+			</a>
+		</p>
+	{/if}
 </Card>

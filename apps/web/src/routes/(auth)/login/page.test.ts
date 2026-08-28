@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { waitLocale } from 'svelte-i18n';
 import '$lib/i18n';
@@ -8,8 +8,12 @@ import { session } from '$lib/auth/session.svelte';
 const goto = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto }));
 
+const setupRequired = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
+vi.mock('$lib/auth/setup', () => ({ setupRequired }));
+
 beforeEach(async () => {
 	goto.mockClear();
+	setupRequired.mockResolvedValue(false);
 	await waitLocale('en');
 });
 afterEach(() => vi.restoreAllMocks());
@@ -44,6 +48,24 @@ describe('login page', () => {
 			password: 'correct-horse-battery'
 		});
 		expect(goto).toHaveBeenCalledWith('/');
+	});
+
+	/** Everyone but the very first visitor arrives by invitation, not by signing up. */
+	it('hides the setup link once the instance has its organization', async () => {
+		render(LoginPage);
+
+		await waitFor(() => expect(setupRequired).toHaveBeenCalled());
+		expect(screen.queryByRole('link', { name: 'Create one' })).not.toBeInTheDocument();
+	});
+
+	it('offers setup while the instance is still unclaimed', async () => {
+		setupRequired.mockResolvedValue(true);
+		render(LoginPage);
+
+		expect(await screen.findByRole('link', { name: 'Create one' })).toHaveAttribute(
+			'href',
+			'/register'
+		);
 	});
 
 	it('announces a rejected sign-in and stays put', async () => {

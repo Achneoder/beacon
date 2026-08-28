@@ -13,7 +13,7 @@ export function errorKey(error: unknown): string {
 		case 401:
 			return 'errors.invalidCredentials';
 		case 403:
-			return 'errors.signupDisabled';
+			return 'errors.forbidden';
 		case 409:
 			return 'errors.conflict';
 		case 429:
