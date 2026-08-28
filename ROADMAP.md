@@ -45,8 +45,9 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | People (users, invitations, departments, teams) | shipped |
 | Attendance (clock, timesheet, corrections) | shipped |
 | Absence (calendar, quota, approvals, public holidays) | shipped |
-| Employee data, documents | not started |
-| Storage (`StorageService` → MinIO) | interface + implementation, no callers |
+| Documents (categories, versions, access grants) | shipped |
+| Employee data | not started |
+| Storage (`StorageService` → MinIO) | shipped — `DocumentsService` is its first caller |
 | SSO (OIDC), 2FA, passkeys | not started — phase 7 specifies SSO |
 | Search, notifications, monitoring | not started |
 | Mobile, desktop | not created; frameworks undecided |
@@ -297,7 +298,7 @@ scope is *your own days* — widening to reports and then the organization needs
 and every day cell is a real `<button>`, since the canvas's two-click range selection
 is hover-only and would otherwise be unreachable by keyboard.
 
-## Phase 4 — Documents
+## Phase 4 — Documents — **done**
 
 The first consumer of `StorageService`. Feature code injects the abstract class; the `minio` SDK
 stays behind `MinioStorageService`.
@@ -322,21 +323,58 @@ query slips.
 | `GET /documents/:id`, `GET /documents/:id/versions` | `document:read` |
 | `GET /documents/:id/download` → signed URL | `document:read` |
 | `PATCH /documents/:id`, `DELETE /documents/:id`, `POST /documents/:id/access` | `document:manage` |
-| `GET/POST /document-categories` | `organization:manage` |
+| `GET /document-categories` | `document:read` — see below |
+| `POST /document-categories`, `DELETE /document-categories/:id` | `organization:manage` |
 
-Downloads hand back a short-lived `signedUrl()` rather than proxying bytes. The canvas states the
-upload contract in the dropzone — **pdf · docx · jpg, max 20 MB, encrypted at rest** — so enforce
-the allowlist and cap in the controller and turn on server-side encryption on the bucket. Virus
-scanning is a later hook on the same seam.
+Downloads hand back a short-lived `signedUrl()` rather than proxying bytes. The upload contract —
+**pdf · docx · jpg, max 20 MB** — is enforced by content sniffing, not the client's declared type;
+**encrypted at rest** is opt-in (`STORAGE_ENCRYPTION=sse-s3`, default `none`) because the bundled dev
+MinIO runs no KMS, so the dropzone only claims encryption when the backend has actually confirmed
+it. Virus scanning is a later hook on the same seam.
 
-**Sick notes tie back to phase 3.** The canvas lists "Sick note 12 Aug 2026.pdf" as a category and
-the same date is a Sick leave day, so `AbsenceRequest.documentId` lets a request carry its
-evidence. The column already exists — phase 3 added it as a bare `uuid` so the link needs no
-migration — and it is unenforced until `Document` does.
+**Sick notes tie back to phase 3.** `AbsenceRequest.documentId` is now a real relation to
+`Document` — the FK the column was always meant for, added without touching the column. Attaching
+one goes through the same visibility check as every other read: an invisible document 404s, and one
+that belongs to someone other than the absence's subject is refused outright.
 
-**Web** — `/documents`: the category filter chip row (with `All` selected by default), a table of
-`icon · name + category · date · size · Open`, and the dashed dropzone below. Version history and
-the per-document access panel for `document:manage` are undesigned — take them to the canvas.
+**Web** — `/documents`: the category filter chip row (`All` selected by default), a table of
+`icon · name + category · date · size · Open`, and the dashed dropzone below. A row click expands
+an inline detail panel — version history, and an access panel behind `document:manage` — rather
+than a separate route; the canvas has no detail screen and the design system has no dialog
+primitive.
+
+Six things settled while building, worth knowing before the next phase that touches permissions,
+storage or this module:
+
+- **Visibility is resolved in exactly one place.** `DocumentsService`'s private
+  `accessContext()`/`findVisible()` is the only code that decides what a caller may see — own
+  documents, organization-wide ones (`owner === null`, not a second `visibility` column), and
+  anything granted via `DocumentAccess` to their user, department or role (read fresh from the
+  database on every call, never from the token, so a department move takes effect immediately).
+  A document the caller cannot see 404s; one they can see but may not write to 403s — existence
+  itself is the secret for a payslip or a sick note, and the two statuses are how the API stays
+  able to say so without confirming a guess.
+- **`document:write` reached `employee` and `admin` through a boot-time reconciler**, not a
+  migration. `OrganizationService` now re-syncs every `isSystem` role's permissions from
+  `DEFAULT_ROLES` on every start — safe because no route lets an organization edit a system role
+  yet, and durable for whatever permission the next phase adds. Revisit this the day a role editor
+  ships.
+- **`GET /document-categories` is gated on `document:read`, not `organization:manage`** — the same
+  correction phase 3 made for `attendance:read`. The category chip row is an employee screen;
+  gating its read behind an admin permission would have shipped it broken for everyone it exists
+  for. Writing a category is still an organization setting.
+- **The object always exists before the row that points at it.** Both ids are generated
+  client-side before any SQL, so the storage key is known before the upload happens; a storage
+  failure touches no row, and a database failure after a successful upload gets a best-effort
+  compensating delete. A stray object with nothing pointing at it is harmless; the reverse is not.
+  `versionNumber` is allocated under a pessimistic lock on the parent document, never `count() + 1`.
+- **The e2e suite needed a storage guard the same shape as its database one.** `apps/api/test/storage.ts`
+  mirrors `assertThrowawayDatabase()` — the suite refuses to run against any bucket not named
+  `*-e2e` — because the API-side vitest config had been pinning `DATABASE_URL` and `MAIL_*` to the
+  throwaway compose project but leaving `STORAGE_*` to point at `apps/api/.env`, the dev bucket.
+- **Delete is soft.** `deletedAt`/`deletedBy` are set and the bytes stay; a `retentionUntil` in the
+  future refuses the delete outright, so an employee's tidy-up cannot silently strip the evidence
+  behind an approved sick leave. No retention sweep exists yet — storage grows until one does.
 
 ## Phase 5 — Search
 
@@ -568,22 +606,23 @@ throwaway database up; CI needs Docker and `playwright install --with-deps chrom
 
 ```
 0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Clients
-                       └─ 3  Absence ────┘   (0–3 done)
+                       └─ 3  Absence ────┘   (0–4 done)
                        └─ 4  Documents ── 5  Search
 Cross-cutting: notifications + audit log after 3; auth expansion any time; hardening before launch.
 ```
 
-Phases 2/3 and 4 share only phase 1, so two people can run them in parallel. Phase 4 has a small
-dependency back on 3 (sick-note attachment) — build the entity link, ship the UI whenever 3 lands.
-Nothing in phases 0–4 changes the auth or tenancy model; if a phase seems to require that, stop and
-write it down as a question instead.
+Phases 2/3 and 4 share only phase 1, so two people can run them in parallel. Phase 4 had a small
+dependency back on 3 (sick-note attachment), landed once both entities existed. Nothing in phases
+0–4 changes the auth or tenancy model; if a phase seems to require that, stop and write it down as
+a question instead.
 
 ## Open design questions
 
 Take these back to the canvas before the phase that needs them:
 
 1. The manager/admin surface in full — approval queue, people directory, org and role settings,
-   team reports. Phases 1, 2, 3 and 6 all have an undesigned half.
+   team reports, the document version history and access panels. Phases 1, 2, 3, 4 and 6 all have
+   an undesigned half.
 2. What the sidebar looks like for a user with `attendance:approve` or `employee:manage` — the
    canvas only ever draws the five employee entries.
 3. Search: no entry point exists anywhere in the design.

@@ -8,8 +8,8 @@ Beacon is an attendance / time-tracking, holiday-planning, employee-data and doc
 application for organizations. `README.md` holds the product spec; this file holds the working
 rules.
 
-The monorepo is green (build, lint, typecheck, unit tests, e2e). Authentication and organization
-setup are implemented; attendance, holidays, employee data and documents are not.
+The monorepo is green (build, lint, typecheck, unit tests, e2e). Authentication, organization
+setup, attendance, holidays and documents are implemented; employee data is not.
 
 ## Layout
 
@@ -87,7 +87,9 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
   through `MailService` (`apps/api/src/common/mail/`), implemented by `SmtpMailService` — or by
   `LogMailService` when no `MAIL_HOST` is set. Inject the abstract class; never import the `minio`
   or `nodemailer` SDK — or any other vendor SDK — from feature code. The same rule will apply to
-  search and monitoring.
+  search and monitoring. Objects are encrypted at rest only when `STORAGE_ENCRYPTION=sse-s3` —
+  the bundled dev MinIO runs no KMS, so the default is `none` and `MinioStorageService` refuses to
+  finish booting if it asked for `sse-s3` and the bucket does not confirm it.
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
   (`apps/web/src/lib/i18n/`, locales `en` + `de`). No hardcoded strings. Target WCAG 2.1.
 
@@ -191,7 +193,9 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
   account through `POST /invitations`, which is what keeps one spec's clock-ins and absences
   out of another's. The API e2e specs instead reset the database in `beforeAll`
   (`apps/api/test/instance.ts`, guarded to databases named `*_e2e`) and run one file at a
-  time — `fileParallelism` is off in `vitest.config.e2e.ts`.
+  time — `fileParallelism` is off in `vitest.config.e2e.ts`. The object store gets the same
+  treatment: `apps/api/test/storage.ts` refuses to touch a bucket not named `*-e2e`, for the
+  same reason the database guard exists — a documents spec writes and deletes real objects.
 - **Rate limits are raised, not disabled.** A dozen parallel browsers sign in faster than any
   human; `THROTTLE_LIMIT` and `AUTH_THROTTLE_LIMIT` (see
   `apps/api/src/common/auth/throttle.ts`) are read from the real process environment, because
