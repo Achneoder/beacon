@@ -20,7 +20,8 @@
     "test:e2e": "node ../web/tests/services.mjs && vitest run --config ./vitest.config.e2e.ts",
     "mikro-orm": "tsx node_modules/@mikro-orm/cli/esm.js",
     "migration:up": "pnpm --filter @beacon/shared build && pnpm mikro-orm migration:up",
-    "test:reset-storage": "tsx test/reset-storage-cli.ts"
+    "test:reset-storage": "tsx test/reset-storage-cli.ts",
+    "test:reset-search": "tsx test/reset-search-cli.ts"
   },
   "dependencies": {
     "@beacon/shared": "workspace:*",
@@ -39,6 +40,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
+    "meilisearch": "^0.60.0",
     "minio": "^8.0.4",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.6",
