@@ -13,11 +13,13 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured'",
-    "test": "echo 'no tests'",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepare": "tsc"
   },
   "devDependencies": {
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
   },
   "files": [
     "dist"
