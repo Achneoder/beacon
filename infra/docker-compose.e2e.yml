@@ -1,0 +1,43 @@
+# Throwaway backing services for the browser e2e suite (apps/web/tests).
+#
+# Separate project name and separate ports from infra/docker-compose.yml, so a running
+# dev stack is never touched and never collides. Every volume is a tmpfs: the suite
+# registers real organizations on every run and the data is meant to die with the
+# container.
+name: beacon-e2e
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: beacon
+      POSTGRES_PASSWORD: beacon
+      POSTGRES_DB: beacon_e2e
+    ports:
+      - '55432:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U beacon -d beacon_e2e']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # StorageService connects on boot (it creates its bucket), so the API will not start
+  # without an object store — even though no feature writes to it yet.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: beacon
+      MINIO_ROOT_PASSWORD: beacon-secret
+    ports:
+      - '59000:9000'
+      - '59001:9001'
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 2s
+      timeout: 3s
+      retries: 30
