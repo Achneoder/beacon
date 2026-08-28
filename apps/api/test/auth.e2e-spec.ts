@@ -6,9 +6,12 @@ import { MikroORM } from '@mikro-orm/core';
 import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/main.js';
-import { Organization } from '../src/modules/organizations/organization.entity.js';
+import { resetInstance } from './instance.js';
 
-/** Every run gets its own tenant, so repeated runs never collide. */
+/**
+ * Names are still run-unique, so a failed run leaving data behind is easy to read in
+ * the database — the reset in `beforeAll` is what actually keeps runs from colliding.
+ */
 const RUN = Date.now().toString(36);
 const ORG_NAME = `Acme ${RUN}`;
 const EMAIL = `owner.${RUN}@acme.test`;
@@ -34,27 +37,23 @@ describe('Auth (e2e)', () => {
     app = configureApp(moduleRef.createNestApplication());
     await app.init();
     orm = app.get(MikroORM);
+    // Registration installs the instance and then refuses forever, so every file has to
+    // start from an empty database. Files run one at a time — see vitest.config.e2e.ts.
+    await resetInstance(orm);
   });
 
   afterAll(async () => {
-    // Cascades through roles, users and refresh tokens via the organization.
-    if (orm && organizationId) {
-      const em = orm.em.fork();
-      await em.nativeDelete('refresh_tokens', { organization_id: organizationId });
-      // Scoped by subquery: these pivots carry no organization_id of their own, and
-      // deleting them unfiltered wipes every account's roles in the whole database.
-      await em.getConnection().execute(
-        'delete from user_roles where role_id in (select id from roles where organization_id = ?)',
-        [organizationId],
-      );
-      await em.nativeDelete('users', { organization_id: organizationId });
-      await em.nativeDelete('roles', { organization_id: organizationId });
-      await em.nativeDelete(Organization, { id: organizationId });
-    }
+    // Nothing to tear down: the next file resets the database before it installs.
     await app?.close();
   });
 
   describe('registration', () => {
+    it('reports an instance that still needs its organization', async () => {
+      const response = await request(app.getHttpServer()).get('/api/auth/setup').expect(200);
+
+      expect(response.body).toEqual({ setupRequired: true });
+    });
+
     it('creates the organization, its owner and a session', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/auth/register')
@@ -83,6 +82,26 @@ describe('Auth (e2e)', () => {
       accessToken = response.body.accessToken;
       firstCookie = refreshCookie(response);
       organizationId = response.body.user.organizationId;
+    });
+
+    /**
+     * The whole point of the change: Beacon is installed for one organization, so the
+     * door closes behind the first one and self-service signup ends with it.
+     */
+    it('refuses a second organization once one exists', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          organizationName: `Interloper ${RUN}`,
+          email: `interloper.${RUN}@acme.test`,
+          password: PASSWORD,
+          firstName: 'Mal',
+          lastName: 'Lory',
+        })
+        .expect(409);
+
+      const state = await request(app.getHttpServer()).get('/api/auth/setup').expect(200);
+      expect(state.body).toEqual({ setupRequired: false });
     });
 
     it('rejects a password below the minimum length', async () => {

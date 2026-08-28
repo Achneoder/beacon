@@ -12,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { PASSWORD_THROTTLE } from '../../common/auth/throttle.js';
 import type { Request, Response } from 'express';
-import type { AuthResponse, AuthenticatedUser, SessionUser } from '@beacon/shared';
+import type { AuthResponse, AuthenticatedUser, SessionUser, SetupState } from '@beacon/shared';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { AuthService, type IssuedSession } from './auth.service.js';
 import { Public } from './public.decorator.js';
@@ -27,6 +27,17 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Public, and readable before anyone has an account: the login and register screens
+   * need to know whether this installation still has an owner to create.
+   */
+  @Public()
+  @Get('setup')
+  setup(): Promise<SetupState> {
+    return this.auth.setupState();
+  }
+
+  /** Installs the instance. Succeeds exactly once — see `AuthService.register`. */
   @Public()
   @Throttle(PASSWORD_THROTTLE)
   @Post('register')

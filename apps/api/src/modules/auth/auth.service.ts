@@ -1,9 +1,9 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { createHash, randomBytes } from 'node:crypto';
-import type { AuthResponse, SessionUser } from '@beacon/shared';
+import type { AuthResponse, SessionUser, SetupState } from '@beacon/shared';
 import { OrganizationService } from '../organizations/organization.service.js';
 import { User, UserStatus } from '../users/user.entity.js';
 import { RefreshToken } from './refresh-token.entity.js';
@@ -37,11 +37,12 @@ export class AuthService {
     private readonly organizations: OrganizationService,
   ) {}
 
+  /**
+   * First run only. `OrganizationService.createWithOwner` refuses once an organization
+   * exists, so this endpoint installs the instance and then permanently 409s — Beacon
+   * is deployed for one organization and everybody after the owner is invited.
+   */
   async register(dto: RegisterDto, userAgent?: string): Promise<IssuedSession> {
-    if ((this.config.get<string>('AUTH_ALLOW_SIGNUP') ?? 'true') !== 'true') {
-      throw new ForbiddenException('signup is disabled');
-    }
-
     const passwordHash = await this.passwords.hash(dto.password);
     const { user } = await this.organizations.createWithOwner({ ...dto, passwordHash });
 
@@ -50,33 +51,26 @@ export class AuthService {
     return this.issueSession(user, userAgent);
   }
 
+  /** Whether the register screen still has anything to offer. */
+  async setupState(): Promise<SetupState> {
+    return { setupRequired: await this.organizations.isSetupRequired() };
+  }
+
   /**
-   * Email is unique per organization, not globally, so one address may exist in several
-   * tenants. Rather than asking which organization up front, the password decides: the
-   * account whose hash matches wins. Candidates are checked newest-first.
+   * Email is unique per organization, and an installation holds exactly one, so an
+   * address identifies at most one account.
    */
   async login(dto: LoginDto, userAgent?: string): Promise<IssuedSession> {
-    const email = dto.email.toLowerCase();
-    const candidates = await this.em.find(
+    const user = await this.em.findOne(
       User,
-      { email },
-      { populate: ['roles', 'organization'], orderBy: { createdAt: 'desc' } },
+      { email: dto.email.toLowerCase() },
+      { populate: ['roles', 'organization'] },
     );
 
-    let user: User | null = null;
-    for (const candidate of candidates) {
-      if (await this.passwords.verify(candidate.passwordHash, dto.password)) {
-        user = candidate;
-        break;
-      }
-    }
-
-    // No candidate matched: still pay for one verification, so a missing account and a
-    // wrong password are indistinguishable by timing.
-    if (!user) {
-      await this.passwords.verify(null, dto.password);
-      throw new UnauthorizedException('invalid credentials');
-    }
+    // Verify even when there is no account, so a missing address and a wrong password
+    // are indistinguishable by timing.
+    const matches = await this.passwords.verify(user?.passwordHash ?? null, dto.password);
+    if (!user || !matches) throw new UnauthorizedException('invalid credentials');
 
     if (user.status !== UserStatus.Active) throw new UnauthorizedException('account is not active');
 

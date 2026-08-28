@@ -5,9 +5,12 @@ import type { INestApplication } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/main.js';
-import { Organization } from '../src/modules/organizations/organization.entity.js';
+import { resetInstance } from './instance.js';
 
-/** Every run gets its own tenant, so repeated runs never collide. */
+/**
+ * Names are still run-unique, so a failed run leaving data behind is easy to read in
+ * the database — the reset in `beforeAll` is what actually keeps runs from colliding.
+ */
 const RUN = Date.now().toString(36);
 const ORG_NAME = `People ${RUN}`;
 const OWNER_EMAIL = `owner.${RUN}@people.test`;
@@ -18,7 +21,6 @@ describe('People (e2e)', () => {
   let app: INestApplication;
   let orm: MikroORM;
   let owner: string;
-  let organizationId: string;
   let departmentId: string;
   let teamId: string;
   let ownerId: string;
@@ -30,6 +32,9 @@ describe('People (e2e)', () => {
     app = configureApp(moduleRef.createNestApplication());
     await app.init();
     orm = app.get(MikroORM);
+    // Registration installs the instance and then refuses forever, so every file has to
+    // start from an empty database. Files run one at a time — see vitest.config.e2e.ts.
+    await resetInstance(orm);
 
     const registration = await request(app.getHttpServer())
       .post('/api/auth/register')
@@ -43,33 +48,11 @@ describe('People (e2e)', () => {
       .expect(201);
 
     owner = registration.body.accessToken;
-    organizationId = registration.body.user.organizationId;
     ownerId = registration.body.user.id;
   });
 
   afterAll(async () => {
-    if (orm && organizationId) {
-      const em = orm.em.fork();
-      await em.nativeDelete('refresh_tokens', { organization_id: organizationId });
-      await em.getConnection().execute(
-        'delete from invitation_roles where role_id in (select id from roles where organization_id = ?)',
-        [organizationId],
-      );
-      await em.nativeDelete('invitations', { organization_id: organizationId });
-      // Scoped by subquery: these pivots carry no organization_id of their own, and
-      // deleting them unfiltered wipes every account's roles in the whole database.
-      await em.getConnection().execute(
-        'delete from user_roles where role_id in (select id from roles where organization_id = ?)',
-        [organizationId],
-      );
-      // Self-referencing managers would block the delete below.
-      await em.nativeUpdate('users', { organization_id: organizationId }, { manager_id: null });
-      await em.nativeDelete('users', { organization_id: organizationId });
-      await em.nativeDelete('roles', { organization_id: organizationId });
-      await em.nativeDelete('teams', { organization_id: organizationId });
-      await em.nativeDelete('departments', { organization_id: organizationId });
-      await em.nativeDelete(Organization, { id: organizationId });
-    }
+    // Nothing to tear down: the next file resets the database before it installs.
     await app?.close();
   });
 

@@ -21,16 +21,41 @@ export interface CreateOrganizationInput {
 /** The role every founder gets — it is the only one holding organization:manage. */
 const OWNER_ROLE_KEY = 'owner';
 
+/**
+ * An arbitrary but fixed key for the Postgres advisory lock that serialises first-run
+ * registration. Two requests arriving together on an empty database would otherwise
+ * both pass the count below and install two organizations.
+ */
+const INSTALL_LOCK = 4_022_026_001;
+
 @Injectable()
 export class OrganizationService {
   constructor(private readonly em: EntityManager) {}
 
+  /** Whether the instance is still unclaimed — the one thing registration is allowed on. */
+  async isSetupRequired(): Promise<boolean> {
+    return (await this.em.count(Organization, {})) === 0;
+  }
+
   /**
-   * Bootstraps a tenant: the organization, its four built-in roles, and the owner —
-   * all or nothing, because an organization without an owner is unreachable.
+   * Bootstraps the installation: the organization, its four built-in roles, and the
+   * owner — all or nothing, because an organization without an owner is unreachable.
+   *
+   * Runs exactly once in the life of a deployment. Beacon is installed on-premise for
+   * one organization; everybody else arrives by invitation.
    */
   async createWithOwner(input: CreateOrganizationInput): Promise<{ organization: Organization; user: User }> {
     return this.em.transactional(async (em) => {
+      // Held until the transaction ends, so a second registration racing this one
+      // waits here and then loses on the count.
+      await em
+        .getConnection()
+        .execute('select pg_advisory_xact_lock(?)', [INSTALL_LOCK], 'run', em.getTransactionContext());
+
+      if (await em.count(Organization, {})) {
+        throw new ConflictException('this instance already has an organization');
+      }
+
       const requested = input.slug ?? slugify(input.organizationName);
 
       if (input.slug && (await em.count(Organization, { slug: input.slug })) > 0) {

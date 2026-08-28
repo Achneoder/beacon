@@ -23,6 +23,9 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.e2e-spec.ts'],
+    // Each file installs its own organization, and an installation holds exactly one —
+    // so the files take turns rather than fighting over the same instance.
+    fileParallelism: false,
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: process.env.DATABASE_URL ?? E2E_DATABASE_URL,
