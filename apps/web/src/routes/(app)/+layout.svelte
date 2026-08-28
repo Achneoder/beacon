@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import { goto } from '$app/navigation';
-	import type { ClockState } from '@beacon/shared';
 	import { Sidebar } from '$lib/components/shell';
 	import { session } from '$lib/auth/session.svelte';
+	import { clock } from '$lib/attendance/clock.svelte';
 
 	let { children } = $props();
 
@@ -14,11 +14,25 @@
 
 	const user = $derived(session.user);
 
-	// Phase 2 replaces this with `GET /attendance/me/today`. Until entries exist there
-	// is nothing running, so the card reads "clocked out" and the dot does not pulse.
-	const clockState: ClockState = 'out';
+	// One clock for the whole shell, so the sidebar and the Today screen cannot
+	// describe different states.
+	$effect(() => {
+		if (user) void clock.refresh();
+	});
+
+	/**
+	 * Re-read on focus. The counter itself is driven from the server's `since`, but a
+	 * tab left open overnight — or a clock-out from another device — would otherwise
+	 * still be showing yesterday's state.
+	 */
+	$effect(() => {
+		const onFocus = () => void clock.refresh();
+		window.addEventListener('focus', onFocus);
+		return () => window.removeEventListener('focus', onFocus);
+	});
 
 	async function signOut() {
+		clock.reset();
 		await session.logout();
 		await goto('/login');
 	}
@@ -33,7 +47,7 @@
 	</a>
 
 	<div class="flex min-h-screen flex-col lg:flex-row">
-		<Sidebar {user} {clockState} onSignOut={signOut} />
+		<Sidebar {user} clockState={clock.state} clockSince={clock.since} onSignOut={signOut} />
 
 		<main id="main" class="min-w-0 flex-1 px-6 py-8 lg:px-10 lg:py-9">
 			<div class="mx-auto max-w-[1180px]">{@render children()}</div>

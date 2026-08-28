@@ -23,6 +23,8 @@
 	 */
 	const NAV: { href: string; key: string; permission?: Permission }[] = [
 		{ href: '/', key: 'nav.today', permission: 'attendance:read' },
+		{ href: '/timesheet', key: 'nav.timesheet', permission: 'attendance:read' },
+		{ href: '/approvals', key: 'nav.approvals', permission: 'attendance:write' },
 		{ href: '/people', key: 'nav.people', permission: 'employee:read' },
 		{ href: '/settings/organization', key: 'nav.settings', permission: 'organization:manage' },
 		// Everyone has a profile — no permission gates your own account.

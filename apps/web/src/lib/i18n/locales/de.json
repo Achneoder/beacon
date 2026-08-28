@@ -6,7 +6,9 @@
 		"today": "Heute",
 		"people": "Personen",
 		"profile": "Profil",
-		"settings": "Einstellungen"
+		"settings": "Einstellungen",
+		"timesheet": "Zeitkonto",
+		"approvals": "Freigaben"
 	},
 	"shell": {
 		"navLabel": "Hauptnavigation",
@@ -18,9 +20,33 @@
 		}
 	},
 	"today": {
-		"kicker": "Übersicht",
+		"kicker": "Überblick",
 		"title": "Heute",
-		"empty": "Die Zeiterfassung kommt im nächsten Release. Ihre Uhr, der Tagesfortschritt und Ihre Zeitabschnitte erscheinen hier."
+		"empty": "Die Zeiterfassung kommt im nächsten Release. Ihre Uhr, der Tagesfortschritt und Ihre Zeitabschnitte erscheinen hier.",
+		"loading": "Dein Tag wird geladen…",
+		"controls": "Zeiterfassung",
+		"clockIn": "Einstempeln",
+		"clockOut": "Ausstempeln",
+		"startBreak": "Pause beginnen",
+		"resumeWork": "Weiterarbeiten",
+		"addManual": "Zeit nachtragen",
+		"dayProgress": "Fortschritt zum Tagesziel",
+		"workedOfTarget": "{worked} von {target}",
+		"running": "läuft",
+		"weekBalance": "Wochensaldo",
+		"weekWorked": "{worked} in dieser Woche gearbeitet",
+		"overtimeBank": "Überstundenkonto",
+		"cap": "Grenze {cap}",
+		"overCap": "{over} über der Grenze — wird weiterhin gezählt.",
+		"breakTotal": "Pausen heute",
+		"breakHint": "Pausen zählen nicht als Arbeitszeit.",
+		"segments": "Heutige Einträge",
+		"openTimesheet": "Zeitkonto öffnen",
+		"noSegments": "Heute ist noch nichts erfasst. Stemple ein, um zu beginnen.",
+		"segment": {
+			"work": "Arbeit",
+			"break": "Pause"
+		}
 	},
 	"theme": {
 		"label": "Darstellung",
@@ -186,5 +212,78 @@
 		"rolesHint": "Die eingebauten Rollen sind noch nicht bearbeitbar. Ein Rolleneditor kommt mit den Manager-Ansichten.",
 		"systemRole": "Eingebaut",
 		"permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}"
+	},
+	"timesheet": {
+		"kicker": "Zeiterfassung",
+		"title": "Zeitkonto",
+		"loading": "Woche wird geladen…",
+		"caption": "Gearbeitete Stunden nach Tag",
+		"previous": "Vorherige Woche",
+		"next": "Nächste Woche",
+		"thisWeek": "Diese Woche",
+		"day": "Tag",
+		"start": "Beginn",
+		"end": "Ende",
+		"break": "Pause",
+		"worked": "Gearbeitet",
+		"balance": "Saldo",
+		"total": "Gesamt",
+		"credited": "angerechnet",
+		"pending": "Korrektur offen",
+		"locked": "Diese Woche ist abgeschlossen. Änderungen brauchen eine Korrektur.",
+		"unlockedUntil": "Woche ist bis {moment} offen.",
+		"requestCorrection": "Korrektur beantragen",
+		"requestTitle": "Korrektur beantragen",
+		"requestHint": "Deine Führungskraft entscheidet. Gib an, wie der Tag hätte sein sollen — und warum.",
+		"date": "Datum",
+		"breakMinutes": "Pause (Minuten)",
+		"reason": "Begründung",
+		"reasonHint": "Für deine Führungskraft sichtbar.",
+		"send": "Antrag senden",
+		"sending": "Wird gesendet…",
+		"cancel": "Abbrechen",
+		"requestSent": "Dein Korrekturantrag wurde gesendet."
+	},
+	"approvals": {
+		"kicker": "Zeiterfassung",
+		"title": "Freigaben",
+		"loading": "Anträge werden geladen…",
+		"queue": "Wartet auf dich",
+		"queueHint": "Korrekturanträge der Personen, für die du freigibst.",
+		"yours": "Deine Anträge",
+		"yoursHint": "Korrekturen, die du beantragt hast — und was daraus wurde.",
+		"empty": "Es wartet nichts.",
+		"decided": "Entschieden",
+		"approve": "Freigeben",
+		"reject": "Ablehnen",
+		"awaiting": "Wartet auf {name}",
+		"kind": {
+			"add": "Eintrag ergänzt",
+			"amend": "Eintrag geändert",
+			"remove": "Eintrag entfernt"
+		}
+	},
+	"attendance": {
+		"source": {
+			"manual": "Manuell",
+			"web": "Web",
+			"mobile": "Mobil",
+			"desktop": "Desktop",
+			"badge": "Ausweis"
+		},
+		"approval": {
+			"approved": "Freigegeben",
+			"pending": "Offen",
+			"rejected": "Abgelehnt"
+		},
+		"weekday": {
+			"monday": "Montag",
+			"tuesday": "Dienstag",
+			"wednesday": "Mittwoch",
+			"thursday": "Donnerstag",
+			"friday": "Freitag",
+			"saturday": "Samstag",
+			"sunday": "Sonntag"
+		}
 	}
 }

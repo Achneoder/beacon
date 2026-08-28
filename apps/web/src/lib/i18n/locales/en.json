@@ -6,7 +6,9 @@
 		"today": "Today",
 		"people": "People",
 		"profile": "Profile",
-		"settings": "Settings"
+		"settings": "Settings",
+		"timesheet": "Timesheet",
+		"approvals": "Approvals"
 	},
 	"shell": {
 		"navLabel": "Main navigation",
@@ -20,7 +22,31 @@
 	"today": {
 		"kicker": "Overview",
 		"title": "Today",
-		"empty": "Time tracking arrives in the next release. Your clock, day progress and segments will show up here."
+		"empty": "Time tracking arrives in the next release. Your clock, day progress and segments will show up here.",
+		"loading": "Loading your day…",
+		"controls": "Clock controls",
+		"clockIn": "Clock in",
+		"clockOut": "Clock out",
+		"startBreak": "Start break",
+		"resumeWork": "Resume work",
+		"addManual": "Add manual entry",
+		"dayProgress": "Progress towards today's target",
+		"workedOfTarget": "{worked} of {target}",
+		"running": "running",
+		"weekBalance": "Week balance",
+		"weekWorked": "{worked} worked this week",
+		"overtimeBank": "Overtime bank",
+		"cap": "Cap {cap}",
+		"overCap": "{over} over the cap — still counted.",
+		"breakTotal": "Breaks today",
+		"breakHint": "Break time is not counted as worked time.",
+		"segments": "Today's entries",
+		"openTimesheet": "Open timesheet",
+		"noSegments": "Nothing recorded yet today. Clock in to start.",
+		"segment": {
+			"work": "Work",
+			"break": "Break"
+		}
 	},
 	"theme": {
 		"label": "Appearance",
@@ -186,5 +212,78 @@
 		"rolesHint": "Built-in roles cannot be edited yet. A role editor arrives with the manager screens.",
 		"systemRole": "Built-in",
 		"permissionCount": "{count, plural, one {# permission} other {# permissions}}"
+	},
+	"timesheet": {
+		"kicker": "Time tracking",
+		"title": "Timesheet",
+		"loading": "Loading the week…",
+		"caption": "Hours worked, by day",
+		"previous": "Previous week",
+		"next": "Next week",
+		"thisWeek": "This week",
+		"day": "Day",
+		"start": "Start",
+		"end": "End",
+		"break": "Break",
+		"worked": "Worked",
+		"balance": "Balance",
+		"total": "Total",
+		"credited": "credited",
+		"pending": "Correction pending",
+		"locked": "This week is closed. Ask for a correction to change it.",
+		"unlockedUntil": "Week is unlocked until {moment}.",
+		"requestCorrection": "Request correction",
+		"requestTitle": "Request a correction",
+		"requestHint": "Your manager decides. Say what the day should have been and why.",
+		"date": "Date",
+		"breakMinutes": "Break (minutes)",
+		"reason": "Reason",
+		"reasonHint": "Visible to your manager.",
+		"send": "Send request",
+		"sending": "Sending…",
+		"cancel": "Cancel",
+		"requestSent": "Your correction request has been sent."
+	},
+	"approvals": {
+		"kicker": "Time tracking",
+		"title": "Approvals",
+		"loading": "Loading requests…",
+		"queue": "Waiting for you",
+		"queueHint": "Correction requests from the people you approve for.",
+		"yours": "Your requests",
+		"yoursHint": "Corrections you have asked for, and what came of them.",
+		"empty": "Nothing is waiting.",
+		"decided": "Decided",
+		"approve": "Approve",
+		"reject": "Reject",
+		"awaiting": "Awaiting {name}",
+		"kind": {
+			"add": "added entry",
+			"amend": "amended entry",
+			"remove": "removed entry"
+		}
+	},
+	"attendance": {
+		"source": {
+			"manual": "Manual",
+			"web": "Web",
+			"mobile": "Mobile",
+			"desktop": "Desktop",
+			"badge": "Badge"
+		},
+		"approval": {
+			"approved": "Approved",
+			"pending": "Pending",
+			"rejected": "Rejected"
+		},
+		"weekday": {
+			"monday": "Monday",
+			"tuesday": "Tuesday",
+			"wednesday": "Wednesday",
+			"thursday": "Thursday",
+			"friday": "Friday",
+			"saturday": "Saturday",
+			"sunday": "Sunday"
+		}
 	}
 }
