@@ -47,7 +47,8 @@ const invitation: CreatedInvitation = {
 	acceptedAt: null,
 	isExpired: false,
 	token: 'secret-token',
-	acceptUrl: 'http://localhost:5173/invite/secret-token'
+	acceptUrl: 'http://localhost:5173/invite/secret-token',
+	emailSent: true
 };
 
 function grant(...permissions: string[]) {
@@ -123,6 +124,25 @@ describe('people page', () => {
 				expect.objectContaining({ email: 'grace@acme.test', firstName: 'Grace' })
 			)
 		);
+		expect(await screen.findByText('Invitation sent to grace@acme.test.')).toBeInTheDocument();
+		// The link stays on screen either way: the token is never retrievable again.
+		expect(await screen.findByText(invitation.acceptUrl)).toBeInTheDocument();
+	});
+
+	it('says so when the invitation could not be emailed', async () => {
+		grant('employee:read', 'employee:manage');
+		vi.spyOn(people, 'createInvitation').mockResolvedValue({ ...invitation, emailSent: false });
+		render(PeoplePage);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }));
+		await fireEvent.input(screen.getByLabelText('First name'), { target: { value: 'Grace' } });
+		await fireEvent.input(screen.getByLabelText('Last name'), { target: { value: 'Hopper' } });
+		await fireEvent.input(screen.getByLabelText('Email address'), {
+			target: { value: 'grace@acme.test' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Create invitation' }));
+
+		expect(await screen.findByText(/could not be sent/)).toBeInTheDocument();
 		expect(await screen.findByText(invitation.acceptUrl)).toBeInTheDocument();
 	});
 

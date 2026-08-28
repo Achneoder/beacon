@@ -171,11 +171,18 @@
 		<p class="mt-1 text-xs text-ink-muted">{$_('people.inviteHint')}</p>
 
 		{#if created}
-			<Alert tone="success" live="status" class="mt-4">
-				{$_('people.inviteDone', { values: { email: created.email } })}
+			<Alert tone={created.emailSent ? 'success' : 'warning'} live="status" class="mt-4">
+				{created.emailSent
+					? $_('people.inviteEmailed', { values: { email: created.email } })
+					: $_('people.inviteNotEmailed', { values: { email: created.email } })}
 			</Alert>
-			<!-- Shown once and never again: the server stores only the token's hash. -->
-			<div class="mt-3 flex flex-wrap items-center gap-3">
+			<!--
+				Shown once and never again: the server stores only the token's hash. Kept even
+				when the email went out, because an invitee who never receives it has no other
+				way back in — the token cannot be re-read from the database.
+			-->
+			<p class="mt-3 text-xs text-ink-muted">{$_('people.inviteLinkHint')}</p>
+			<div class="mt-2 flex flex-wrap items-center gap-3">
 				<code
 					class="min-w-0 flex-1 truncate rounded-control bg-surface-muted px-3 py-2 font-mono text-xs"
 				>
