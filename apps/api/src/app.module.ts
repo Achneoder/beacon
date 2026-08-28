@@ -7,6 +7,7 @@ import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { createOrmConfig } from './mikro-orm.config.js';
 import { StorageModule } from './common/storage/storage.module.js';
 import { PermissionsGuard } from './common/auth/permissions.guard.js';
+import { DEFAULT_THROTTLE_LIMIT } from './common/auth/throttle.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard.js';
@@ -28,7 +29,7 @@ import { AbsencesModule } from './modules/absences/absences.module.js';
         createOrmConfig(config.getOrThrow<string>('DATABASE_URL')),
     }),
     // A baseline limit for every route; the password endpoints tighten it further.
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: DEFAULT_THROTTLE_LIMIT }]),
     StorageModule,
     HealthModule,
     AuthModule,

@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
+import { PASSWORD_THROTTLE } from '../../common/auth/throttle.js';
 import type { Request, Response } from 'express';
 import type {
   AuthResponse,
@@ -28,9 +29,6 @@ import { setRefreshCookie } from '../auth/refresh-cookie.js';
 import { InvitationsService } from './invitations.service.js';
 import { CreateInvitationDto } from './dto/create-invitation.dto.js';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto.js';
-
-/** Acceptance sets a password, so it gets the same hard limit as /auth/*. */
-const PASSWORD_THROTTLE = { auth: { ttl: 60_000, limit: 10 } };
 
 @Controller('invitations')
 export class InvitationsController {

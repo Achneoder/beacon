@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
+import { PASSWORD_THROTTLE } from '../../common/auth/throttle.js';
 import type { Request, Response } from 'express';
 import type { AuthResponse, AuthenticatedUser, SessionUser } from '@beacon/shared';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
@@ -18,9 +19,6 @@ import { Public } from './public.decorator.js';
 import { clearRefreshCookie, cookieName, setRefreshCookie } from './refresh-cookie.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
-
-/** Password endpoints are the obvious brute-force target, so they are rate-limited hard. */
-const PASSWORD_THROTTLE = { auth: { ttl: 60_000, limit: 10 } };
 
 @Controller('auth')
 export class AuthController {
