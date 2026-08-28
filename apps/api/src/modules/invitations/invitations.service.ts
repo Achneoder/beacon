@@ -3,9 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { ref, type Ref } from '@mikro-orm/core';
 import {
-  formatEmployeeNumber,
   fullName,
-  parseEmployeeNumber,
   type CreatedInvitation,
   type InvitationSummary,
 } from '@beacon/shared';
@@ -14,6 +12,7 @@ import { Organization } from '../organizations/organization.entity.js';
 import { Role } from '../roles/role.entity.js';
 import { Team } from '../teams/team.entity.js';
 import { User, UserStatus } from '../users/user.entity.js';
+import { nextEmployeeNumber } from '../users/employee-number.js';
 import { PasswordService } from '../auth/password.service.js';
 import { Invitation } from './invitation.entity.js';
 import {
@@ -221,22 +220,3 @@ export function toInvitationSummary(invitation: Invitation): InvitationSummary {
   };
 }
 
-/**
- * Duplicated deliberately rather than reaching into `UsersService`: acceptance runs
- * inside its own transaction and must number the new user from that same `em`.
- */
-async function nextEmployeeNumber(em: EntityManager, organizationId: string): Promise<string> {
-  const existing = await em.find(
-    User,
-    { organization: organizationId, employeeNumber: { $ne: null } },
-    { fields: ['employeeNumber'] },
-  );
-
-  const highest = existing.reduce((max, user) => {
-    const sequence = user.employeeNumber ? parseEmployeeNumber(user.employeeNumber) : null;
-
-    return sequence && sequence > max ? sequence : max;
-  }, 0);
-
-  return formatEmployeeNumber(highest + 1);
-}

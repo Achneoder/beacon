@@ -2,9 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { EntityManager } from '@mikro-orm/postgresql';
 import { type Ref, ref } from '@mikro-orm/core';
 import {
-  formatEmployeeNumber,
   fullName,
-  parseEmployeeNumber,
   type EmploymentFields,
   type UserDetail,
   type UserSummary,
@@ -14,6 +12,7 @@ import { Organization } from '../organizations/organization.entity.js';
 import { Role } from '../roles/role.entity.js';
 import { Team } from '../teams/team.entity.js';
 import { User, UserStatus } from './user.entity.js';
+import { nextEmployeeNumber } from './employee-number.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 import type { UpdateUserDto } from './dto/update-user.dto.js';
 import type { UpdateProfileDto } from './dto/update-profile.dto.js';
@@ -79,31 +78,45 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Transactional because the employee number is allocated under a lock that lives and
+   * dies with the transaction — see `nextEmployeeNumber`. `begin` on this `em` rather
+   * than `em.transactional`, so the helpers below keep working against the same one.
+   */
   async create(organizationId: string, dto: CreateUserDto): Promise<UserDetail> {
     const email = dto.email.toLowerCase();
 
-    if (await this.em.count(User, { organization: organizationId, email })) {
-      throw new ConflictException('a user with that email already exists');
+    await this.em.begin();
+    let userId: string;
+    try {
+      if (await this.em.count(User, { organization: organizationId, email })) {
+        throw new ConflictException('a user with that email already exists');
+      }
+
+      const user = this.em.create(User, {
+        organization: this.em.getReference(Organization, organizationId, { wrapped: true }),
+        email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        locale: dto.locale ?? 'en',
+        // Created without a password: the account is reachable only once someone sets
+        // one, which is what an invitation is for.
+        status: UserStatus.Invited,
+        employeeNumber: dto.employeeNumber ?? (await nextEmployeeNumber(this.em, organizationId)),
+      });
+
+      await this.applyEmployment(organizationId, user, dto);
+      user.roles.set(await this.resolveRoles(organizationId, dto.roleIds));
+
+      await this.em.flush();
+      await this.em.commit();
+      userId = user.id;
+    } catch (error) {
+      await this.em.rollback();
+      throw error;
     }
 
-    const user = this.em.create(User, {
-      organization: this.em.getReference(Organization, organizationId, { wrapped: true }),
-      email,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-      locale: dto.locale ?? 'en',
-      // Created without a password: the account is reachable only once someone sets
-      // one, which is what an invitation is for.
-      status: UserStatus.Invited,
-      employeeNumber: dto.employeeNumber ?? (await this.nextEmployeeNumber(organizationId)),
-    });
-
-    await this.applyEmployment(organizationId, user, dto);
-    user.roles.set(await this.resolveRoles(organizationId, dto.roleIds));
-
-    await this.em.flush();
-
-    return this.findDetail(organizationId, user.id);
+    return this.findDetail(organizationId, userId);
   }
 
   async update(organizationId: string, userId: string, dto: UpdateUserDto): Promise<UserDetail> {
@@ -172,27 +185,6 @@ export class UsersService {
     );
 
     return reports.map((report) => report.id);
-  }
-
-  /**
-   * `BCN-0148` — one past the highest number the organization has issued. Hand-typed
-   * numbers are skipped rather than parsed, so a custom scheme never blocks the next
-   * automatic one.
-   */
-  private async nextEmployeeNumber(organizationId: string): Promise<string> {
-    const existing = await this.em.find(
-      User,
-      { organization: organizationId, employeeNumber: { $ne: null } },
-      { fields: ['employeeNumber'] },
-    );
-
-    const highest = existing.reduce((max, user) => {
-      const sequence = user.employeeNumber ? parseEmployeeNumber(user.employeeNumber) : null;
-
-      return sequence && sequence > max ? sequence : max;
-    }, 0);
-
-    return formatEmployeeNumber(highest + 1);
   }
 
   /** Shared by create and update, so the two cannot interpret a field differently. */
