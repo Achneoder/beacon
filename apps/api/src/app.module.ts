@@ -11,6 +11,10 @@ import { HealthModule } from './modules/health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard.js';
 import { OrganizationModule } from './modules/organizations/organization.module.js';
+import { UsersModule } from './modules/users/users.module.js';
+import { DepartmentsModule } from './modules/departments/departments.module.js';
+import { TeamsModule } from './modules/teams/teams.module.js';
+import { InvitationsModule } from './modules/invitations/invitations.module.js';
 
 @Module({
   imports: [
@@ -27,6 +31,10 @@ import { OrganizationModule } from './modules/organizations/organization.module.
     HealthModule,
     AuthModule,
     OrganizationModule,
+    UsersModule,
+    DepartmentsModule,
+    TeamsModule,
+    InvitationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

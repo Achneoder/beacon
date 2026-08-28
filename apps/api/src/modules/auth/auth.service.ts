@@ -128,6 +128,17 @@ export class AuthService {
     await this.em.flush();
   }
 
+  /**
+   * Signs in a user the caller has just created — invitation acceptance, which has
+   * already proved the invitee's identity through the token and needs the same session
+   * registration hands back.
+   */
+  async startSessionFor(user: User, userAgent?: string): Promise<IssuedSession> {
+    await this.em.populate(user, ['roles', 'organization']);
+
+    return this.issueSession(user, userAgent);
+  }
+
   /** Re-read from the database, so /auth/me reflects role changes before the token expires. */
   async currentUser(userId: string, organizationId: string): Promise<SessionUser> {
     const user = await this.em.findOne(
@@ -201,6 +212,8 @@ export function toSessionUser(user: User): SessionUser {
     firstName: user.firstName,
     lastName: user.lastName,
     locale: user.locale,
+    timezone: user.timezone,
+    jobTitle: user.jobTitle,
     roleKeys: user.roles.getItems().map((role) => role.key),
     organizationName: organization.name,
     organizationSlug: organization.slug,

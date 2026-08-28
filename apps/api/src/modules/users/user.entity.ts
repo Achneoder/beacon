@@ -1,7 +1,19 @@
-import { Collection, Entity, Enum, ManyToMany, Property, Unique } from '@mikro-orm/core';
-import type { Permission } from '@beacon/shared';
+import {
+  Collection,
+  Entity,
+  Enum,
+  ManyToMany,
+  ManyToOne,
+  Property,
+  Unique,
+  type Ref,
+} from '@mikro-orm/core';
+import type { ContractType, Permission, WorkLocation } from '@beacon/shared';
+import { CONTRACT_TYPES, WORK_LOCATIONS } from '@beacon/shared';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
+import { Department } from '../departments/department.entity.js';
 import { Role } from '../roles/role.entity.js';
+import { Team } from '../teams/team.entity.js';
 
 export enum UserStatus {
   Invited = 'invited',
@@ -12,9 +24,14 @@ export enum UserStatus {
 /**
  * Users belong to exactly one organization — an address may sign up again elsewhere,
  * so email is unique per organization rather than globally.
+ *
+ * The employment fields are what the Profile screen displays. They are all nullable:
+ * the owner created by registration has none of them, and an organization fills them
+ * in at its own pace.
  */
 @Entity({ tableName: 'users' })
 @Unique({ properties: ['organization', 'email'] })
+@Unique({ properties: ['organization', 'employeeNumber'] })
 export class User extends OrganizationScopedEntity<'permissions'> {
   /** Always stored lower-cased so lookups can compare directly. */
   @Property({ type: 'string', length: 320 })
@@ -36,8 +53,53 @@ export class User extends OrganizationScopedEntity<'permissions'> {
   @Property({ type: 'string', length: 10, default: 'en' })
   locale: string = 'en';
 
+  /** IANA zone. Null falls back to `Organization.timezone` at the edge. */
+  @Property({ type: 'string', length: 64, nullable: true })
+  timezone: string | null = null;
+
   @Property({ type: 'timestamptz', nullable: true })
   lastLoginAt: Date | null = null;
+
+  /** `BCN-0148`, unique per organization; assigned on creation, editable after. */
+  @Property({ type: 'string', length: 32, nullable: true })
+  employeeNumber: string | null = null;
+
+  @Property({ type: 'string', length: 120, nullable: true })
+  jobTitle: string | null = null;
+
+  @ManyToOne(() => Department, { ref: true, nullable: true, deleteRule: 'set null' })
+  department: Ref<Department> | null = null;
+
+  @ManyToOne(() => Team, { ref: true, nullable: true, deleteRule: 'set null' })
+  team: Ref<Team> | null = null;
+
+  /**
+   * The approver. Load-bearing, not decoration: absence requests and attendance
+   * corrections both route to this person, and `UsersService.subordinateIdsOf` reads
+   * the same edge to answer "the people I approve for".
+   */
+  @ManyToOne(() => User, { ref: true, nullable: true, deleteRule: 'set null' })
+  manager: Ref<User> | null = null;
+
+  @Enum({ items: () => CONTRACT_TYPES, type: 'string', nullable: true })
+  contractType: ContractType | null = null;
+
+  /** The office city; `workLocation` says how the person works from it. */
+  @Property({ type: 'string', length: 120, nullable: true })
+  office: string | null = null;
+
+  @Enum({ items: () => WORK_LOCATIONS, type: 'string', nullable: true })
+  workLocation: WorkLocation | null = null;
+
+  @Property({ type: 'string', length: 40, nullable: true })
+  phone: string | null = null;
+
+  /** Plain dates, not instants — an employment start has no time of day. */
+  @Property({ type: 'date', nullable: true })
+  startsOn: string | null = null;
+
+  @Property({ type: 'date', nullable: true })
+  endsOn: string | null = null;
 
   @ManyToMany({ entity: () => Role, owner: true, pivotTable: 'user_roles' })
   roles = new Collection<Role>(this);
