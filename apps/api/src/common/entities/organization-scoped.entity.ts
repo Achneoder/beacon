@@ -6,7 +6,9 @@ import { Organization } from '../../modules/organizations/organization.entity.js
  * Base class for every tenant-owned record. Extending this makes the organization
  * column mandatory — repositories must still scope their queries by it.
  */
-export abstract class OrganizationScopedEntity extends BaseEntity {
+export abstract class OrganizationScopedEntity<
+  Optional extends string = never,
+> extends BaseEntity<Optional> {
   @Index()
   @ManyToOne(() => Organization, { ref: true })
   organization!: Ref<Organization>;
