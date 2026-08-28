@@ -46,10 +46,12 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | Attendance (clock, timesheet, corrections) | shipped |
 | Absence (calendar, quota, approvals, public holidays) | shipped |
 | Documents (categories, versions, access grants) | shipped |
-| Employee data | not started |
+| Search (sidebar field over documents and people) | shipped |
+| Employee data | shipped as part of People — the employment fields and the Profile screen |
 | Storage (`StorageService` → MinIO) | shipped — `DocumentsService` is its first caller |
+| Search (`SearchService` → Meilisearch) | shipped — `NoopSearchService` when `SEARCH_HOST` is unset |
 | SSO (OIDC), 2FA, passkeys | not started — phase 7 specifies SSO |
-| Search, notifications, monitoring | not started |
+| Notifications, monitoring | not started |
 | Mobile, desktop | not created; frameworks undecided |
 
 The permission union in `packages/shared/src/permissions.ts` already names every feature below
@@ -376,19 +378,65 @@ storage or this module:
   future refuses the delete outright, so an employee's tidy-up cannot silently strip the evidence
   behind an approved sick leave. No retention sweep exists yet — storage grows until one does.
 
-## Phase 5 — Search
+## Phase 5 — Search — **done**
 
-Resolves the open question in `README.md`. Introduce `SearchService` in
-`apps/api/src/common/search/` — same shape as `StorageService`: `index()`, `remove()`, `query()`,
-scoped by organization on every call — plus a `NoopSearchService` so the API runs without a search
-container. Then implement `MeilisearchSearchService` and add the container to
-`infra/docker-compose.yml`.
+Resolved the open question in `README.md`. `SearchService` lives in
+`apps/api/src/common/search/` — same shape as `StorageService`: `index()`, `remove()`,
+`replaceAll()`, `query()`, scoped by organization on every call — with `NoopSearchService` so the
+API runs without a search container, and `MeilisearchSearchService` behind `SEARCH_HOST`. The
+container is in both compose files (7700 dev, 57700 e2e).
 
-Index documents first (name and category, extracted text later), then employees. Re-index on write
-through a subscriber, not scattered service calls. **Decide before building:** Meilisearch as the
-bundled default, per the README's leaning — confirm it, record it in `README.md`, and delete the
-"still to be decided" note. There is no search UI in the canvas; design one before shipping this,
-or the feature has nowhere to live.
+Documents (title, category, filename) and employees (name, job title, email, employee number) are
+indexed; extracted text is still later. Re-indexing runs through `SearchSubscriber` on
+`afterFlush`, not through calls scattered across the services.
+
+**Both decisions the phase was blocked on were made.** Meilisearch is confirmed as the bundled
+default and `README.md` no longer says otherwise. The UI is a **search field in the sidebar**
+between the brand and the nav — the one structural gap the canvas's sidebar leaves — opening a
+popover grouped Documents / People. It is still undesigned; see the open questions below.
+
+Six things settled while building, worth knowing before the next phase that touches permissions,
+search or the shell:
+
+- **The index holds no permission data, and that is the whole design.** `SearchRecord` carries
+  organization, type and text — no owner, no grant, no department. The engine answers *what
+  matched*; `DocumentsService.findVisibleByIds` answers *which of those you may see*, through the
+  same private `accessContext()` phase 4 established as the one place visibility is decided. The
+  alternative — indexing grant subjects and filtering in the engine — makes an index that can go
+  stale into a second authority on who may read a payslip. Concretely: over-fetch four times the
+  page from the engine, narrow in Postgres, then re-apply the engine's ordering, because
+  `id IN (...)` comes back in whatever order Postgres likes and ranking is what a search backend
+  is for.
+- **Indexing never fails or slows a write.** The subscriber fires without awaiting and
+  `SearchIndexer` swallows and logs — the same contract `MailService.send` keeps, where an
+  invitation is committed and stays valid whether or not the email left the building. A degraded
+  Meilisearch must not degrade a document upload. The accepted cost is that search is **eventually
+  consistent**, which is why `search.e2e-spec.ts` polls through `until()` rather than asserting
+  once, and why the browser spec retypes inside a `toPass`.
+- **A soft delete arrives as an update, and a disabled user is not a delete.** `DocumentsService.remove`
+  sets `deletedAt` and flushes; read as an ordinary change that would re-index a document meant to
+  be gone and leave it findable forever. `UserStatus.Disabled` is the opposite case — it is the
+  soft delete for people, but `UsersService.list` still returns them and an admin has to be able to
+  find the account they just disabled, so status is never a reason to drop a record. Both rules
+  have a unit test.
+- **No entity and no migration.** The index is derived state; every record in it can be rebuilt
+  from Postgres. That is also why nothing backfills it at boot: a full reindex on every start is
+  wrong for a large installation, so a fresh container or a restored volume leaves search
+  **silently empty** until `POST /search/reindex` is pressed on `/settings/organization`. That
+  gap is real and is the phase's known limitation.
+- **`GET /search` declares no permission**, deliberately, and the service narrows instead — the
+  third time this correction has been needed, after `attendance:read` in phase 3 and
+  `document:read` in phase 4. The endpoint spans two features: someone with `employee:read` and no
+  `document:read` gets colleagues and no documents, rather than a 403 for the half they were never
+  asking about. `POST /search/reindex` is still `organization:manage`. No permission was added.
+- **The seam and the feature are two modules.** `common/search` is global and knows nothing about
+  `Document` or `User`; `modules/search` imports `DocumentsModule` and `UsersModule` and injects
+  the seam. Collapsing them would make `DocumentsModule` and the search module import each other.
+
+The field is a real ARIA combobox — `aria-activedescendant` over a `listbox`, ↑/↓ wrapping, Enter,
+Escape, `/` to focus, a polite live region for the count — because the canvas's hover-only
+affordances would otherwise leave the whole feature unreachable by keyboard, the same trap phase 3's
+calendar cells had.
 
 ## Phase 6 — Reporting and dashboard
 
@@ -606,7 +654,7 @@ throwaway database up; CI needs Docker and `playwright install --with-deps chrom
 
 ```
 0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Clients
-                       └─ 3  Absence ────┘   (0–4 done)
+                       └─ 3  Absence ────┘   (0–5 done)
                        └─ 4  Documents ── 5  Search
 Cross-cutting: notifications + audit log after 3; auth expansion any time; hardening before launch.
 ```
@@ -625,7 +673,11 @@ Take these back to the canvas before the phase that needs them:
    an undesigned half.
 2. What the sidebar looks like for a user with `attendance:approve` or `employee:manage` — the
    canvas only ever draws the five employee entries.
-3. Search: no entry point exists anywhere in the design.
+3. Search. Phase 5 shipped an entry point the canvas does not have — a field in the sidebar
+   between the brand and the nav, opening a popover grouped Documents / People. It is built to the
+   existing tokens and is keyboard-complete, but it was specified by this roadmap alone and still
+   owes a canvas pass: the popover's density, whether hits should show a type icon, and what a
+   full results page would look like if the popover ever proves too small.
 4. Notifications: no bell, no inbox, no toast pattern.
 5. Empty, loading and error states — every screen in the canvas is drawn full of data.
 6. Mobile layout. The canvas is a fixed 258px sidebar beside a `1180px` column; the breakpoint

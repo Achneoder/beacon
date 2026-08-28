@@ -9,7 +9,7 @@ application for organizations. `README.md` holds the product spec; this file hol
 rules.
 
 The monorepo is green (build, lint, typecheck, unit tests, e2e). Authentication, organization
-setup, attendance, holidays and documents are implemented; employee data is not.
+setup, people, attendance, holidays, documents and search are implemented.
 
 ## Layout
 
@@ -20,7 +20,7 @@ apps/web         SvelteKit + Svelte 5 + Tailwind 4 — client-only SPA
 apps/api         NestJS 12 (ESM) + MikroORM 6 + PostgreSQL
 packages/shared  @beacon/shared — permissions, tenant types shared by both apps
 packages/config  @beacon/config — shared tsconfig base
-infra            docker-compose: postgres, MinIO, Mailpit, Prometheus/Loki/Alloy/Grafana
+infra            docker-compose: postgres, MinIO, Meilisearch, Mailpit, Prometheus/Loki/Alloy/Grafana
 ```
 
 `apps/mobile` and `apps/desktop` are planned but not created; their frameworks are undecided.
@@ -86,8 +86,11 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
   (`apps/api/src/common/storage/`), implemented by `MinioStorageService`, and outbound email
   through `MailService` (`apps/api/src/common/mail/`), implemented by `SmtpMailService` — or by
   `LogMailService` when no `MAIL_HOST` is set. Inject the abstract class; never import the `minio`
-  or `nodemailer` SDK — or any other vendor SDK — from feature code. The same rule will apply to
-  search and monitoring. Objects are encrypted at rest only when `STORAGE_ENCRYPTION=sse-s3` —
+  or `nodemailer` SDK — or any other vendor SDK — from feature code. Search is the third:
+  `SearchService` (`apps/api/src/common/search/`), implemented by `MeilisearchSearchService` when
+  `SEARCH_HOST` is set and by `NoopSearchService` when it is not, so an installation with no search
+  container is a supported deployment rather than a broken one. The same rule will apply to
+  monitoring. Objects are encrypted at rest only when `STORAGE_ENCRYPTION=sse-s3` —
   the bundled dev MinIO runs no KMS, so the default is `none` and `MinioStorageService` refuses to
   finish booting if it asked for `sse-s3` and the bucket does not confirm it.
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
@@ -183,7 +186,8 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
   and the suite cannot reach dev data at all. **Never point a suite that registers and
   tears down tenants at a database with real accounts in it.**
 - **Its backing services are throwaway.** `infra/docker-compose.e2e.yml` is a separate
-  compose project on separate ports (Postgres 55432, MinIO 59000, Mailpit 51025/58025) with
+  compose project on separate ports (Postgres 55432, MinIO 59000, Meilisearch 57700,
+  Mailpit 51025/58025) with
   tmpfs volumes, so a running dev stack is never touched. `apps/web/tests/services.mjs`
   starts them, builds the API and migrates before Playwright launches either server; the
   ports and the API's environment live in `apps/web/tests/environment.mjs`.
@@ -196,6 +200,12 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
   time — `fileParallelism` is off in `vitest.config.e2e.ts`. The object store gets the same
   treatment: `apps/api/test/storage.ts` refuses to touch a bucket not named `*-e2e`, for the
   same reason the database guard exists — a documents spec writes and deletes real objects.
+  `apps/api/test/search.ts` is the third rail of the same shape, refusing any index not
+  named `*-e2e`.
+- **Search is asserted by polling, not by waiting.** `SearchSubscriber` never blocks a write
+  on the search backend, so a spec that uploads and then searches is racing a write it
+  deliberately did not wait for. `until()` in `apps/api/test/search.ts` is the honest way to
+  assert on that; a fixed sleep would be either flaky or slow.
 - **Rate limits are raised, not disabled.** A dozen parallel browsers sign in faster than any
   human; `THROTTLE_LIMIT` and `AUTH_THROTTLE_LIMIT` (see
   `apps/api/src/common/auth/throttle.ts`) are read from the real process environment, because
@@ -228,8 +238,27 @@ Rules:
   explaining the migration.
 - Use the body to say *why*, not to restate the diff.
 
+## Search
+
+Meilisearch, decided in phase 5 and recorded in `README.md`. One index per installation, holding
+documents and people.
+
+- **The index holds no permission data.** Not an owner, not a grant, not a department —
+  `SearchRecord` carries only organization, type and text. The engine answers *what matched*;
+  `DocumentsService.findVisibleByIds` answers *which of those you may see*, through the same
+  private `accessContext()` every other read path uses. An index is derived state that can go
+  stale, and a stale grant must never be able to widen what someone can find.
+- **Indexing never fails or slows a write.** `SearchSubscriber` hooks `afterFlush` and fires
+  without awaiting; `SearchIndexer` swallows and logs. Search is therefore eventually consistent,
+  which is deliberate and is why the e2e suite polls.
+- **Nothing backfills the index at boot.** A fresh container or a restored volume leaves search
+  empty until `POST /search/reindex` (Settings → Organization) rebuilds it from Postgres. A full
+  reindex on every start would be wrong for a large installation.
+- **No entity, no migration.** Every record can be rebuilt from the database, so the index owns
+  nothing.
+
 ## Open questions
 
 - Mobile and desktop frameworks are unspecified.
-- The search engine is explicitly undecided in `README.md` (Meilisearch is the leading
-  self-hosted candidate). Nothing is wired up for it yet.
+- The search UI is not in the design canvas. The sidebar field is specified by the roadmap alone
+  and still owes a canvas pass.
