@@ -19,6 +19,9 @@ export default defineConfig({
 			adapter: adapter({ fallback: 'index.html' })
 		})
 	],
+	// Component tests mount Svelte in jsdom, so resolution must pick the client
+	// build of `svelte` rather than its server entry.
+	resolve: process.env.VITEST ? { conditions: ['browser'] } : {},
 	test: {
 		environment: 'jsdom',
 		include: ['src/**/*.{test,spec}.{js,ts}'],

@@ -1,0 +1,199 @@
+/*
+ * Beacon design tokens.
+ *
+ * Extracted from the "Beacon employee tracking platform" design canvas
+ * (claude.ai/design project 9d740e9a-49b9-4037-96a5-ed3d0fbdbcda).
+ *
+ * Three layers, in order:
+ *   1. raw palettes  — the literal light/dark values, defined exactly once
+ *   2. semantic vars — `--bc-*`, remapped per theme
+ *   3. `@theme inline` — exposes the semantic vars as Tailwind utilities
+ *
+ * Themes resolve in three states, matching the artifact/theme convention:
+ * bare `:root` is light, `prefers-color-scheme: dark` flips anything not
+ * explicitly pinned to light, and `[data-theme]` on <html> wins over both.
+ */
+
+:root {
+	/* 1a. raw light palette */
+	--bc-light-canvas: #f7f4f0;
+	--bc-light-surface: #ffffff;
+	--bc-light-surface-muted: #fbf9f6;
+	--bc-light-border: #e9e3dc;
+	--bc-light-border-subtle: #f1ece6;
+	--bc-light-ink: #1f1b18;
+	--bc-light-ink-muted: #7c736a;
+	--bc-light-accent: #6b4e9e;
+	--bc-light-accent-on-soft: #5a3f8a;
+	--bc-light-accent-soft: #f1ebfa;
+	--bc-light-success: #3e7c5a;
+	--bc-light-success-soft: #e8f1eb;
+	--bc-light-warning: #b0542c;
+	--bc-light-warning-soft: #faede5;
+	--bc-light-info: #3b5ba5;
+	--bc-light-info-soft: #e9eef8;
+	--bc-light-shadow-card: 0 1px 2px rgb(31 27 24 / 0.05), 0 8px 24px -12px rgb(31 27 24 / 0.14);
+	--bc-light-shadow-overlay: 0 2px 4px rgb(31 27 24 / 0.06), 0 24px 48px -20px rgb(31 27 24 / 0.22);
+
+	/* 1b. raw dark palette */
+	--bc-dark-canvas: #16151a;
+	--bc-dark-surface: #1e1d23;
+	--bc-dark-surface-muted: #25232b;
+	--bc-dark-border: #332f3a;
+	--bc-dark-border-subtle: #2a2833;
+	--bc-dark-ink: #f2eeea;
+	--bc-dark-ink-muted: #9c949e;
+	--bc-dark-accent: #a88cdc;
+	--bc-dark-accent-on-soft: #c1aaeb;
+	--bc-dark-accent-soft: #2b2340;
+	--bc-dark-success: #7fbe9c;
+	--bc-dark-success-soft: #20302a;
+	--bc-dark-warning: #df9c78;
+	--bc-dark-warning-soft: #332620;
+	--bc-dark-info: #8faae4;
+	--bc-dark-info-soft: #212a3d;
+	--bc-dark-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+	--bc-dark-shadow-overlay: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 48px -20px rgb(0 0 0 / 0.7);
+
+	/* 2. semantic assignment — light */
+	--bc-scheme: light;
+	--bc-canvas: var(--bc-light-canvas);
+	--bc-surface: var(--bc-light-surface);
+	--bc-surface-muted: var(--bc-light-surface-muted);
+	--bc-border: var(--bc-light-border);
+	--bc-border-subtle: var(--bc-light-border-subtle);
+	--bc-ink: var(--bc-light-ink);
+	--bc-ink-muted: var(--bc-light-ink-muted);
+	--bc-accent: var(--bc-light-accent);
+	--bc-accent-on-soft: var(--bc-light-accent-on-soft);
+	--bc-accent-soft: var(--bc-light-accent-soft);
+	--bc-success: var(--bc-light-success);
+	--bc-success-soft: var(--bc-light-success-soft);
+	--bc-warning: var(--bc-light-warning);
+	--bc-warning-soft: var(--bc-light-warning-soft);
+	--bc-info: var(--bc-light-info);
+	--bc-info-soft: var(--bc-light-info-soft);
+	--bc-shadow-card: var(--bc-light-shadow-card);
+	--bc-shadow-overlay: var(--bc-light-shadow-overlay);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bc-scheme: dark;
+		--bc-canvas: var(--bc-dark-canvas);
+		--bc-surface: var(--bc-dark-surface);
+		--bc-surface-muted: var(--bc-dark-surface-muted);
+		--bc-border: var(--bc-dark-border);
+		--bc-border-subtle: var(--bc-dark-border-subtle);
+		--bc-ink: var(--bc-dark-ink);
+		--bc-ink-muted: var(--bc-dark-ink-muted);
+		--bc-accent: var(--bc-dark-accent);
+		--bc-accent-on-soft: var(--bc-dark-accent-on-soft);
+		--bc-accent-soft: var(--bc-dark-accent-soft);
+		--bc-success: var(--bc-dark-success);
+		--bc-success-soft: var(--bc-dark-success-soft);
+		--bc-warning: var(--bc-dark-warning);
+		--bc-warning-soft: var(--bc-dark-warning-soft);
+		--bc-info: var(--bc-dark-info);
+		--bc-info-soft: var(--bc-dark-info-soft);
+		--bc-shadow-card: var(--bc-dark-shadow-card);
+		--bc-shadow-overlay: var(--bc-dark-shadow-overlay);
+	}
+}
+
+:root[data-theme='dark'] {
+	--bc-scheme: dark;
+	--bc-canvas: var(--bc-dark-canvas);
+	--bc-surface: var(--bc-dark-surface);
+	--bc-surface-muted: var(--bc-dark-surface-muted);
+	--bc-border: var(--bc-dark-border);
+	--bc-border-subtle: var(--bc-dark-border-subtle);
+	--bc-ink: var(--bc-dark-ink);
+	--bc-ink-muted: var(--bc-dark-ink-muted);
+	--bc-accent: var(--bc-dark-accent);
+	--bc-accent-on-soft: var(--bc-dark-accent-on-soft);
+	--bc-accent-soft: var(--bc-dark-accent-soft);
+	--bc-success: var(--bc-dark-success);
+	--bc-success-soft: var(--bc-dark-success-soft);
+	--bc-warning: var(--bc-dark-warning);
+	--bc-warning-soft: var(--bc-dark-warning-soft);
+	--bc-info: var(--bc-dark-info);
+	--bc-info-soft: var(--bc-dark-info-soft);
+	--bc-shadow-card: var(--bc-dark-shadow-card);
+	--bc-shadow-overlay: var(--bc-dark-shadow-overlay);
+}
+
+/*
+ * 3. Tailwind theme. `inline` keeps the `var(--bc-*)` reference in the
+ * generated utility instead of resolving it at build time, so a single
+ * `bg-surface` follows the active theme.
+ */
+@theme inline {
+	--color-canvas: var(--bc-canvas);
+	--color-surface: var(--bc-surface);
+	--color-surface-muted: var(--bc-surface-muted);
+	--color-border-default: var(--bc-border);
+	--color-border-subtle: var(--bc-border-subtle);
+	--color-ink: var(--bc-ink);
+	--color-ink-muted: var(--bc-ink-muted);
+	--color-accent: var(--bc-accent);
+	/* readable accent for text/icons sitting on `accent-soft` */
+	--color-accent-on-soft: var(--bc-accent-on-soft);
+	--color-accent-soft: var(--bc-accent-soft);
+	--color-success: var(--bc-success);
+	--color-success-soft: var(--bc-success-soft);
+	--color-warning: var(--bc-warning);
+	--color-warning-soft: var(--bc-warning-soft);
+	--color-info: var(--bc-info);
+	--color-info-soft: var(--bc-info-soft);
+
+	--font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+	/* Scale is denser than Tailwind's default — the canvas sits at 15px body. */
+	--text-eyebrow: 0.719rem; /* 11.5px, uppercase labels */
+	--text-eyebrow--line-height: 1.3;
+	--text-2xs: 0.781rem; /* 12.5px */
+	--text-2xs--line-height: 1.4;
+	--text-xs: 0.844rem; /* 13.5px */
+	--text-xs--line-height: 1.4;
+	--text-sm: 0.906rem; /* 14.5px */
+	--text-sm--line-height: 1.45;
+	--text-base: 0.9375rem; /* 15px */
+	--text-base--line-height: 1.45;
+	--text-lg: 1.0625rem; /* 17px */
+	--text-lg--line-height: 1.4;
+	--text-xl: 1.3125rem; /* 21px */
+	--text-xl--line-height: 1.3;
+	--text-2xl: 1.625rem; /* 26px */
+	--text-2xl--line-height: 1.2;
+	--text-3xl: 1.75rem; /* 28px */
+	--text-3xl--line-height: 1.15;
+
+	--tracking-eyebrow: 0.09em;
+	--tracking-tight: -0.02em;
+	--tracking-tighter: -0.025em;
+	--tracking-clock: -0.04em;
+
+	--radius-control: 11px; /* buttons, inputs, nav items */
+	--radius-tile: 14px; /* small stat tiles */
+	--radius-card: 18px; /* secondary cards */
+	--radius-panel: 20px; /* primary panels */
+
+	--shadow-card: var(--bc-shadow-card);
+	--shadow-overlay: var(--bc-shadow-overlay);
+
+	--animate-status-pulse: bc-status-pulse 2.4s ease-in-out infinite;
+
+	@keyframes bc-status-pulse {
+		0%,
+		100% {
+			opacity: 1;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 0.35;
+			transform: scale(0.82);
+		}
+	}
+}

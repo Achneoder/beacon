@@ -7,5 +7,11 @@
 		"attendance": "Anwesenheit",
 		"holidays": "Urlaub",
 		"documents": "Dokumente"
+	},
+	"theme": {
+		"label": "Darstellung",
+		"system": "System",
+		"light": "Hell",
+		"dark": "Dunkel"
 	}
 }
