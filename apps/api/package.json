@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:e2e": "pnpm --filter @beacon/shared build && vitest run --config ./vitest.config.e2e.ts",
-    "mikro-orm": "tsx node_modules/@mikro-orm/cli/esm.js"
+    "mikro-orm": "tsx node_modules/@mikro-orm/cli/esm.js",
+    "migration:up": "pnpm --filter @beacon/shared build && pnpm mikro-orm migration:up"
   },
   "dependencies": {
     "@beacon/shared": "workspace:*",
