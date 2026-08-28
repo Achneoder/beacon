@@ -51,6 +51,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Search over documents and people. Bundled self-hosted default; point SEARCH_* at
+  # another engine, or leave SEARCH_HOST empty and Beacon runs without search at all.
+  meilisearch:
+    image: getmeili/meilisearch:v1.13
+    environment:
+      MEILI_MASTER_KEY: beacon-search-key
+      MEILI_ENV: development
+    ports:
+      - '7700:7700'
+    volumes:
+      - meilisearch-data:/meili_data
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:7700/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   prometheus:
     image: prom/prometheus:latest
     command:
@@ -100,6 +117,7 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  meilisearch-data:
   prometheus-data:
   loki-data:
   grafana-data:
