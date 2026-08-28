@@ -3,6 +3,7 @@
 	import type { ClockState, Permission, SessionUser } from '@beacon/shared';
 	import { session } from '$lib/auth/session.svelte';
 	import NavItem from './NavItem.svelte';
+	import SearchField from './SearchField.svelte';
 	import StatusCard from './StatusCard.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import UserCard from './UserCard.svelte';
@@ -38,16 +39,30 @@
 	];
 
 	const items = $derived(NAV.filter((item) => !item.permission || session.can(item.permission)));
+
+	/**
+	 * Search spans documents and people, so it is offered to anyone who can read
+	 * either. An account with neither would get a box that can only ever come back
+	 * empty — the same reasoning that filters the nav above.
+	 */
+	const canSearch = $derived(session.can('document:read') || session.can('employee:read'));
 </script>
 
 <div
 	class="flex shrink-0 flex-col gap-6 border-border-subtle bg-surface p-4
 	       max-lg:border-b lg:sticky lg:top-0 lg:h-screen lg:w-[258px] lg:border-r"
 >
-	<a href="/" class="flex items-center gap-2 rounded-control px-3 py-2">
-		<span class="size-2 rounded-full bg-accent" aria-hidden="true"></span>
-		<span class="truncate text-base font-bold tracking-tighter">{user.organizationName}</span>
-	</a>
+	<!-- Brand and search read as one block; the canvas's gap belongs below them. -->
+	<div class="flex flex-col gap-3">
+		<a href="/" class="flex items-center gap-2 rounded-control px-3 py-2">
+			<span class="size-2 rounded-full bg-accent" aria-hidden="true"></span>
+			<span class="truncate text-base font-bold tracking-tighter">{user.organizationName}</span>
+		</a>
+
+		{#if canSearch}
+			<SearchField />
+		{/if}
+	</div>
 
 	<nav aria-label={$_('shell.navLabel')} class="min-w-0 flex-1">
 		<ul class="flex gap-1 max-lg:overflow-x-auto lg:flex-col">

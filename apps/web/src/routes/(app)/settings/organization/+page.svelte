@@ -19,6 +19,7 @@
 		listHolidays,
 		retireAbsenceType
 	} from '$lib/api/absences';
+	import { reindexSearch } from '$lib/api/search';
 	import { formatDate, toneOf, typeName } from '$lib/absence/labels';
 	import { errorKey } from '$lib/auth/errors';
 
@@ -132,6 +133,31 @@
 	async function removeHoliday(id: string) {
 		await deleteHoliday(id);
 		holidays = holidays.filter((holiday) => holiday.id !== id);
+	}
+
+	/**
+	 * The search index is derived state and nothing backfills it at boot, so a fresh
+	 * container or a restored volume leaves search silently empty. This is the repair,
+	 * and it lives here rather than anywhere automatic because rebuilding an entire
+	 * organization is an administrator's decision, not a side effect of starting up.
+	 */
+	let reindexing = $state(false);
+	let reindexedMessage = $state<string | null>(null);
+	let reindexErrorKey = $state<string | null>(null);
+
+	async function rebuildIndex() {
+		reindexing = true;
+		reindexedMessage = null;
+		reindexErrorKey = null;
+
+		try {
+			const counts = await reindexSearch();
+			reindexedMessage = $_('search.reindexed', { values: counts });
+		} catch {
+			reindexErrorKey = 'search.reindexFailed';
+		} finally {
+			reindexing = false;
+		}
 	}
 </script>
 
@@ -291,6 +317,22 @@
 			/>
 			<Button type="submit" size="sm">{$_('settings.addHoliday')}</Button>
 		</form>
+	</Card>
+
+	<Card variant="panel" as="section" class="mt-6">
+		<h2 class="text-sm font-bold">{$_('search.reindex')}</h2>
+		<p class="mt-1 text-xs text-ink-muted">{$_('search.reindexHint')}</p>
+
+		{#if reindexedMessage}
+			<Alert tone="success" live="status" class="mt-4">{reindexedMessage}</Alert>
+		{/if}
+		{#if reindexErrorKey}
+			<Alert tone="warning" class="mt-4">{$_(reindexErrorKey)}</Alert>
+		{/if}
+
+		<Button size="sm" class="mt-5" disabled={reindexing} onclick={rebuildIndex}>
+			{reindexing ? $_('search.reindexing') : $_('search.reindex')}
+		</Button>
 	</Card>
 
 	<Card variant="panel" as="section" class="mt-6">

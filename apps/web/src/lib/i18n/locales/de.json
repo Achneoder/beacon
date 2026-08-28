@@ -21,6 +21,23 @@
 			"out": "Ausgestempelt"
 		}
 	},
+	"search": {
+		"label": "Dokumente und Personen durchsuchen",
+		"placeholder": "Suchen …",
+		"searching": "Wird gesucht …",
+		"noResults": "Keine Treffer",
+		"resultCount": "{count} Treffer",
+		"group": {
+			"document": "Dokumente",
+			"employee": "Personen"
+		},
+		"reindex": "Suchindex neu aufbauen",
+		"reindexHint": "Die Suche wird aus der Datenbank neu aufgebaut. Nach dem Einspielen einer Sicherung oder dem Start eines neuen Such-Containers ausführen.",
+		"reindexing": "Wird aufgebaut …",
+		"reindexed": "{documents} Dokumente und {employees} Personen indexiert.",
+		"reindexFailed": "Der Suchindex konnte nicht neu aufgebaut werden.",
+		"unavailable": "Für diese Installation ist keine Suche konfiguriert."
+	},
 	"today": {
 		"kicker": "Überblick",
 		"title": "Heute",
