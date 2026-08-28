@@ -135,7 +135,7 @@ export class DocumentsService {
   async findVisible(
     caller: DocumentCaller,
     id: string,
-    populate: readonly string[] = ['owner', 'category', 'currentVersion'],
+    populate: readonly string[] = ['owner', 'category', 'currentVersion', 'currentVersion.uploadedBy'],
   ): Promise<Document> {
     const { where } = await this.accessContext(caller);
     const document = await this.em.findOne(
@@ -201,7 +201,7 @@ export class DocumentsService {
     if (filter.userId) where.owner = filter.userId;
 
     const documents = await this.em.find(Document, where, {
-      populate: ['owner', 'category', 'currentVersion'],
+      populate: ['owner', 'category', 'currentVersion', 'currentVersion.uploadedBy'],
       orderBy: { createdAt: 'desc' },
     });
 
@@ -432,7 +432,7 @@ export class DocumentsService {
     const document = await this.em.findOne(
       Document,
       { id, organization: caller.organizationId, deletedAt: null },
-      { populate: ['owner', 'category', 'currentVersion'] },
+      { populate: ['owner', 'category', 'currentVersion', 'currentVersion.uploadedBy'] },
     );
     if (!document || !document.currentVersion) throw new NotFoundException('document not found');
 

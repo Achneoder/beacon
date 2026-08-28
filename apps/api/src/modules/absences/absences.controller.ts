@@ -148,6 +148,7 @@ export function callerOf(user: AuthenticatedUser): Caller {
     id: user.id,
     organizationId: user.organizationId,
     canApprove: user.permissions.includes('holiday:approve'),
+    canManageDocuments: user.permissions.includes('document:manage'),
   };
 }
 

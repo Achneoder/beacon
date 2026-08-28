@@ -47,6 +47,10 @@ export interface Caller {
   organizationId: string;
   /** True when the caller holds `holiday:approve` — they may read and decide widely. */
   canApprove: boolean;
+  /** True when the caller holds `document:manage` — carried through to
+   *  `DocumentsService.findVisible` so an admin attaching a sick note sees as widely
+   *  as they do everywhere else in the documents module. */
+  canManageDocuments: boolean;
 }
 
 export interface CalendarFilter {
@@ -205,7 +209,7 @@ export class AbsencesService {
     let document: Ref<Document> | null = null;
     if (dto.documentId) {
       const found = await this.documents.findVisible(
-        { id: caller.id, organizationId: caller.organizationId, canManage: false },
+        { id: caller.id, organizationId: caller.organizationId, canManage: caller.canManageDocuments },
         dto.documentId,
       );
       if (found.owner?.id !== subjectId) {
