@@ -17,7 +17,7 @@ Requires **Node 22+**, **pnpm 10+**, and **Docker**.
 ```bash
 pnpm install
 
-# Postgres, MinIO and the observability stack
+# Postgres, MinIO, Mailpit and the observability stack
 pnpm infra:up
 
 # Environment defaults (both files are gitignored)
@@ -43,6 +43,7 @@ http://localhost:5173, create an organization, and you are signed in as its owne
 | Web | http://localhost:5173 | — |
 | Postgres | `localhost:5432` | `beacon` / `beacon` |
 | MinIO console | http://localhost:9001 | `beacon` / `beacon-secret` |
+| Mailpit | http://localhost:8025 | — |
 | Grafana | http://localhost:3001 | `admin` / `admin` |
 | Prometheus | http://localhost:9090 | — |
 
@@ -81,7 +82,7 @@ apps/web         SvelteKit + Svelte 5 + TailwindCSS — client-only SPA
 apps/api         NestJS + MikroORM + PostgreSQL
 packages/shared  @beacon/shared — permissions and tenant types shared by both apps
 packages/config  @beacon/config — shared TypeScript base config
-infra            docker-compose: Postgres, MinIO, Prometheus, Loki, Alloy, Grafana
+infra            docker-compose: Postgres, MinIO, Mailpit, Prometheus, Loki, Alloy, Grafana
 ```
 
 `apps/mobile` and `apps/desktop` are planned; their frameworks are not yet chosen.
@@ -172,6 +173,11 @@ the API so the implementation can be swapped without touching feature code.
 - **Object storage** — integrate with an external object storage service such as Amazon S3 or
   Google Cloud Storage to reuse existing storage infrastructure and gain scalability and
   reliability. Out of the box, Beacon provides **MinIO** as a self-hosted alternative.
+- **Email** — point `MAIL_HOST` at the organization's own SMTP relay to send invitations and,
+  later, every other notification from an address its people already trust. Out of the box, Beacon
+  provides **Mailpit** for development, which catches every message instead of delivering it.
+  Configure no host at all and mail is logged rather than sent — invitation links can still be
+  passed on by hand.
 - **Monitoring** — integrate with external monitoring services such as Prometheus or Grafana to
   identify and address issues before they impact users. Out of the box, Beacon provides a
   **Prometheus, Loki, Alloy and Grafana** setup.

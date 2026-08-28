@@ -20,7 +20,7 @@ apps/web         SvelteKit + Svelte 5 + Tailwind 4 — client-only SPA
 apps/api         NestJS 12 (ESM) + MikroORM 6 + PostgreSQL
 packages/shared  @beacon/shared — permissions, tenant types shared by both apps
 packages/config  @beacon/config — shared tsconfig base
-infra            docker-compose: postgres, MinIO, Prometheus/Loki/Alloy/Grafana
+infra            docker-compose: postgres, MinIO, Mailpit, Prometheus/Loki/Alloy/Grafana
 ```
 
 `apps/mobile` and `apps/desktop` are planned but not created; their frameworks are undecided.
@@ -45,7 +45,7 @@ pnpm e2e:down                                  # drop the e2e containers and the
 pnpm --filter api mikro-orm migration:create   # add --initial for the first one
 pnpm --filter api mikro-orm migration:up
 
-pnpm infra:up                                  # postgres, minio, observability
+pnpm infra:up                                  # postgres, minio, mailpit, observability
 pnpm infra:down
 ```
 
@@ -83,9 +83,11 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
   caller with `@CurrentUser()`, and resolve the tenant from `user.organizationId` — **never** take
   an organization id from the client. `/api/organizations/current` is the shape to copy.
 - **Optional services sit behind interfaces.** Documents go through the abstract `StorageService`
-  (`apps/api/src/common/storage/`), implemented by `MinioStorageService`. Inject `StorageService`;
-  never import the `minio` SDK — or any other vendor SDK — from feature code. The same rule will
-  apply to search and monitoring.
+  (`apps/api/src/common/storage/`), implemented by `MinioStorageService`, and outbound email
+  through `MailService` (`apps/api/src/common/mail/`), implemented by `SmtpMailService` — or by
+  `LogMailService` when no `MAIL_HOST` is set. Inject the abstract class; never import the `minio`
+  or `nodemailer` SDK — or any other vendor SDK — from feature code. The same rule will apply to
+  search and monitoring.
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
   (`apps/web/src/lib/i18n/`, locales `en` + `de`). No hardcoded strings. Target WCAG 2.1.
 
@@ -106,6 +108,24 @@ is nullable and hashing sits behind `PasswordService` rather than calling `@node
   `AuthService.login` is a single lookup.
 - **Web guards are UX only.** The redirects in `src/routes/(app)/+layout.svelte` are convenience;
   the API re-checks every request. `session.can()` decides what to *offer*, never what to allow.
+
+## Email
+
+Invitations are emailed; every other notification will follow the same path.
+
+- **`MailService` is the seam** (`apps/api/src/common/mail/`). `SmtpMailService` is chosen at boot
+  when `MAIL_HOST` is set, `LogMailService` otherwise — so a deployment without a relay still
+  works, and a bad host fails at startup rather than silently per message.
+- **`send` never throws.** It returns whether the message reached a transport. An invitation is
+  committed before the email goes out and stays valid regardless; `CreatedInvitation.emailSent`
+  is how the web app decides between "sent" and "pass the link on yourself". The accept link is
+  shown either way — the token is stored only as a hash and cannot be re-read.
+- **Copy lives in `invitation-email.ts`**, a pure function over `en`/`de`, mirroring the web
+  locales. No template engine, and no runtime string escapes the escaping helper.
+- **Mailpit catches everything in development** — SMTP on 1025, the inbox at
+  http://localhost:8025 — and again in both e2e suites on 51025/58025, where
+  `apps/api/test/mailpit.ts` reads messages back over its REST API. That is deliberate: mocking
+  `MailService` would prove the call, not the SMTP conversation.
 
 ## MikroORM specifics
 
@@ -161,10 +181,10 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
   and the suite cannot reach dev data at all. **Never point a suite that registers and
   tears down tenants at a database with real accounts in it.**
 - **Its backing services are throwaway.** `infra/docker-compose.e2e.yml` is a separate
-  compose project on separate ports (Postgres 55432, MinIO 59000) with tmpfs volumes, so a
-  running dev stack is never touched. `apps/web/tests/services.mjs` starts them, builds the
-  API and migrates before Playwright launches either server; the ports and the API's
-  environment live in `apps/web/tests/environment.mjs`.
+  compose project on separate ports (Postgres 55432, MinIO 59000, Mailpit 51025/58025) with
+  tmpfs volumes, so a running dev stack is never touched. `apps/web/tests/services.mjs`
+  starts them, builds the API and migrates before Playwright launches either server; the
+  ports and the API's environment live in `apps/web/tests/environment.mjs`.
 - **One organization for the whole run, one person per test.** Registration installs the
   instance and then 409s, so a tenant per spec is not available. Playwright's `setup`
   project (`apps/web/tests/instance.setup.ts`) installs it; each test then invites its own
