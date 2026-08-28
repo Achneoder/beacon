@@ -41,3 +41,21 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # The invitation email has to go somewhere the suite can read it back; Mailpit's REST
+  # API on 58025 is how the e2e specs assert that a message actually left the API.
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 'true'
+      MP_SMTP_AUTH_ALLOW_INSECURE: 'true'
+      # Messages live in memory only, like every other service in this project.
+      MP_MAX_MESSAGES: '500'
+    ports:
+      - '51025:1025'
+      - '58025:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 2s
+      timeout: 3s
+      retries: 30

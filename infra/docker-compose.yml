@@ -35,6 +35,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Development mail sink. Accepts every message on 1025 and delivers none — read them
+  # in the web UI on http://localhost:8025. Point MAIL_* at a real relay in production.
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 'true'
+      MP_SMTP_AUTH_ALLOW_INSECURE: 'true'
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   prometheus:
     image: prom/prometheus:latest
     command:

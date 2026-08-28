@@ -12,6 +12,9 @@ export const API_PORT = 3210;
 export const WEB_URL = `http://localhost:${WEB_PORT}`;
 export const API_URL = `http://localhost:${API_PORT}/api`;
 
+export const MAILPIT_SMTP_PORT = 51025;
+export const MAILPIT_URL = 'http://localhost:58025';
+
 export const DATABASE_URL = 'postgresql://beacon:beacon@localhost:55432/beacon_e2e';
 
 export const COMPOSE_FILE = '../../infra/docker-compose.e2e.yml';
@@ -45,5 +48,13 @@ export const API_ENV = {
 	STORAGE_USE_SSL: 'false',
 	STORAGE_ACCESS_KEY: 'beacon',
 	STORAGE_SECRET_KEY: 'beacon-secret',
-	STORAGE_BUCKET: 'beacon-e2e'
+	STORAGE_BUCKET: 'beacon-e2e',
+
+	// The throwaway Mailpit. Every invitation the suite creates lands there instead of
+	// a real inbox, and MAILPIT_URL is how a spec reads it back.
+	MAIL_HOST: 'localhost',
+	MAIL_PORT: String(MAILPIT_SMTP_PORT),
+	MAIL_SECURE: 'false',
+	MAIL_FROM: 'Beacon <beacon@e2e.local>',
+	WEB_BASE_URL: WEB_URL
 };

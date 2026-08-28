@@ -34,7 +34,7 @@ function run(label, argv, env = {}) {
 
 if (process.env.E2E_SKIP_DOCKER !== '1') {
 	// --wait blocks on the healthchecks, so migrating straight afterwards is safe.
-	run('starting e2e postgres and minio', [
+	run('starting e2e postgres, minio and mailpit', [
 		'docker',
 		'compose',
 		'-f',
