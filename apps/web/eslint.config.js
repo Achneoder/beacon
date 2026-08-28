@@ -13,12 +13,20 @@ export default ts.config(
 		}
 	},
 	{
+		// The e2e harness runs in Node, not the browser: Playwright's config, its setup
+		// script and the specs all read `process`.
+		files: ['playwright.config.ts', 'tests/**'],
+		languageOptions: {
+			globals: { ...globals.node }
+		}
+	},
+	{
 		files: ['**/*.svelte'],
 		languageOptions: {
 			parserOptions: { parser: ts.parser }
 		}
 	},
 	{
-		ignores: ['build/', '.svelte-kit/', 'dist/']
+		ignores: ['build/', '.svelte-kit/', 'dist/', 'playwright-report/', 'test-results/']
 	}
 );

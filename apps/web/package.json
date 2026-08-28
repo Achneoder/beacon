@@ -12,6 +12,8 @@
 		"lint": "eslint . && prettier --check .",
 		"format": "prettier --write .",
 		"test": "pnpm --filter @beacon/shared build && vitest run",
+		"test:e2e": "node tests/services.mjs && playwright test",
+		"test:e2e:ui": "node tests/services.mjs && playwright test --ui",
 		"test:watch": "vitest"
 	},
 	"dependencies": {
@@ -20,6 +22,7 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.18.0",
+		"@playwright/test": "^1.62.1",
 		"@sveltejs/adapter-static": "^3.0.8",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",

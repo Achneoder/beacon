@@ -14,9 +14,11 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "e2e": "pnpm --filter web test:e2e",
     "migrate": "pnpm --filter api migration:up",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
-    "infra:down": "docker compose -f infra/docker-compose.yml down"
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "e2e:down": "docker compose -f infra/docker-compose.e2e.yml down -v"
   },
   "devDependencies": {
     "prettier": "^3.4.2",

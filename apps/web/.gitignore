@@ -18,6 +18,12 @@ Thumbs.db
 !.env.example
 !.env.test
 
+# Playwright
+/playwright-report
+/test-results
+/blob-report
+/.playwright
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
