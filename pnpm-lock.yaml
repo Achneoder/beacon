@@ -65,6 +65,9 @@ importers:
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
+      meilisearch:
+        specifier: ^0.60.0
+        version: 0.60.0
       minio:
         specifier: ^8.0.4
         version: 8.0.7
@@ -3042,6 +3045,10 @@ packages:
   media-typer@1.1.1:
     resolution: {integrity: sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ==}
     engines: {node: '>= 0.8'}
+
+  meilisearch@0.60.0:
+    resolution: {integrity: sha512-z32KgxE6/7hRzbVfzUgzlmNl2OS7TwGE6wSWs2tVEuAY9DWrX6zAmt0s7wTyelH36orIaZ3/t1mQsCsExGtVDQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
 
   memoizee@0.4.17:
     resolution: {integrity: sha512-DGqD7Hjpi/1or4F/aYAspXKNm5Yili0QDAFAY4QYvpqpgiY6+1jOfqpmByzjxbWd/T9mChbCArXAbDAsTm5oXA==}
@@ -6717,6 +6724,8 @@ snapshots:
   media-typer@0.3.0: {}
 
   media-typer@1.1.1: {}
+
+  meilisearch@0.60.0: {}
 
   memoizee@0.4.17:
     dependencies:
