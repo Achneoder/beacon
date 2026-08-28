@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { createOrmConfig } from './mikro-orm.config.js';
+import { MailModule } from './common/mail/mail.module.js';
 import { StorageModule } from './common/storage/storage.module.js';
 import { PermissionsGuard } from './common/auth/permissions.guard.js';
 import { DEFAULT_THROTTLE_LIMIT } from './common/auth/throttle.js';
@@ -30,6 +31,7 @@ import { AbsencesModule } from './modules/absences/absences.module.js';
     }),
     // A baseline limit for every route; the password endpoints tighten it further.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: DEFAULT_THROTTLE_LIMIT }]),
+    MailModule,
     StorageModule,
     HealthModule,
     AuthModule,
