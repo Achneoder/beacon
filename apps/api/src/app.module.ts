@@ -19,6 +19,7 @@ import { TeamsModule } from './modules/teams/teams.module.js';
 import { InvitationsModule } from './modules/invitations/invitations.module.js';
 import { AttendanceModule } from './modules/attendance/attendance.module.js';
 import { AbsencesModule } from './modules/absences/absences.module.js';
+import { DocumentsModule } from './modules/documents/documents.module.js';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AbsencesModule } from './modules/absences/absences.module.js';
     InvitationsModule,
     AttendanceModule,
     AbsencesModule,
+    DocumentsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
