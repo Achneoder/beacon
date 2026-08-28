@@ -1,0 +1,13 @@
+{
+  "name": "@beacon/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["tsconfig.base.json"],
+  "scripts": {
+    "build": "echo 'nothing to build'",
+    "lint": "echo 'no linter configured'",
+    "typecheck": "echo 'nothing to check'",
+    "test": "echo 'no tests'"
+  }
+}
