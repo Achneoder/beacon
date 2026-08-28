@@ -24,6 +24,7 @@
 	const NAV: { href: string; key: string; permission?: Permission }[] = [
 		{ href: '/', key: 'nav.today', permission: 'attendance:read' },
 		{ href: '/timesheet', key: 'nav.timesheet', permission: 'attendance:read' },
+		{ href: '/calendar', key: 'nav.calendar', permission: 'attendance:read' },
 		{ href: '/approvals', key: 'nav.approvals', permission: 'attendance:write' },
 		{ href: '/people', key: 'nav.people', permission: 'employee:read' },
 		{ href: '/settings/organization', key: 'nav.settings', permission: 'organization:manage' },

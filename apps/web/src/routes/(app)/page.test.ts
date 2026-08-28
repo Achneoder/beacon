@@ -1,10 +1,16 @@
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { waitLocale } from 'svelte-i18n';
-import type { TimesheetWeek, TodayStatus } from '@beacon/shared';
+import type {
+	AbsenceRequestSummary,
+	LeaveBalanceSummary,
+	TimesheetWeek,
+	TodayStatus
+} from '@beacon/shared';
 import '$lib/i18n';
 import TodayPage from './+page.svelte';
 import * as attendance from '$lib/api/attendance';
+import * as absences from '$lib/api/absences';
 import { clock } from '$lib/attendance/clock.svelte';
 import { session } from '$lib/auth/session.svelte';
 
@@ -55,11 +61,51 @@ const week: TimesheetWeek = {
 	locksAt: '2026-08-31T07:00:00.000Z'
 };
 
+const balance: LeaveBalanceSummary = {
+	year: 2026,
+	entitlementDays: 30,
+	carryOverDays: 0,
+	carryOverExpiresOn: null,
+	takenDays: 12,
+	pendingDays: 2,
+	remainingDays: 18
+};
+
+function absence(overrides: Partial<AbsenceRequestSummary> = {}): AbsenceRequestSummary {
+	return {
+		id: 'a1',
+		userId: 'u1',
+		userName: 'Sam Tester',
+		typeId: 't1',
+		typeKey: 'vacation',
+		typeName: 'Vacation',
+		colorRole: 'accent',
+		countsAsWork: false,
+		startsOn: '2026-09-14',
+		endsOn: '2026-09-18',
+		halfDayStart: false,
+		halfDayEnd: false,
+		status: 'approved',
+		costDays: 5,
+		workingDays: 5,
+		approverId: null,
+		approverName: null,
+		decidedAt: null,
+		decisionNote: null,
+		note: null,
+		documentId: null,
+		createdAt: '2026-08-01T09:00:00.000Z',
+		...overrides
+	};
+}
+
 beforeEach(async () => {
 	await waitLocale('en');
 	vi.spyOn(session, 'can').mockReturnValue(true);
 	vi.spyOn(attendance, 'getToday').mockResolvedValue(today);
 	vi.spyOn(attendance, 'getWeek').mockResolvedValue(week);
+	vi.spyOn(absences, 'getLeaveBalance').mockResolvedValue(balance);
+	vi.spyOn(absences, 'listAbsences').mockResolvedValue([absence()]);
 	await clock.refresh();
 });
 
@@ -124,6 +170,32 @@ describe('today page', () => {
 		// The balance keeps climbing past the cap; the hint says by how much.
 		await waitFor(() => expect(screen.getByText('+42:20')).toBeInTheDocument());
 		expect(screen.getByText('2:20 over the cap — still counted.')).toBeInTheDocument();
+	});
+
+	it('shows what is left of the year’s holiday', async () => {
+		render(TodayPage);
+
+		await waitFor(() => expect(screen.getByText('18')).toBeInTheDocument());
+		expect(screen.getByText('12 of 30 days taken')).toBeInTheDocument();
+	});
+
+	it('names the next absence that has not been lived yet', async () => {
+		render(TodayPage);
+
+		await waitFor(() => expect(screen.getByText('Vacation')).toBeInTheDocument());
+		expect(screen.getByText('Sep 14, 2026 – Sep 18, 2026')).toBeInTheDocument();
+	});
+
+	it('says so plainly when nothing is planned', async () => {
+		// A refused request is not a plan, and a past one is not next.
+		vi.spyOn(absences, 'listAbsences').mockResolvedValue([
+			absence({ id: 'a2', status: 'rejected' }),
+			absence({ id: 'a3', startsOn: '2026-01-05', endsOn: '2026-01-09', status: 'taken' })
+		]);
+
+		render(TodayPage);
+
+		await waitFor(() => expect(screen.getByText('Nothing planned')).toBeInTheDocument());
 	});
 });
 

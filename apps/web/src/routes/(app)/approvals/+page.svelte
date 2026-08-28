@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { _, locale } from 'svelte-i18n';
-	import { formatDuration, minutesBetween, type CorrectionSummary } from '@beacon/shared';
+	import {
+		formatDuration,
+		minutesBetween,
+		type AbsenceRequestSummary,
+		type CorrectionSummary
+	} from '@beacon/shared';
 	import { Alert, Badge, Button, Card } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
+	import { RequestRow } from '$lib/components/absence';
 	import {
 		approvalKey,
 		approvalTone,
@@ -10,6 +16,7 @@
 		formatTimeRange
 	} from '$lib/attendance/labels';
 	import { approveCorrection, listCorrections, rejectCorrection } from '$lib/api/attendance';
+	import { approveAbsence, listAbsences, rejectAbsence } from '$lib/api/absences';
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
 
@@ -24,6 +31,7 @@
 	let decidingId = $state<string | null>(null);
 
 	const canApprove = $derived(session.can('attendance:approve'));
+	const canApproveAbsence = $derived(session.can('holiday:approve'));
 	const lang = $derived($locale ?? 'en');
 	// The user's own zone; a correction states instants, and a queue read in the wrong
 	// zone would show the wrong hours.
@@ -32,21 +40,47 @@
 	const pending = $derived(corrections.filter((item) => item.status === 'pending'));
 	const decided = $derived(corrections.filter((item) => item.status !== 'pending'));
 
+	/**
+	 * Absences are a second queue on the same screen, because they route along the
+	 * same `User.manager` edge and a manager should not have to remember which of two
+	 * pages a request landed on. The two permissions are separate, though — an
+	 * approver of hours is not automatically an approver of holiday.
+	 */
+	let absences = $state<AbsenceRequestSummary[]>([]);
+
+	const pendingAbsences = $derived(absences.filter((item) => item.status === 'pending'));
+
 	$effect(() => {
-		void load(canApprove);
+		void load(canApprove, canApproveAbsence);
 	});
 
-	async function load(approver: boolean) {
+	async function load(approver: boolean, absenceApprover: boolean) {
 		loading = true;
 		loadErrorKey = null;
 
 		try {
 			// An approver sees the queue; everyone else sees the requests they raised.
-			corrections = await listCorrections(!approver);
+			[corrections, absences] = await Promise.all([
+				listCorrections(!approver),
+				listAbsences({ mine: !absenceApprover })
+			]);
 		} catch (error) {
 			loadErrorKey = errorKey(error);
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function decideAbsence(id: string, approved: boolean) {
+		decidingId = id;
+
+		try {
+			const updated = approved ? await approveAbsence(id) : await rejectAbsence(id);
+			absences = absences.map((item) => (item.id === id ? updated : item));
+		} catch (error) {
+			loadErrorKey = errorKey(error);
+		} finally {
+			decidingId = null;
 		}
 	}
 
@@ -86,7 +120,52 @@
 
 <Card variant="panel" as="section" class="mt-6">
 	<h2 class="text-base font-bold tracking-tight">
-		{canApprove ? $_('approvals.queue') : $_('approvals.yours')}
+		{$_('approvals.absences')}
+	</h2>
+	<p class="mt-1 text-2xs text-ink-muted">
+		{canApproveAbsence ? $_('approvals.absencesQueueHint') : $_('approvals.absencesYoursHint')}
+	</p>
+
+	{#if loading}
+		<p class="mt-4 text-sm text-ink-muted">{$_('approvals.loading')}</p>
+	{:else if pendingAbsences.length === 0}
+		<p class="mt-4 text-sm text-ink-muted">{$_('approvals.absencesEmpty')}</p>
+	{:else}
+		<ul class="mt-4 flex flex-col gap-3">
+			{#each pendingAbsences as absence (absence.id)}
+				<RequestRow {absence} showName={canApproveAbsence}>
+					{#if canApproveAbsence}
+						<Button
+							size="sm"
+							variant="primary"
+							tone="success"
+							disabled={decidingId === absence.id}
+							onclick={() => decideAbsence(absence.id, true)}
+						>
+							{$_('approvals.approve')}
+						</Button>
+						<Button
+							size="sm"
+							variant="ghost"
+							disabled={decidingId === absence.id}
+							onclick={() => decideAbsence(absence.id, false)}
+						>
+							{$_('approvals.reject')}
+						</Button>
+					{:else if absence.approverName}
+						<span class="text-2xs text-ink-muted">
+							{$_('approvals.awaiting', { values: { name: absence.approverName } })}
+						</span>
+					{/if}
+				</RequestRow>
+			{/each}
+		</ul>
+	{/if}
+</Card>
+
+<Card variant="panel" as="section" class="mt-4">
+	<h2 class="text-base font-bold tracking-tight">
+		{$_('approvals.corrections')}
 	</h2>
 	<p class="mt-1 text-2xs text-ink-muted">
 		{canApprove ? $_('approvals.queueHint') : $_('approvals.yoursHint')}

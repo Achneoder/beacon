@@ -8,6 +8,7 @@
 		"profile": "Profil",
 		"settings": "Einstellungen",
 		"timesheet": "Zeitkonto",
+		"calendar": "Kalender",
 		"approvals": "Freigaben"
 	},
 	"shell": {
@@ -46,7 +47,12 @@
 		"segment": {
 			"work": "Arbeit",
 			"break": "Pause"
-		}
+		},
+		"holidayLeft": "Resturlaub",
+		"holidayLeftHint": "{taken} von {entitlement} Tagen genommen",
+		"nextAbsence": "Nächste Abwesenheit",
+		"noAbsence": "Nichts geplant",
+		"openCalendar": "Kalender öffnen"
 	},
 	"theme": {
 		"label": "Darstellung",
@@ -211,7 +217,20 @@
 		"roles": "Rollen",
 		"rolesHint": "Die eingebauten Rollen sind noch nicht bearbeitbar. Ein Rolleneditor kommt mit den Manager-Ansichten.",
 		"systemRole": "Eingebaut",
-		"permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}"
+		"permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+		"absenceTypes": "Abwesenheitsarten",
+		"absenceTypesHint": "Was beantragt werden kann. Eine stillgelegte Art lässt alte Anträge unberührt.",
+		"deducts": "Vom Kontingent",
+		"paid": "Bezahlt",
+		"countsAsWork": "Zählt als Arbeit",
+		"retire": "Stilllegen",
+		"retired": "Stillgelegt",
+		"holidays": "Feiertage",
+		"holidaysHint": "Tage, an denen das Büro geschlossen ist. Sie kosten niemanden Urlaub.",
+		"holidayDate": "Datum",
+		"holidayName": "Name",
+		"addHoliday": "Feiertag hinzufügen",
+		"noHolidays": "Für dieses Jahr sind noch keine Feiertage hinterlegt."
 	},
 	"timesheet": {
 		"kicker": "Zeiterfassung",
@@ -248,9 +267,7 @@
 		"kicker": "Zeiterfassung",
 		"title": "Freigaben",
 		"loading": "Anträge werden geladen…",
-		"queue": "Wartet auf dich",
 		"queueHint": "Korrekturanträge der Personen, für die du freigibst.",
-		"yours": "Deine Anträge",
 		"yoursHint": "Korrekturen, die du beantragt hast — und was daraus wurde.",
 		"empty": "Es wartet nichts.",
 		"decided": "Entschieden",
@@ -261,7 +278,12 @@
 			"add": "Eintrag ergänzt",
 			"amend": "Eintrag geändert",
 			"remove": "Eintrag entfernt"
-		}
+		},
+		"corrections": "Zeitkorrekturen",
+		"absences": "Abwesenheitsanträge",
+		"absencesQueueHint": "Abwesenheiten, die auf deine Entscheidung warten.",
+		"absencesYoursHint": "Abwesenheiten, die du beantragt hast — und was daraus wurde.",
+		"absencesEmpty": "Es wartet keine Abwesenheit."
 	},
 	"attendance": {
 		"source": {
@@ -285,5 +307,77 @@
 			"saturday": "Samstag",
 			"sunday": "Sonntag"
 		}
+	},
+	"absence": {
+		"type": {
+			"vacation": "Urlaub",
+			"sick": "Krankheit",
+			"home-office": "Homeoffice",
+			"unpaid": "Unbezahlter Urlaub",
+			"parental": "Elternzeit",
+			"training": "Fortbildung",
+			"business-trip": "Dienstreise",
+			"special": "Sonderurlaub"
+		},
+		"status": {
+			"pending": "Offen",
+			"approved": "Genehmigt",
+			"rejected": "Abgelehnt",
+			"taken": "Genommen"
+		},
+		"days": "{count, plural, one {# Tag} other {# Tage}}",
+		"halfDay": "Halber Tag"
+	},
+	"calendar": {
+		"kicker": "Abwesenheit",
+		"title": "Kalender",
+		"loading": "Kalender wird geladen…",
+		"previous": "Vorheriger Monat",
+		"next": "Nächster Monat",
+		"thisMonth": "Dieser Monat",
+		"grid": "Abwesenheiten nach Tag",
+		"scope": {
+			"me": "Nur ich",
+			"team": "Mein Team",
+			"organization": "Alle"
+		},
+		"weekdayShort": {
+			"monday": "Mo",
+			"tuesday": "Di",
+			"wednesday": "Mi",
+			"thursday": "Do",
+			"friday": "Fr",
+			"saturday": "Sa",
+			"sunday": "So"
+		},
+		"selectStart": "Wähle den ersten Tag deiner Abwesenheit.",
+		"selectEnd": "Jetzt den letzten Tag wählen — oder denselben Tag noch einmal für einen einzelnen Tag.",
+		"selected": "{range} · {cost}",
+		"newRequest": "Neuer Antrag",
+		"type": "Art",
+		"note": "Notiz",
+		"noteHint": "Optional — für deine Führungskraft sichtbar.",
+		"halfDayStart": "Erster Tag ist ein halber Tag",
+		"halfDayEnd": "Letzter Tag ist ein halber Tag",
+		"send": "Antrag senden",
+		"sending": "Wird gesendet…",
+		"cancel": "Abbrechen",
+		"requestSent": "Dein Antrag wurde gesendet.",
+		"requests": "Deine Anträge",
+		"requestsEmpty": "Du hast noch keine Abwesenheit beantragt.",
+		"withdraw": "Zurückziehen",
+		"withdrawn": "Antrag zurückgezogen.",
+		"awaiting": "Wartet auf {name}",
+		"legend": "Legende",
+		"holiday": "Feiertag",
+		"today": "Heute",
+		"balance": "Urlaub",
+		"entitlement": "Anspruch",
+		"carryOver": "Übertrag",
+		"carryOverExpires": "Verfällt am {date}",
+		"taken": "Genommen",
+		"pendingDays": "Offen",
+		"remaining": "Rest",
+		"noTypes": "Es sind noch keine Abwesenheitsarten eingerichtet."
 	}
 }

@@ -1,22 +1,51 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
-	import { formatDuration, formatSignedDuration, type TimesheetWeek } from '@beacon/shared';
+	import { locale } from 'svelte-i18n';
+	import {
+		formatDays,
+		formatDuration,
+		formatSignedDuration,
+		type AbsenceRequestSummary,
+		type LeaveBalanceSummary,
+		type TimesheetWeek
+	} from '@beacon/shared';
 	import { Alert, Button, Card, StatTile } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
 	import { ClockPanel, SegmentRow } from '$lib/components/attendance';
 	import { clock } from '$lib/attendance/clock.svelte';
 	import { balanceTone } from '$lib/attendance/labels';
+	import { formatRange, typeName } from '$lib/absence/labels';
 	import { getWeek } from '$lib/api/attendance';
+	import { getLeaveBalance, listAbsences } from '$lib/api/absences';
 	import { errorKey } from '$lib/auth/errors';
 
 	let week = $state<TimesheetWeek | null>(null);
+	let balance = $state<LeaveBalanceSummary | null>(null);
+	let absences = $state<AbsenceRequestSummary[]>([]);
 	let errorMessageKey = $state<string | null>(null);
 
 	const today = $derived(clock.today);
+	const lang = $derived($locale ?? 'en');
+	const todayDate = $derived(today?.date ?? new Date().toISOString().slice(0, 10));
+
+	/**
+	 * The soonest absence that has not been lived yet, whether or not it has been
+	 * decided — the card is a reminder, and a pending request is exactly what a
+	 * person wants reminding of.
+	 */
+	const nextAbsence = $derived(
+		absences
+			.filter((absence) => absence.status !== 'rejected' && absence.endsOn >= todayDate)
+			.sort((left, right) => left.startsOn.localeCompare(right.startsOn))[0] ?? null
+	);
 
 	async function loadWeek() {
 		try {
-			week = await getWeek(0);
+			[week, balance, absences] = await Promise.all([
+				getWeek(0),
+				getLeaveBalance(),
+				listAbsences({ mine: true })
+			]);
 		} catch (error) {
 			errorMessageKey = errorKey(error);
 		}
@@ -72,6 +101,27 @@
 					: undefined}
 			/>
 			<StatTile
+				label={$_('today.holidayLeft')}
+				value={balance ? formatDays(balance.remainingDays) : '—'}
+				aside={$_('calendar.remaining')}
+				tone="accent"
+				hint={balance
+					? $_('today.holidayLeftHint', {
+							values: {
+								taken: formatDays(balance.takenDays),
+								entitlement: formatDays(balance.entitlementDays)
+							}
+						})
+					: undefined}
+			/>
+			<StatTile
+				label={$_('today.nextAbsence')}
+				value={nextAbsence
+					? typeName({ key: nextAbsence.typeKey, name: nextAbsence.typeName }, $_)
+					: $_('today.noAbsence')}
+				hint={nextAbsence ? formatRange(nextAbsence.startsOn, nextAbsence.endsOn, lang) : undefined}
+			/>
+			<StatTile
 				label={$_('today.breakTotal')}
 				value={formatDuration(today.breakMinutes)}
 				hint={$_('today.breakHint')}
@@ -82,7 +132,10 @@
 	<Card variant="panel" as="section" class="mt-4">
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<h2 class="text-base font-bold tracking-tight">{$_('today.segments')}</h2>
-			<Button variant="quiet" href="/timesheet">{$_('today.openTimesheet')}</Button>
+			<div class="flex items-center gap-3">
+				<Button variant="quiet" href="/calendar">{$_('today.openCalendar')}</Button>
+				<Button variant="quiet" href="/timesheet">{$_('today.openTimesheet')}</Button>
+			</div>
 		</div>
 
 		{#if today.segments.length}

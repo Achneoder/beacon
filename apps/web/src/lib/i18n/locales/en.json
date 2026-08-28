@@ -8,6 +8,7 @@
 		"profile": "Profile",
 		"settings": "Settings",
 		"timesheet": "Timesheet",
+		"calendar": "Calendar",
 		"approvals": "Approvals"
 	},
 	"shell": {
@@ -46,7 +47,12 @@
 		"segment": {
 			"work": "Work",
 			"break": "Break"
-		}
+		},
+		"holidayLeft": "Holiday left",
+		"holidayLeftHint": "{taken} of {entitlement} days taken",
+		"nextAbsence": "Next absence",
+		"noAbsence": "Nothing planned",
+		"openCalendar": "Open calendar"
 	},
 	"theme": {
 		"label": "Appearance",
@@ -211,7 +217,20 @@
 		"roles": "Roles",
 		"rolesHint": "Built-in roles cannot be edited yet. A role editor arrives with the manager screens.",
 		"systemRole": "Built-in",
-		"permissionCount": "{count, plural, one {# permission} other {# permissions}}"
+		"permissionCount": "{count, plural, one {# permission} other {# permissions}}",
+		"absenceTypes": "Absence types",
+		"absenceTypesHint": "What people can ask for. Retiring a type keeps old requests intact.",
+		"deducts": "Deducts quota",
+		"paid": "Paid",
+		"countsAsWork": "Counts as work",
+		"retire": "Retire",
+		"retired": "Retired",
+		"holidays": "Public holidays",
+		"holidaysHint": "Days the office is shut. They cost nobody a day of leave.",
+		"holidayDate": "Date",
+		"holidayName": "Name",
+		"addHoliday": "Add holiday",
+		"noHolidays": "No public holidays for this year yet."
 	},
 	"timesheet": {
 		"kicker": "Time tracking",
@@ -248,9 +267,7 @@
 		"kicker": "Time tracking",
 		"title": "Approvals",
 		"loading": "Loading requests…",
-		"queue": "Waiting for you",
 		"queueHint": "Correction requests from the people you approve for.",
-		"yours": "Your requests",
 		"yoursHint": "Corrections you have asked for, and what came of them.",
 		"empty": "Nothing is waiting.",
 		"decided": "Decided",
@@ -261,7 +278,12 @@
 			"add": "added entry",
 			"amend": "amended entry",
 			"remove": "removed entry"
-		}
+		},
+		"corrections": "Time corrections",
+		"absences": "Absence requests",
+		"absencesQueueHint": "Time off waiting for your decision.",
+		"absencesYoursHint": "Absences you have asked for, and what came of them.",
+		"absencesEmpty": "No absence is waiting."
 	},
 	"attendance": {
 		"source": {
@@ -285,5 +307,77 @@
 			"saturday": "Saturday",
 			"sunday": "Sunday"
 		}
+	},
+	"absence": {
+		"type": {
+			"vacation": "Vacation",
+			"sick": "Sick leave",
+			"home-office": "Home office",
+			"unpaid": "Unpaid leave",
+			"parental": "Parental leave",
+			"training": "Training",
+			"business-trip": "Business trip",
+			"special": "Special leave"
+		},
+		"status": {
+			"pending": "Pending",
+			"approved": "Approved",
+			"rejected": "Rejected",
+			"taken": "Taken"
+		},
+		"days": "{count, plural, one {# day} other {# days}}",
+		"halfDay": "Half day"
+	},
+	"calendar": {
+		"kicker": "Absence",
+		"title": "Calendar",
+		"loading": "Loading the calendar…",
+		"previous": "Previous month",
+		"next": "Next month",
+		"thisMonth": "This month",
+		"grid": "Absences by day",
+		"scope": {
+			"me": "Just me",
+			"team": "My team",
+			"organization": "Everyone"
+		},
+		"weekdayShort": {
+			"monday": "Mon",
+			"tuesday": "Tue",
+			"wednesday": "Wed",
+			"thursday": "Thu",
+			"friday": "Fri",
+			"saturday": "Sat",
+			"sunday": "Sun"
+		},
+		"selectStart": "Pick the first day of your absence.",
+		"selectEnd": "Now pick the last day — or the same day again for a single day.",
+		"selected": "{range} · {cost}",
+		"newRequest": "New request",
+		"type": "Type",
+		"note": "Note",
+		"noteHint": "Optional — visible to your manager.",
+		"halfDayStart": "First day is a half day",
+		"halfDayEnd": "Last day is a half day",
+		"send": "Send request",
+		"sending": "Sending…",
+		"cancel": "Cancel",
+		"requestSent": "Your request has been sent.",
+		"requests": "Your requests",
+		"requestsEmpty": "You have not asked for any time off yet.",
+		"withdraw": "Withdraw",
+		"withdrawn": "Request withdrawn.",
+		"awaiting": "Awaiting {name}",
+		"legend": "Legend",
+		"holiday": "Public holiday",
+		"today": "Today",
+		"balance": "Leave",
+		"entitlement": "Entitlement",
+		"carryOver": "Carried over",
+		"carryOverExpires": "Expires {date}",
+		"taken": "Taken",
+		"pendingDays": "Pending",
+		"remaining": "Remaining",
+		"noTypes": "No absence types have been set up yet."
 	}
 }

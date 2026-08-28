@@ -1,10 +1,25 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
-	import type { DepartmentSummary, OrganizationSummary, RoleSummary } from '@beacon/shared';
+	import { locale } from 'svelte-i18n';
+	import type {
+		AbsenceTypeSummary,
+		DepartmentSummary,
+		HolidaySummary,
+		OrganizationSummary,
+		RoleSummary
+	} from '@beacon/shared';
 	import { Alert, Badge, Button, Card, TextField } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
 	import { api, apiSend } from '$lib/api/client';
 	import { createDepartment, deleteDepartment, listDepartments } from '$lib/api/people';
+	import {
+		createHoliday,
+		deleteHoliday,
+		listAllAbsenceTypes,
+		listHolidays,
+		retireAbsenceType
+	} from '$lib/api/absences';
+	import { formatDate, toneOf, typeName } from '$lib/absence/labels';
 	import { errorKey } from '$lib/auth/errors';
 
 	let organization = $state<OrganizationSummary | null>(null);
@@ -22,6 +37,20 @@
 	let newDepartment = $state('');
 	let departmentErrorKey = $state<string | null>(null);
 
+	/**
+	 * Absence types and public holidays live under organization settings rather than
+	 * behind an `absence:manage` permission of their own — they are settings, and the
+	 * permission union only grows when a phase says so.
+	 */
+	let absenceTypes = $state<AbsenceTypeSummary[]>([]);
+	let holidays = $state<HolidaySummary[]>([]);
+	let holidayDate = $state('');
+	let holidayName = $state('');
+	let holidayErrorKey = $state<string | null>(null);
+
+	const lang = $derived($locale ?? 'en');
+	const year = new Date().getUTCFullYear();
+
 	$effect(() => {
 		void load();
 	});
@@ -34,6 +63,8 @@
 			defaultLocale = organization.defaultLocale;
 			roles = await api<RoleSummary[]>('/organizations/current/roles');
 			departments = await listDepartments();
+			absenceTypes = await listAllAbsenceTypes();
+			holidays = await listHolidays(`${year}-01-01`, `${year}-12-31`);
 		} catch (error) {
 			loadErrorKey = errorKey(error);
 		}
@@ -75,6 +106,32 @@
 	async function removeDepartment(id: string) {
 		await deleteDepartment(id);
 		departments = departments.filter((department) => department.id !== id);
+	}
+
+	/** Retiring, never deleting — old requests must keep naming their type. */
+	async function retireType(id: string) {
+		const updated = await retireAbsenceType(id);
+		absenceTypes = absenceTypes.map((type) => (type.id === id ? updated : type));
+	}
+
+	async function addHoliday(event: SubmitEvent) {
+		event.preventDefault();
+		if (!holidayDate || !holidayName.trim()) return;
+
+		holidayErrorKey = null;
+		try {
+			const created = await createHoliday({ date: holidayDate, name: holidayName.trim() });
+			holidays = [...holidays, created].sort((left, right) => left.date.localeCompare(right.date));
+			holidayDate = '';
+			holidayName = '';
+		} catch (error) {
+			holidayErrorKey = errorKey(error);
+		}
+	}
+
+	async function removeHoliday(id: string) {
+		await deleteHoliday(id);
+		holidays = holidays.filter((holiday) => holiday.id !== id);
 	}
 </script>
 
@@ -158,6 +215,81 @@
 				bind:value={newDepartment}
 			/>
 			<Button type="submit" size="sm">{$_('settings.addDepartment')}</Button>
+		</form>
+	</Card>
+
+	<Card variant="panel" as="section" class="mt-6">
+		<h2 class="text-sm font-bold">{$_('settings.absenceTypes')}</h2>
+		<p class="mt-1 text-xs text-ink-muted">{$_('settings.absenceTypesHint')}</p>
+
+		<ul class="mt-4 flex flex-col gap-3">
+			{#each absenceTypes as type (type.id)}
+				<li class="flex flex-wrap items-center justify-between gap-3">
+					<span class="flex flex-wrap items-center gap-2">
+						<Badge tone={toneOf(type.colorRole)}>{typeName(type, $_)}</Badge>
+						{#if type.deductsFromQuota}
+							<span class="text-xs text-ink-muted">{$_('settings.deducts')}</span>
+						{/if}
+						{#if type.countsAsWork}
+							<span class="text-xs text-ink-muted">{$_('settings.countsAsWork')}</span>
+						{/if}
+						{#if !type.paid}
+							<span class="text-xs text-ink-muted">{$_('settings.paid')}: —</span>
+						{/if}
+					</span>
+					{#if type.active}
+						<Button size="sm" variant="quiet" onclick={() => retireType(type.id)}>
+							{$_('settings.retire')}
+						</Button>
+					{:else}
+						<Badge tone="neutral">{$_('settings.retired')}</Badge>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+	</Card>
+
+	<Card variant="panel" as="section" class="mt-6">
+		<h2 class="text-sm font-bold">{$_('settings.holidays')}</h2>
+		<p class="mt-1 text-xs text-ink-muted">{$_('settings.holidaysHint')}</p>
+
+		{#if holidays.length === 0}
+			<p class="mt-4 text-sm text-ink-muted">{$_('settings.noHolidays')}</p>
+		{:else}
+			<ul class="mt-4 flex flex-col gap-2">
+				{#each holidays as holiday (holiday.id)}
+					<li class="flex flex-wrap items-center justify-between gap-3">
+						<span class="min-w-0">
+							<span class="block truncate text-sm font-semibold">{holiday.name}</span>
+							<span class="block font-mono text-xs text-ink-muted">
+								{formatDate(holiday.date, lang)}
+							</span>
+						</span>
+						<Button size="sm" variant="quiet" onclick={() => removeHoliday(holiday.id)}>
+							{$_('settings.delete')}
+						</Button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<form class="mt-5 flex flex-wrap items-end gap-3" onsubmit={addHoliday} novalidate>
+			<label class="flex flex-col gap-1.5 text-sm font-semibold">
+				{$_('settings.holidayDate')}
+				<input
+					type="date"
+					bind:value={holidayDate}
+					class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
+				/>
+			</label>
+			<TextField
+				id="settings-new-holiday"
+				label={$_('settings.holidayName')}
+				class="w-full sm:w-72"
+				error={holidayErrorKey ? $_(holidayErrorKey) : undefined}
+				bind:value={holidayName}
+			/>
+			<Button type="submit" size="sm">{$_('settings.addHoliday')}</Button>
 		</form>
 	</Card>
 
