@@ -4,14 +4,14 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
+		"dev": "pnpm --filter @beacon/shared build && vite dev",
+		"build": "pnpm --filter @beacon/shared build && vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "eslint . && prettier --check .",
 		"format": "prettier --write .",
-		"test": "vitest run",
+		"test": "pnpm --filter @beacon/shared build && vitest run",
 		"test:watch": "vitest"
 	},
 	"dependencies": {

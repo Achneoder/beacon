@@ -6,9 +6,15 @@
     "strict": true,
     "declaration": true,
     "skipLibCheck": true,
-    "noEmit": true,
+    "noEmit": false,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }

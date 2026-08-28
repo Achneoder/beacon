@@ -5,17 +5,21 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no linter configured'",
-    "test": "echo 'no tests'"
+    "test": "echo 'no tests'",
+    "prepare": "tsc"
   },
   "devDependencies": {
     "typescript": "^6.0.2"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
