@@ -13,5 +13,52 @@
 		"system": "System",
 		"light": "Light",
 		"dark": "Dark"
+	},
+	"auth": {
+		"signIn": "Sign in",
+		"signInSubtitle": "Sign in to your organization.",
+		"signOut": "Sign out",
+		"email": "Email address",
+		"password": "Password",
+		"passwordConfirm": "Confirm password",
+		"submitting": "Signing in…",
+		"noAccount": "Need an organization?",
+		"createOrganization": "Create one",
+		"haveAccount": "Already have an account?",
+		"restoring": "Restoring your session…"
+	},
+	"register": {
+		"title": "Create your organization",
+		"subtitle": "You will be its owner, with full access.",
+		"organizationName": "Organization name",
+		"slugHint": "Your address will be beacon.app/{slug}",
+		"firstName": "First name",
+		"lastName": "Last name",
+		"passwordHint": "At least 12 characters.",
+		"submit": "Create organization",
+		"submitting": "Creating…"
+	},
+	"errors": {
+		"required": "This field is required.",
+		"email": "Enter a valid email address.",
+		"passwordTooShort": "Use at least 12 characters.",
+		"passwordMismatch": "The passwords do not match.",
+		"invalidCredentials": "That email and password do not match an account.",
+		"signupDisabled": "Self-service signup is turned off for this deployment.",
+		"conflict": "That name is already taken.",
+		"rateLimited": "Too many attempts. Wait a minute and try again.",
+		"network": "Could not reach the server. Check your connection.",
+		"unexpected": "Something went wrong. Please try again."
+	},
+	"org": {
+		"label": "Organization",
+		"timezone": "Time zone",
+		"defaultLocale": "Default language"
+	},
+	"roles": {
+		"owner": "Owner",
+		"admin": "Administrator",
+		"manager": "Manager",
+		"employee": "Employee"
 	}
 }

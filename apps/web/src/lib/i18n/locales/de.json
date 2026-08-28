@@ -13,5 +13,52 @@
 		"system": "System",
 		"light": "Hell",
 		"dark": "Dunkel"
+	},
+	"auth": {
+		"signIn": "Anmelden",
+		"signInSubtitle": "Melden Sie sich bei Ihrer Organisation an.",
+		"signOut": "Abmelden",
+		"email": "E-Mail-Adresse",
+		"password": "Passwort",
+		"passwordConfirm": "Passwort bestätigen",
+		"submitting": "Anmeldung läuft…",
+		"noAccount": "Noch keine Organisation?",
+		"createOrganization": "Jetzt anlegen",
+		"haveAccount": "Sie haben bereits ein Konto?",
+		"restoring": "Sitzung wird wiederhergestellt…"
+	},
+	"register": {
+		"title": "Organisation anlegen",
+		"subtitle": "Sie werden ihr Eigentümer – mit vollem Zugriff.",
+		"organizationName": "Name der Organisation",
+		"slugHint": "Ihre Adresse lautet beacon.app/{slug}",
+		"firstName": "Vorname",
+		"lastName": "Nachname",
+		"passwordHint": "Mindestens 12 Zeichen.",
+		"submit": "Organisation anlegen",
+		"submitting": "Wird angelegt…"
+	},
+	"errors": {
+		"required": "Dieses Feld ist erforderlich.",
+		"email": "Geben Sie eine gültige E-Mail-Adresse ein.",
+		"passwordTooShort": "Verwenden Sie mindestens 12 Zeichen.",
+		"passwordMismatch": "Die Passwörter stimmen nicht überein.",
+		"invalidCredentials": "E-Mail-Adresse und Passwort passen zu keinem Konto.",
+		"signupDisabled": "Die Selbstregistrierung ist in dieser Installation deaktiviert.",
+		"conflict": "Dieser Name ist bereits vergeben.",
+		"rateLimited": "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
+		"network": "Der Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung.",
+		"unexpected": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+	},
+	"org": {
+		"label": "Organisation",
+		"timezone": "Zeitzone",
+		"defaultLocale": "Standardsprache"
+	},
+	"roles": {
+		"owner": "Eigentümer",
+		"admin": "Administrator",
+		"manager": "Manager",
+		"employee": "Mitarbeiter"
 	}
 }
