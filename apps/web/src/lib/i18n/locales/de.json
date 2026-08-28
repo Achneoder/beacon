@@ -48,7 +48,9 @@
 		"conflict": "Dieser Name ist bereits vergeben.",
 		"rateLimited": "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut.",
 		"network": "Der Server ist nicht erreichbar. Prüfen Sie Ihre Verbindung.",
-		"unexpected": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+		"unexpected": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+		"checkFields": "Bitte prüfen Sie die markierten Felder.",
+		"organizationTooShort": "Verwenden Sie mindestens 2 Zeichen."
 	},
 	"org": {
 		"label": "Organisation",

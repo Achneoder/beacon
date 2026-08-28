@@ -5,8 +5,7 @@
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
 	import { previewSlug } from '$lib/auth/slug';
-
-	const MIN_PASSWORD_LENGTH = 12;
+	import { validateRegistration, type RegistrationFields } from '$lib/auth/validation';
 
 	let organizationName = $state('');
 	let firstName = $state('');
@@ -14,47 +13,77 @@
 	let email = $state('');
 	let password = $state('');
 	let passwordConfirm = $state('');
-	let errorMessageKey = $state<string | null>(null);
+	let serverErrorKey = $state<string | null>(null);
 	let submitting = $state(false);
-	/** Field errors stay hidden until the first submit, so typing is not nagged at. */
-	let submitted = $state(false);
+	/**
+	 * Field errors stay hidden until the first submit, so a half-typed address is not
+	 * called wrong. After that they update live, so fixing a field clears its message.
+	 */
+	let showErrors = $state(false);
+
+	/** Input ids in DOM order, so an invalid submit can focus the first problem. */
+	const FIELD_IDS: Record<keyof RegistrationFields, string> = {
+		organizationName: 'register-organization',
+		firstName: 'register-first-name',
+		lastName: 'register-last-name',
+		email: 'register-email',
+		password: 'register-password',
+		passwordConfirm: 'register-password-confirm'
+	};
 
 	const slug = $derived(previewSlug(organizationName));
 
-	const fieldErrors = $derived({
-		password:
-			password.length > 0 && password.length < MIN_PASSWORD_LENGTH
-				? 'errors.passwordTooShort'
-				: null,
-		passwordConfirm:
-			passwordConfirm.length > 0 && passwordConfirm !== password ? 'errors.passwordMismatch' : null
-	});
-
-	const valid = $derived(
-		organizationName.trim().length > 1 &&
-			firstName.trim().length > 0 &&
-			lastName.trim().length > 0 &&
-			email.includes('@') &&
-			password.length >= MIN_PASSWORD_LENGTH &&
-			password === passwordConfirm
+	const errors = $derived(
+		validateRegistration({
+			organizationName,
+			firstName,
+			lastName,
+			email,
+			password,
+			passwordConfirm
+		})
 	);
 
-	function errorFor(key: string | null): string | undefined {
-		return submitted && key ? $_(key) : undefined;
+	const summaryKey = $derived(
+		serverErrorKey ?? (showErrors && Object.keys(errors).length > 0 ? 'errors.checkFields' : null)
+	);
+
+	function errorFor(field: keyof RegistrationFields): string | undefined {
+		const key = errors[field];
+
+		return showErrors && key ? $_(key) : undefined;
+	}
+
+	function focusFirstInvalid() {
+		const field = (Object.keys(FIELD_IDS) as (keyof RegistrationFields)[]).find(
+			(name) => errors[name]
+		);
+		if (field) document.getElementById(FIELD_IDS[field])?.focus();
 	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		submitted = true;
-		errorMessageKey = null;
-		if (!valid) return;
+		showErrors = true;
+		serverErrorKey = null;
+
+		// Never fail silently: point at the first problem and let the alert say so.
+		if (Object.keys(errors).length > 0) {
+			focusFirstInvalid();
+			return;
+		}
 
 		submitting = true;
 		try {
-			await session.register({ organizationName, firstName, lastName, email, password });
+			await session.register({
+				organizationName: organizationName.trim(),
+				firstName: firstName.trim(),
+				lastName: lastName.trim(),
+				email: email.trim(),
+				password
+			});
 			await goto('/');
 		} catch (error) {
-			errorMessageKey = errorKey(error);
+			serverErrorKey = errorKey(error);
 		} finally {
 			submitting = false;
 		}
@@ -71,60 +100,64 @@
 	<p class="mt-1 text-sm text-ink-muted">{$_('register.subtitle')}</p>
 
 	<form class="mt-6 flex flex-col gap-4" onsubmit={submit} novalidate>
-		{#if errorMessageKey}
-			<Alert tone="warning">{$_(errorMessageKey)}</Alert>
+		{#if summaryKey}
+			<Alert tone="warning">{$_(summaryKey)}</Alert>
 		{/if}
 
 		<TextField
-			id="register-organization"
+			id={FIELD_IDS.organizationName}
 			label={$_('register.organizationName')}
 			autocomplete="organization"
 			hint={slug ? $_('register.slugHint', { values: { slug } }) : undefined}
+			error={errorFor('organizationName')}
 			required
 			bind:value={organizationName}
 		/>
 
 		<div class="grid gap-4 sm:grid-cols-2">
 			<TextField
-				id="register-first-name"
+				id={FIELD_IDS.firstName}
 				label={$_('register.firstName')}
 				autocomplete="given-name"
+				error={errorFor('firstName')}
 				required
 				bind:value={firstName}
 			/>
 			<TextField
-				id="register-last-name"
+				id={FIELD_IDS.lastName}
 				label={$_('register.lastName')}
 				autocomplete="family-name"
+				error={errorFor('lastName')}
 				required
 				bind:value={lastName}
 			/>
 		</div>
 
 		<TextField
-			id="register-email"
+			id={FIELD_IDS.email}
 			label={$_('auth.email')}
 			type="email"
 			autocomplete="email"
+			error={errorFor('email')}
 			required
 			bind:value={email}
 		/>
 		<TextField
-			id="register-password"
+			id={FIELD_IDS.password}
 			label={$_('auth.password')}
 			type="password"
 			autocomplete="new-password"
 			hint={$_('register.passwordHint')}
-			error={errorFor(fieldErrors.password)}
+			error={errorFor('password')}
 			required
 			bind:value={password}
 		/>
 		<TextField
-			id="register-password-confirm"
+			id={FIELD_IDS.passwordConfirm}
 			label={$_('auth.passwordConfirm')}
 			type="password"
 			autocomplete="new-password"
-			error={errorFor(fieldErrors.passwordConfirm)}
+			error={errorFor('passwordConfirm')}
 			required
 			bind:value={passwordConfirm}
 		/>

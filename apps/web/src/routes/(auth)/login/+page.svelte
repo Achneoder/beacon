@@ -4,22 +4,53 @@
 	import { Alert, Button, Card, Eyebrow, TextField } from '$lib/components/ui';
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
+	import { validateLogin, type LoginFields } from '$lib/auth/validation';
+
+	const FIELD_IDS: Record<keyof LoginFields, string> = {
+		email: 'login-email',
+		password: 'login-password'
+	};
 
 	let email = $state('');
 	let password = $state('');
-	let errorMessageKey = $state<string | null>(null);
+	let serverErrorKey = $state<string | null>(null);
 	let submitting = $state(false);
+	/** Hidden until the first submit, so a half-typed address is not called wrong. */
+	let showErrors = $state(false);
+
+	const errors = $derived(validateLogin({ email, password }));
+
+	const summaryKey = $derived(
+		serverErrorKey ?? (showErrors && Object.keys(errors).length > 0 ? 'errors.checkFields' : null)
+	);
+
+	function errorFor(field: keyof LoginFields): string | undefined {
+		const key = errors[field];
+
+		return showErrors && key ? $_(key) : undefined;
+	}
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
-		errorMessageKey = null;
+		showErrors = true;
+		serverErrorKey = null;
+
+		// Without this an empty submit reaches the API and comes back as a 400, which the
+		// user would see as "something went wrong" rather than "fill this in".
+		if (Object.keys(errors).length > 0) {
+			const field = (Object.keys(FIELD_IDS) as (keyof LoginFields)[]).find((name) => errors[name]);
+			if (field) document.getElementById(FIELD_IDS[field])?.focus();
+
+			return;
+		}
+
 		submitting = true;
 
 		try {
-			await session.login({ email, password });
+			await session.login({ email: email.trim(), password });
 			await goto('/');
 		} catch (error) {
-			errorMessageKey = errorKey(error);
+			serverErrorKey = errorKey(error);
 		} finally {
 			submitting = false;
 		}
@@ -36,23 +67,25 @@
 	<p class="mt-1 text-sm text-ink-muted">{$_('auth.signInSubtitle')}</p>
 
 	<form class="mt-6 flex flex-col gap-4" onsubmit={submit} novalidate>
-		{#if errorMessageKey}
-			<Alert tone="warning">{$_(errorMessageKey)}</Alert>
+		{#if summaryKey}
+			<Alert tone="warning">{$_(summaryKey)}</Alert>
 		{/if}
 
 		<TextField
-			id="login-email"
+			id={FIELD_IDS.email}
 			label={$_('auth.email')}
 			type="email"
 			autocomplete="email"
+			error={errorFor('email')}
 			required
 			bind:value={email}
 		/>
 		<TextField
-			id="login-password"
+			id={FIELD_IDS.password}
 			label={$_('auth.password')}
 			type="password"
 			autocomplete="current-password"
+			error={errorFor('password')}
 			required
 			bind:value={password}
 		/>

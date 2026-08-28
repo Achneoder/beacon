@@ -48,7 +48,9 @@
 		"conflict": "That name is already taken.",
 		"rateLimited": "Too many attempts. Wait a minute and try again.",
 		"network": "Could not reach the server. Check your connection.",
-		"unexpected": "Something went wrong. Please try again."
+		"unexpected": "Something went wrong. Please try again.",
+		"checkFields": "Check the highlighted fields.",
+		"organizationTooShort": "Use at least 2 characters."
 	},
 	"org": {
 		"label": "Organization",
