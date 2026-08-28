@@ -1,3 +1,4 @@
+export { default as Alert } from './Alert.svelte';
 export { default as Avatar } from './Avatar.svelte';
 export { default as Badge } from './Badge.svelte';
 export { default as Button } from './Button.svelte';
@@ -6,4 +7,5 @@ export { default as Eyebrow } from './Eyebrow.svelte';
 export { default as ProgressBar } from './ProgressBar.svelte';
 export { default as StatTile } from './StatTile.svelte';
 export { default as StatusDot } from './StatusDot.svelte';
+export { default as TextField } from './TextField.svelte';
 export { TONES, type Tone } from './types';
