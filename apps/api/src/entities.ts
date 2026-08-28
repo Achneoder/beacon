@@ -5,10 +5,30 @@ import { Team } from './modules/teams/team.entity.js';
 import { User } from './modules/users/user.entity.js';
 import { Invitation } from './modules/invitations/invitation.entity.js';
 import { RefreshToken } from './modules/auth/refresh-token.entity.js';
+import { AttendanceEntry } from './modules/attendance/attendance-entry.entity.js';
+import { BreakEntry } from './modules/attendance/break-entry.entity.js';
+import { AttendanceDay } from './modules/attendance/attendance-day.entity.js';
+import { WorkSchedule } from './modules/attendance/work-schedule.entity.js';
+import { OvertimeBalance } from './modules/attendance/overtime-balance.entity.js';
+import { AttendanceCorrection } from './modules/attendance/attendance-correction.entity.js';
 
 /**
  * Explicit entity registry. MikroORM's glob-based discovery would need to require()
  * .ts sources, which breaks under ESM and Vitest — so every entity is listed here.
  * Add new entities to this array.
  */
-export const ENTITIES = [Organization, Role, Department, Team, User, Invitation, RefreshToken];
+export const ENTITIES = [
+  Organization,
+  Role,
+  Department,
+  Team,
+  User,
+  Invitation,
+  RefreshToken,
+  AttendanceEntry,
+  BreakEntry,
+  AttendanceDay,
+  WorkSchedule,
+  OvertimeBalance,
+  AttendanceCorrection,
+];

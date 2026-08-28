@@ -15,6 +15,7 @@ import { UsersModule } from './modules/users/users.module.js';
 import { DepartmentsModule } from './modules/departments/departments.module.js';
 import { TeamsModule } from './modules/teams/teams.module.js';
 import { InvitationsModule } from './modules/invitations/invitations.module.js';
+import { AttendanceModule } from './modules/attendance/attendance.module.js';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module.js';
     DepartmentsModule,
     TeamsModule,
     InvitationsModule,
+    AttendanceModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
