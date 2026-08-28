@@ -1,0 +1,11 @@
+{
+	"app": {
+		"name": "Beacon"
+	},
+	"nav": {
+		"dashboard": "Dashboard",
+		"attendance": "Attendance",
+		"holidays": "Holidays",
+		"documents": "Documents"
+	}
+}
