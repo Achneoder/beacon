@@ -41,7 +41,12 @@ describe('Auth (e2e)', () => {
     if (orm && organizationId) {
       const em = orm.em.fork();
       await em.nativeDelete('refresh_tokens', { organization_id: organizationId });
-      await em.nativeDelete('user_roles', {});
+      // Scoped by subquery: these pivots carry no organization_id of their own, and
+      // deleting them unfiltered wipes every account's roles in the whole database.
+      await em.getConnection().execute(
+        'delete from user_roles where role_id in (select id from roles where organization_id = ?)',
+        [organizationId],
+      );
       await em.nativeDelete('users', { organization_id: organizationId });
       await em.nativeDelete('roles', { organization_id: organizationId });
       await em.nativeDelete(Organization, { id: organizationId });

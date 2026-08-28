@@ -39,7 +39,7 @@ pnpm --filter web test -- src/lib/api/client.test.ts
 pnpm --filter api test -- permissions.guard.spec.ts
 pnpm --filter api test -- -t "requires every declared permission"
 
-pnpm --filter api test:e2e                     # needs infra up + apps/api/.env
+pnpm --filter api test:e2e                     # brings up its own throwaway db, like `pnpm e2e`
 pnpm e2e                                       # browser e2e: SPA + real API + real db
 pnpm e2e:down                                  # drop the e2e containers and their data
 pnpm --filter api mikro-orm migration:create   # add --initial for the first one
@@ -136,7 +136,7 @@ There are **three** suites, and they prove different things:
 | Suite | Command | What it covers |
 | --- | --- | --- |
 | Unit / component | `pnpm -r test` | Vitest. Web mounts components in jsdom against a mocked client. |
-| API e2e | `pnpm --filter api test:e2e` | Supertest against a booted Nest app and the dev database. |
+| API e2e | `pnpm --filter api test:e2e` | Supertest against a booted Nest app and the throwaway database. |
 | Browser e2e | `pnpm e2e` | Playwright: the built SPA against a real API and a throwaway database. |
 
 The browser suite lives in `apps/web/tests` and exists to catch what the other two cannot —
@@ -146,6 +146,13 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
 - **It runs the *built* SPA**, previewed by `adapter-static`, not `vite dev` — that is the
   artefact that ships. `PUBLIC_API_URL` is baked in at build time, so it is set for `build`
   as well as `preview`.
+- **Both e2e suites share those services.** `pnpm --filter api test:e2e` chains the same
+  `services.mjs` and pins `DATABASE_URL` in `vitest.config.e2e.ts`. It used to run against
+  the dev database, where its teardown deleted `user_roles` and `invitation_roles`
+  unscoped — those pivots carry no `organization_id`, so it wiped every account's roles,
+  signing the developer out of their own organization. Teardown is scoped by subquery now,
+  and the suite cannot reach dev data at all. **Never point a suite that registers and
+  tears down tenants at a database with real accounts in it.**
 - **Its backing services are throwaway.** `infra/docker-compose.e2e.yml` is a separate
   compose project on separate ports (Postgres 55432, MinIO 59000) with tmpfs volumes, so a
   running dev stack is never touched. `apps/web/tests/services.mjs` starts them, builds the

@@ -82,9 +82,17 @@ describe('Attendance (e2e)', () => {
       await em.nativeDelete('overtime_balances', { organization_id: organizationId });
       await em.nativeDelete('work_schedules', { organization_id: organizationId });
       await em.nativeDelete('refresh_tokens', { organization_id: organizationId });
-      await em.nativeDelete('invitation_roles', {});
+      await em.getConnection().execute(
+        'delete from invitation_roles where role_id in (select id from roles where organization_id = ?)',
+        [organizationId],
+      );
       await em.nativeDelete('invitations', { organization_id: organizationId });
-      await em.nativeDelete('user_roles', {});
+      // Scoped by subquery: these pivots carry no organization_id of their own, and
+      // deleting them unfiltered wipes every account's roles in the whole database.
+      await em.getConnection().execute(
+        'delete from user_roles where role_id in (select id from roles where organization_id = ?)',
+        [organizationId],
+      );
       await em.nativeUpdate('users', { organization_id: organizationId }, { manager_id: null });
       await em.nativeDelete('users', { organization_id: organizationId });
       await em.nativeDelete('roles', { organization_id: organizationId });
