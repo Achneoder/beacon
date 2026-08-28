@@ -1,6 +1,11 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { DEFAULT_ROLES, type OrganizationSummary, type RoleSummary } from '@beacon/shared';
+import {
+  DEFAULT_ROLES,
+  type DefaultRole,
+  type OrganizationSummary,
+  type RoleSummary,
+} from '@beacon/shared';
 import { Organization } from './organization.entity.js';
 import { Role } from '../roles/role.entity.js';
 import { User, UserStatus } from '../users/user.entity.js';
@@ -29,8 +34,48 @@ const OWNER_ROLE_KEY = 'owner';
 const INSTALL_LOCK = 4_022_026_001;
 
 @Injectable()
-export class OrganizationService {
+export class OrganizationService implements OnModuleInit {
+  private readonly logger = new Logger(OrganizationService.name);
+
   constructor(private readonly em: EntityManager) {}
+
+  /**
+   * A later phase can only add to `DEFAULT_ROLES` — it never has a route to reach
+   * back and update a role an organization already has. Re-syncing every system
+   * role's permissions from `DEFAULT_ROLES` on every boot means a new permission
+   * (`document:write`, this phase's addition) reaches existing installs the moment
+   * they restart, with no hand-written backfill per phase.
+   *
+   * Safe because nothing lets an organization edit a system role today — the day a
+   * role editor changes that, this must stop overwriting what someone set by hand.
+   */
+  async onModuleInit(): Promise<void> {
+    await this.reconcileSystemRoles();
+  }
+
+  private async reconcileSystemRoles(): Promise<void> {
+    const roles = await this.em.find(Role, { isSystem: true });
+    let changed = 0;
+
+    for (const role of roles) {
+      const defaults = DEFAULT_ROLES[role.key as DefaultRole] as readonly string[] | undefined;
+      if (!defaults) continue;
+
+      const current = [...role.permissions].sort();
+      const next = [...defaults].sort();
+      const same =
+        current.length === next.length && current.every((permission, i) => permission === next[i]);
+      if (same) continue;
+
+      role.permissions = [...defaults] as Role['permissions'];
+      changed += 1;
+    }
+
+    if (changed > 0) {
+      await this.em.flush();
+      this.logger.log(`reconciled permissions for ${changed} system role(s)`);
+    }
+  }
 
   /** Whether the instance is still unclaimed — the one thing registration is allowed on. */
   async isSetupRequired(): Promise<boolean> {
