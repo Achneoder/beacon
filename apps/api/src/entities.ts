@@ -15,6 +15,10 @@ import { AbsenceType } from './modules/absences/absence-type.entity.js';
 import { AbsenceRequest } from './modules/absences/absence-request.entity.js';
 import { LeaveBalance } from './modules/absences/leave-balance.entity.js';
 import { Holiday } from './modules/absences/holiday.entity.js';
+import { DocumentCategory } from './modules/documents/document-category.entity.js';
+import { Document } from './modules/documents/document.entity.js';
+import { DocumentVersion } from './modules/documents/document-version.entity.js';
+import { DocumentAccess } from './modules/documents/document-access.entity.js';
 
 /**
  * Explicit entity registry. MikroORM's glob-based discovery would need to require()
@@ -39,4 +43,8 @@ export const ENTITIES = [
   AbsenceRequest,
   LeaveBalance,
   Holiday,
+  DocumentCategory,
+  Document,
+  DocumentVersion,
+  DocumentAccess,
 ];
