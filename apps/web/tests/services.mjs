@@ -34,7 +34,7 @@ function run(label, argv, env = {}) {
 
 if (process.env.E2E_SKIP_DOCKER !== '1') {
 	// --wait blocks on the healthchecks, so migrating straight afterwards is safe.
-	run('starting e2e postgres, minio and mailpit', [
+	run('starting e2e postgres, minio, meilisearch and mailpit', [
 		'docker',
 		'compose',
 		'-f',
@@ -81,6 +81,17 @@ run('resetting the e2e object store', ['pnpm', '--filter', 'api', 'test:reset-st
 	STORAGE_ACCESS_KEY: API_ENV.STORAGE_ACCESS_KEY,
 	STORAGE_SECRET_KEY: API_ENV.STORAGE_SECRET_KEY,
 	STORAGE_BUCKET: API_ENV.STORAGE_BUCKET
+});
+
+// And the search index, for exactly the same reason: it is derived state in a tmpfs
+// that outlives a single run, and last run's documents must not be findable in this
+// one. Rebuilt from Postgres on demand anyway — see POST /api/search/reindex.
+run('resetting the e2e search index', ['pnpm', '--filter', 'api', 'test:reset-search'], {
+	SEARCH_HOST: API_ENV.SEARCH_HOST,
+	SEARCH_PORT: API_ENV.SEARCH_PORT,
+	SEARCH_USE_SSL: API_ENV.SEARCH_USE_SSL,
+	SEARCH_API_KEY: API_ENV.SEARCH_API_KEY,
+	SEARCH_INDEX: API_ENV.SEARCH_INDEX
 });
 
 // The API runs from dist/ rather than through `nest start`, so Playwright's shutdown

@@ -40,6 +40,21 @@ const E2E_STORAGE_ENV = {
   STORAGE_ENCRYPTION: 'none',
 };
 
+/**
+ * The throwaway Meilisearch from the same compose project, pinned for the same reason
+ * as the bucket above — `apps/api/.env` points at the *dev* index, and the search e2e
+ * spec both writes to and wipes whichever one it is given. Must match `SEARCH_*` in
+ * `apps/web/tests/environment.mjs`; `apps/api/test/search.ts` refuses any index whose
+ * name does not end in `-e2e`.
+ */
+const E2E_SEARCH_ENV = {
+  SEARCH_HOST: 'localhost',
+  SEARCH_PORT: '57700',
+  SEARCH_USE_SSL: 'false',
+  SEARCH_API_KEY: 'beacon-search-key',
+  SEARCH_INDEX: 'beacon-e2e',
+};
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
@@ -58,6 +73,7 @@ export default defineConfig({
       MAIL_FROM: 'Beacon <beacon@e2e.local>',
       WEB_BASE_URL: 'http://localhost:4173',
       ...E2E_STORAGE_ENV,
+      ...E2E_SEARCH_ENV,
     },
   },
 });
