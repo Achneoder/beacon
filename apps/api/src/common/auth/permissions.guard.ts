@@ -1,13 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Permission } from '@beacon/shared';
+import type { AuthenticatedUser, Permission } from '@beacon/shared';
 import { PERMISSIONS_KEY } from './permissions.decorator.js';
-
-interface RequestUser {
-  id: string;
-  organizationId: string;
-  permissions: Permission[];
-}
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -21,7 +15,7 @@ export class PermissionsGuard implements CanActivate {
 
     if (!required?.length) return true;
 
-    const user = context.switchToHttp().getRequest<{ user?: RequestUser }>().user;
+    const user = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>().user;
     if (!user) return false;
 
     return required.every((permission) => user.permissions.includes(permission));
