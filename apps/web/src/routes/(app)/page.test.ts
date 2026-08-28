@@ -94,6 +94,7 @@ function absence(overrides: Partial<AbsenceRequestSummary> = {}): AbsenceRequest
 		decisionNote: null,
 		note: null,
 		documentId: null,
+		documentTitle: null,
 		createdAt: '2026-08-01T09:00:00.000Z',
 		...overrides
 	};

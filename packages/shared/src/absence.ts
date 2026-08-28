@@ -98,8 +98,9 @@ export interface AbsenceRequestSummary {
   decidedAt: string | null;
   decisionNote: string | null;
   note: string | null;
-  /** The sick note, once documents exist — phase 4 fills this in. */
+  /** The sick note, once one is attached — `null` for every other type. */
   documentId: string | null;
+  documentTitle: string | null;
   createdAt: string;
 }
 
@@ -112,6 +113,8 @@ export interface CreateAbsenceRequest {
   note?: string | null;
   /** Raising an absence for someone else needs `holiday:approve`. */
   userId?: string | null;
+  /** The sick note — must already belong to the requester. */
+  documentId?: string | null;
 }
 
 export interface DecideAbsenceRequest {

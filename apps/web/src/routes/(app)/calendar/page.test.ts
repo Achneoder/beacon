@@ -70,6 +70,7 @@ const request: AbsenceRequestSummary = {
 	decisionNote: null,
 	note: 'Long weekend',
 	documentId: null,
+	documentTitle: null,
 	createdAt: '2026-08-01T09:00:00.000Z'
 };
 
