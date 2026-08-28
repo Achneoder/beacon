@@ -21,6 +21,25 @@ const E2E_DATABASE_URL = 'postgresql://beacon:beacon@localhost:55432/beacon_e2e'
  * a suite that invites people must not reach a relay that would actually deliver. */
 const E2E_MAIL_PORT = '51025';
 
+/**
+ * The throwaway MinIO from the same compose project. Same reasoning as the database
+ * above, and the same pattern: pinned here rather than left to `apps/api/.env`, which
+ * points at the *dev* bucket. Must match `STORAGE_*` in `apps/web/tests/environment.mjs`
+ * — a plain JS file a TS config here cannot import without dragging it across a
+ * project boundary `tsc` refuses (it sits outside this package's `rootDir`).
+ * Documents specs upload real bytes; without this the suite would write into, and its
+ * reset would delete from, the dev bucket.
+ */
+const E2E_STORAGE_ENV = {
+  STORAGE_ENDPOINT: 'localhost',
+  STORAGE_PORT: '59000',
+  STORAGE_USE_SSL: 'false',
+  STORAGE_ACCESS_KEY: 'beacon',
+  STORAGE_SECRET_KEY: 'beacon-secret',
+  STORAGE_BUCKET: 'beacon-e2e',
+  STORAGE_ENCRYPTION: 'none',
+};
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
@@ -38,6 +57,7 @@ export default defineConfig({
       MAIL_SECURE: 'false',
       MAIL_FROM: 'Beacon <beacon@e2e.local>',
       WEB_BASE_URL: 'http://localhost:4173',
+      ...E2E_STORAGE_ENV,
     },
   },
 });

@@ -49,6 +49,7 @@ export const API_ENV = {
 	STORAGE_ACCESS_KEY: 'beacon',
 	STORAGE_SECRET_KEY: 'beacon-secret',
 	STORAGE_BUCKET: 'beacon-e2e',
+	STORAGE_ENCRYPTION: 'none',
 
 	// The throwaway Mailpit. Every invitation the suite creates lands there instead of
 	// a real inbox, and MAILPIT_URL is how a spec reads it back.
