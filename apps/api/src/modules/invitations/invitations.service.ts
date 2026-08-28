@@ -14,6 +14,8 @@ import { Team } from '../teams/team.entity.js';
 import { User, UserStatus } from '../users/user.entity.js';
 import { nextEmployeeNumber } from '../users/employee-number.js';
 import { PasswordService } from '../auth/password.service.js';
+import { MailService } from '../../common/mail/mail.service.js';
+import { invitationEmail } from './invitation-email.js';
 import { Invitation } from './invitation.entity.js';
 import {
   acceptUrl,
@@ -33,6 +35,7 @@ export class InvitationsService {
     private readonly em: EntityManager,
     private readonly config: ConfigService,
     private readonly passwords: PasswordService,
+    private readonly mail: MailService,
   ) {}
 
   async list(organizationId: string): Promise<InvitationSummary[]> {
@@ -47,8 +50,9 @@ export class InvitationsService {
 
   /**
    * The token is generated here and returned exactly once — only its digest is stored,
-   * so nobody, including an administrator reading the table, can recover it later.
-   * Until the notification seam exists, the caller emails `acceptUrl` by hand.
+   * so nobody, including an administrator reading the table, can recover it later. It
+   * is emailed to the invitee and handed back to the caller, who can pass the link on
+   * by hand when there is no relay configured or the send failed.
    */
   async create(
     organizationId: string,
@@ -93,13 +97,24 @@ export class InvitationsService {
 
     invitation.roles.set(await this.resolveRoles(organizationId, dto.roleIds));
     await this.em.flush();
-    await this.em.populate(invitation, ['roles', 'invitedBy']);
+    await this.em.populate(invitation, ['roles', 'invitedBy', 'organization']);
 
-    return {
-      ...toInvitationSummary(invitation),
-      token,
-      acceptUrl: acceptUrl(this.webBaseUrl(), token),
-    };
+    const summary = toInvitationSummary(invitation);
+    const url = acceptUrl(this.webBaseUrl(), token);
+    // After the flush, and never inside it: a relay that is slow or down must not roll
+    // back an invitation that is already valid. `send` reports delivery, it never throws.
+    const emailSent = await this.mail.send(
+      invitationEmail({
+        email: invitation.email,
+        firstName: invitation.firstName,
+        organizationName: invitation.organization.getEntity().name,
+        invitedByName: summary.invitedByName,
+        acceptUrl: url,
+        locale: invitation.locale,
+      }),
+    );
+
+    return { ...summary, token, acceptUrl: url, emailSent };
   }
 
   async revoke(organizationId: string, id: string): Promise<void> {

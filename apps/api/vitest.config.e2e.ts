@@ -17,6 +17,10 @@ import tsconfigPaths from 'vite-tsconfig-paths';
  */
 const E2E_DATABASE_URL = 'postgresql://beacon:beacon@localhost:55432/beacon_e2e';
 
+/** The throwaway Mailpit from the same compose project. Same reasoning as the database:
+ * a suite that invites people must not reach a relay that would actually deliver. */
+const E2E_MAIL_PORT = '51025';
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
@@ -29,6 +33,11 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: process.env.DATABASE_URL ?? E2E_DATABASE_URL,
+      MAIL_HOST: 'localhost',
+      MAIL_PORT: E2E_MAIL_PORT,
+      MAIL_SECURE: 'false',
+      MAIL_FROM: 'Beacon <beacon@e2e.local>',
+      WEB_BASE_URL: 'http://localhost:4173',
     },
   },
 });

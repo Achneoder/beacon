@@ -6,6 +6,7 @@ import { MikroORM } from '@mikro-orm/core';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/main.js';
 import { resetInstance } from './instance.js';
+import { clearMail, waitForMail } from './mailpit.js';
 
 /**
  * Names are still run-unique, so a failed run leaving data behind is easy to read in
@@ -220,6 +221,8 @@ describe('People (e2e)', () => {
     let invitationId: string;
 
     it('hands the token back exactly once, with a link into the web app', async () => {
+      await clearMail();
+
       const response = await request(app.getHttpServer())
         .post('/api/invitations')
         .set(auth())
@@ -245,6 +248,17 @@ describe('People (e2e)', () => {
         .set(auth())
         .expect(200);
       expect(listed.body[0].token).toBeUndefined();
+    });
+
+    it('emails the invitee the same link, over real SMTP', async () => {
+      // Read back out of Mailpit rather than off a mock: what is being proved here is
+      // that a message left the process and carries a link the invitee can follow.
+      const mail = await waitForMail(INVITEE_EMAIL);
+
+      expect(mail.subject).toBe(`You have been invited to ${ORG_NAME} on Beacon`);
+      expect(mail.text).toContain('Ada Lovelace has invited you');
+      expect(mail.text).toContain(`/invite/${token}`);
+      expect(mail.html).toContain(`/invite/${token}`);
     });
 
     it('accepts without any credential but the token, and signs the invitee in', async () => {
