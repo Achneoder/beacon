@@ -50,6 +50,14 @@ describe('Sidebar', () => {
 		expect(today).toHaveAttribute('aria-current', 'page');
 	});
 
+	it('offers Approvals to an approver who never books time of their own', () => {
+		// The default `manager` role: it approves, and holds no `attendance:write`.
+		renderSidebar(['attendance:read', 'attendance:approve', 'holiday:approve']);
+
+		expect(screen.getByRole('link', { name: 'Approvals' })).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Calendar' })).toBeInTheDocument();
+	});
+
 	it('hides a screen the account has no permission for', () => {
 		renderSidebar([]);
 

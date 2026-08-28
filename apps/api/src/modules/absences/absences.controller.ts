@@ -29,13 +29,19 @@ import { DecideAbsenceDto } from './dto/decide-absence.dto.js';
  * The tenant comes from `@CurrentUser()` and never from the client. `holiday:approve`
  * is what widens a caller past their own record — the permission says *whether* they
  * may look, and the service decides *whose*.
+ *
+ * Reading is gated by `attendance:read`, not by `holiday:request`. The two are not the
+ * same population: the default `manager` and `admin` roles approve time off and never
+ * ask for it, so gating the queue behind the requester's permission locked the
+ * approvers out of the screen built for them. Requesting still needs
+ * `holiday:request`, and deciding still needs `holiday:approve`.
  */
 @Controller('absences')
 export class AbsencesController {
   constructor(private readonly absences: AbsencesService) {}
 
   @Get()
-  @RequirePermissions('holiday:request')
+  @RequirePermissions('attendance:read')
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Query('userId') userId?: string,
@@ -102,7 +108,7 @@ export class AbsencesController {
   }
 
   @Get('types')
-  @RequirePermissions('holiday:request')
+  @RequirePermissions('attendance:read')
   types(@CurrentUser() user: AuthenticatedUser): Promise<AbsenceTypeSummary[]> {
     return this.absences.listTypes(user.organizationId);
   }
@@ -118,7 +124,7 @@ export class AbsencesController {
   }
 
   @Get('balances/me')
-  @RequirePermissions('holiday:request')
+  @RequirePermissions('attendance:read')
   myBalance(
     @CurrentUser() user: AuthenticatedUser,
     @Query('year') year?: string,

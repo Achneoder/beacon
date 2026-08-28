@@ -186,6 +186,16 @@ describe('today page', () => {
 		expect(screen.getByText('Sep 14, 2026 – Sep 18, 2026')).toBeInTheDocument();
 	});
 
+	it('keeps the clock and the week on screen when absence cannot answer', async () => {
+		// A side panel failing must not take the point of the screen with it.
+		vi.spyOn(absences, 'getLeaveBalance').mockRejectedValue(new Error('offline'));
+
+		render(TodayPage);
+
+		await waitFor(() => expect(screen.getByText('+1:45')).toBeInTheDocument());
+		expect(screen.getByText('Clocked in')).toBeInTheDocument();
+	});
+
 	it('says so plainly when nothing is planned', async () => {
 		// A refused request is not a plan, and a past one is not next.
 		vi.spyOn(absences, 'listAbsences').mockResolvedValue([

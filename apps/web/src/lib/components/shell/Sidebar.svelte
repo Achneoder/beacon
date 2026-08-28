@@ -25,7 +25,11 @@
 		{ href: '/', key: 'nav.today', permission: 'attendance:read' },
 		{ href: '/timesheet', key: 'nav.timesheet', permission: 'attendance:read' },
 		{ href: '/calendar', key: 'nav.calendar', permission: 'attendance:read' },
-		{ href: '/approvals', key: 'nav.approvals', permission: 'attendance:write' },
+		// Read, not write: the default `manager` role approves time without ever
+		// booking any, and gating the screen on `attendance:write` hid it from exactly
+		// the people it exists for. The page itself decides whether it shows a queue
+		// or the requests you raised.
+		{ href: '/approvals', key: 'nav.approvals', permission: 'attendance:read' },
 		{ href: '/people', key: 'nav.people', permission: 'employee:read' },
 		{ href: '/settings/organization', key: 'nav.settings', permission: 'organization:manage' },
 		// Everyone has a profile — no permission gates your own account.

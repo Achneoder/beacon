@@ -126,6 +126,9 @@ describe('calendar page', () => {
 		render(CalendarPage);
 
 		await waitFor(() => expect(screen.getAllByRole('gridcell')).toHaveLength(42));
+		// Six weeks plus the weekday header. A gridcell has to be owned by a row —
+		// a flat run of 42 cells is invalid ARIA and announces no week at all.
+		expect(screen.getAllByRole('row')).toHaveLength(7);
 	});
 
 	it('reaches every day by keyboard, not only by hover', async () => {

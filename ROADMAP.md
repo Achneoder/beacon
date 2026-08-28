@@ -228,10 +228,11 @@ calendar cell are one decision made in one place.
 
 | Route | Permission |
 | --- | --- |
-| `GET/POST /absences`, `DELETE /absences/:id` (withdraw own, pending only) | `holiday:request` |
+| `GET /absences`, `GET /absences/types` | `attendance:read` |
+| `POST /absences`, `DELETE /absences/:id` (withdraw own, pending only) | `holiday:request` |
 | `POST /absences/:id/approve` \| `/reject` | `holiday:approve` |
 | `GET /absences/calendar?from&to` | `attendance:read` |
-| `GET /absences/balances/me`, `GET /absences/balances?userId` | `holiday:request` / `employee:read` |
+| `GET /absences/balances/me`, `GET /absences/balances?userId` | `attendance:read` / `employee:read` |
 | `GET/POST /absence-types`, `GET/POST /public-holidays` | `organization:manage` |
 
 Working-day arithmetic — days between two dates minus weekends and public holidays, honouring half
@@ -268,6 +269,19 @@ Five things settled while building, worth knowing before phase 4:
 - **Absence types are seeded on first read, not at registration.** The unique key on
   `(organization, key)` makes a concurrent double-seed a conflict rather than a
   duplicate list, and organizations created before this phase fill themselves in.
+- **Reading absence is gated by `attendance:read`, not `holiday:request`** — a
+  deliberate deviation from the table above, which shipped broken. Requesting and
+  approving are different populations: the default `manager` and `admin` roles hold
+  `holiday:approve` and no `holiday:request` at all, so the original gate locked the
+  approvers out of the queue built for them, and out of the calendar and the Today
+  tiles besides. The same correction applies to the sidebar, where `/approvals` was
+  gated on `attendance:write`. Writing still needs `holiday:request` and deciding
+  still needs `holiday:approve`.
+
+  The web tests could not have caught this — they mock the API, so every call
+  resolves whatever the caller holds. `absences.e2e-spec.ts` now signs in as a real
+  `manager` and walks the screens, which is the only layer where a permission
+  mismatch is visible.
 
 Two rules the phase left in place rather than inventing around: the calendar's default
 scope is *your own days* — widening to reports and then the organization needs

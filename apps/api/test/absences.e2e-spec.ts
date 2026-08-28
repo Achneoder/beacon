@@ -13,6 +13,7 @@ const ORG_NAME = `Leave ${RUN}`;
 const OWNER_EMAIL = `owner.${RUN}@leave.test`;
 const STAFF_EMAIL = `staff.${RUN}@leave.test`;
 const OTHER_EMAIL = `other.${RUN}@leave.test`;
+const BOSS_EMAIL = `boss.${RUN}@leave.test`;
 const PASSWORD = 'correct-horse-battery';
 
 function iso(at: Date): string {
@@ -50,6 +51,8 @@ describe('Absence (e2e)', () => {
   let otherId: string;
   let vacationTypeId: string;
   let homeOfficeTypeId: string;
+  /** A manager: holds `holiday:approve`, and — per DEFAULT_ROLES — not `holiday:request`. */
+  let managerToken: string;
 
   const as = (token: string) => ({ Authorization: `Bearer ${token}` });
   const http = () => request(app.getHttpServer());
@@ -459,6 +462,93 @@ describe('Absence (e2e)', () => {
       expect(response.body.every((absence: { userId: string }) => absence.userId === staffId)).toBe(
         true,
       );
+    });
+  });
+
+  /**
+   * The screens absence shares with attendance are opened by people who approve time
+   * off but never ask for it themselves. The default `manager` role holds
+   * `holiday:approve` and no `holiday:request` at all, so every read on this path has
+   * to be reachable without the requester's permission.
+   */
+  describe('an approver who never requests', () => {
+    beforeAll(async () => {
+      const token = await invite(BOSS_EMAIL, 'Bea');
+      const people = await http().get('/api/users').set(as(ownerToken)).expect(200);
+      const bossId = people.body.find((person: { email: string }) => person.email === BOSS_EMAIL).id;
+
+      const roles = await http()
+        .get('/api/organizations/current/roles')
+        .set(as(ownerToken))
+        .expect(200);
+      const manager = roles.body.find((role: { key: string }) => role.key === 'manager');
+
+      await http()
+        .post(`/api/users/${bossId}/roles`)
+        .set(as(ownerToken))
+        .send({ roleIds: [manager.id] })
+        .expect(201);
+
+      // Staff report to them, so the queue and the team calendar have something in.
+      await http()
+        .patch(`/api/users/${staffId}`)
+        .set(as(ownerToken))
+        .send({ managerId: bossId })
+        .expect(200);
+
+      // The access token carries the permission set, so a role change only lands on
+      // the next one — sign in again rather than reusing the invitation's token.
+      const signedIn = await http()
+        .post('/api/auth/login')
+        .send({ email: BOSS_EMAIL, password: PASSWORD })
+        .expect(200);
+
+      managerToken = signedIn.body.accessToken;
+      expect(signedIn.body.user.permissions).toContain('holiday:approve');
+      expect(signedIn.body.user.permissions).not.toContain('holiday:request');
+      void token;
+    });
+
+    it('reads the calendar', async () => {
+      await http()
+        .get(`/api/absences/calendar?from=${THIS_MONDAY}&to=${shift(THIS_MONDAY, 6)}&scope=team`)
+        .set(as(managerToken))
+        .expect(200);
+    });
+
+    it('reads the absence types, because every screen tags a day with one', async () => {
+      const response = await http().get('/api/absences/types').set(as(managerToken)).expect(200);
+
+      expect(response.body).toHaveLength(8);
+    });
+
+    it('reads the queue it is expected to decide', async () => {
+      const response = await http().get('/api/absences').set(as(managerToken)).expect(200);
+
+      expect(response.body.some((absence: { userId: string }) => absence.userId === staffId)).toBe(
+        true,
+      );
+    });
+
+    it('reads its own balance, empty though it is', async () => {
+      const response = await http()
+        .get('/api/absences/balances/me')
+        .set(as(managerToken))
+        .expect(200);
+
+      expect(response.body.takenDays).toBe(0);
+    });
+
+    it('still may not raise a request without holiday:request', async () => {
+      await http()
+        .post('/api/absences')
+        .set(as(managerToken))
+        .send({
+          typeId: vacationTypeId,
+          startsOn: shift(THIS_MONDAY, 112),
+          endsOn: shift(THIS_MONDAY, 112),
+        })
+        .expect(403);
     });
   });
 

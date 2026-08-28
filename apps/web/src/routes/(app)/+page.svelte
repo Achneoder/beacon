@@ -39,13 +39,22 @@
 			.sort((left, right) => left.startsOn.localeCompare(right.startsOn))[0] ?? null
 	);
 
+	/**
+	 * The week and the absence tiles load independently.
+	 *
+	 * They were one `Promise.all`, which meant a single failing absence call blanked
+	 * the week balance and the overtime bank as well — the clock is the point of this
+	 * screen, and it must not go dark because a side panel could not answer.
+	 */
 	async function loadWeek() {
 		try {
-			[week, balance, absences] = await Promise.all([
-				getWeek(0),
-				getLeaveBalance(),
-				listAbsences({ mine: true })
-			]);
+			week = await getWeek(0);
+		} catch (error) {
+			errorMessageKey = errorKey(error);
+		}
+
+		try {
+			[balance, absences] = await Promise.all([getLeaveBalance(), listAbsences({ mine: true })]);
 		} catch (error) {
 			errorMessageKey = errorKey(error);
 		}
