@@ -31,6 +31,13 @@ export interface SessionUser extends AuthenticatedUser {
   firstName: string;
   lastName: string;
   locale: string;
+  /**
+   * The header states whose clock it is from the very first screen, so the session
+   * carries the user's own zone. Null means "use the organization's".
+   */
+  timezone: string | null;
+  /** Shown under the name in the sidebar's user card. */
+  jobTitle: string | null;
   /** For display only — authorization always goes through `permissions`. */
   roleKeys: string[];
   organizationName: string;
