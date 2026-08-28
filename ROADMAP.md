@@ -47,6 +47,7 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | Absence (calendar, quota, approvals, public holidays) | shipped |
 | Employee data, documents | not started |
 | Storage (`StorageService` → MinIO) | interface + implementation, no callers |
+| SSO (OIDC), 2FA, passkeys | not started — phase 7 specifies SSO |
 | Search, notifications, monitoring | not started |
 | Mobile, desktop | not created; frameworks undecided |
 
@@ -366,6 +367,152 @@ component so theme and locale formatting stay consistent.
 
 ---
 
+## Phase 7 — SSO (OIDC)
+
+*As an admin, I want to enable SSO for my organization.* The first slice of the "auth expansion"
+line below, and the only one an admin configures from inside the app.
+
+Beacon is installed for one organization, so the roadmap's "per-organization configuration and
+domain-based routing" collapses: there is **one provider per installation**, and no routing
+decision to make — the login screen either offers the button or it does not. That is the single
+biggest simplification available here, and the reason this phase is small enough to ship whole.
+
+**Scope, decided before building:**
+
+- **OIDC only.** Authorization code + PKCE against a discovery document. SAML stays on demand;
+  `SsoProvider.protocol` exists so adding it is a new value, not a new table.
+- **Invitation only — SSO never creates an account.** The IdP proves *who is signing in*, not
+  *that they belong here*; membership stays a deliberate act, with the roles, manager, department
+  and employee number that phase 1 attaches to it. An address the installation does not know is
+  refused at the callback.
+- **The admin can enforce SSO, and `organization:manage` is exempt.** A broken IdP must not be able
+  to lock everyone out of an on-premise install whose only other door is a database edit.
+
+### Entities
+
+- `SsoProvider` — `OrganizationScopedEntity`, unique on `organization`: one row, created the first
+  time the settings screen is saved. `protocol` (`oidc`), `displayName` (the button label — "Sign
+  in with Okta"), `issuerUrl`, `clientId`, `clientSecretCiphertext` + `clientSecretIv`, `scopes`
+  (default `openid email profile`), `emailClaim` (default `email`), `allowedDomains` (optional
+  allow-list, empty means any), `enabled`, `enforced`, `lastTestedAt`, `lastTestError`.
+- `SsoLoginAttempt` — one row per authorization request: `stateHash`, `nonce`, `codeVerifier`,
+  `expiresAt` (10 minutes), `consumedAt`, `userAgent`. Single-use; a consumed or expired row is a
+  hard refusal, and a sweep deletes anything past its expiry.
+
+Two things about how those are stored, both of them the reason the fields look the way they do:
+
+- **The client secret is encrypted at rest**, AES-256-GCM under a new `SSO_ENCRYPTION_KEY` (32
+  bytes, base64) in `apps/api/.env.example`, wrapped in `apps/api/src/common/crypto/`. It is a
+  bearer credential for the organization's IdP, unlike `passwordHash`, which is a verifier and can
+  stay one-way. **It is never returned by any endpoint** — the settings DTO carries
+  `hasClientSecret: boolean`, and an update that omits the field leaves the stored one alone.
+- **`state` is stored as its SHA-256 hash**, like `RefreshToken.tokenHash` and the invitation
+  token; the PKCE verifier is stored as-is, because the exchange has to send it and it is worthless
+  without the matching authorization code and a live row.
+
+One migration, both tables. Both entities go into `apps/api/src/entities.ts`.
+
+### The flow
+
+The IdP redirects the *browser*, and the browser lands on the API's origin, not the SPA's — so the
+callback is an API route that finishes by redirecting back to the web app.
+
+| Route | Permission |
+| --- | --- |
+| `GET /auth/sso` | `@Public()` — `{ enabled, displayName, enforced }` for the login screen |
+| `POST /auth/sso/start` | `@Public()`, `PASSWORD_THROTTLE` — creates the attempt, returns `{ authorizationUrl }` |
+| `GET /auth/sso/callback` | `@Public()` — exchanges the code, issues the session, 302s to the SPA |
+| `GET /sso/settings`, `PUT /sso/settings`, `DELETE /sso/settings` | `organization:manage` |
+| `POST /sso/settings/test` | `organization:manage` — fetches discovery, reports issuer and endpoints or the error |
+
+`POST /auth/sso/start` returns a URL rather than a 302 because the caller is `fetch` inside the
+SPA, which cannot follow a cross-origin redirect usefully and needs to show a failure inline; the
+SPA assigns `window.location` itself.
+
+The callback: validate `state` against an unconsumed row, exchange the code with the verifier,
+verify the ID token (issuer, audience, expiry, `nonce`), read the email claim, check the domain
+allow-list, then look the address up **in the one organization**. Not found, `invited` (see below)
+or `disabled` → no session. Found and `active` → `AuthService.startSessionFor(user)` — the same
+seam invitation acceptance already uses — which sets the refresh cookie on the API origin and
+302s to `WEB_APP_URL`.
+
+**No token ever travels in a URL.** The redirect back to the SPA carries nothing; the browser
+arrives with the `HttpOnly` refresh cookie already set, and `session.bootstrap()` trades it for an
+access token through the `POST /auth/refresh` it already calls on start-up. A failure redirects to
+`/login?error=<code>` with a small closed set of codes the web app maps to real copy. The cookie
+survives the hop because the callback is a top-level GET on the API origin and the cookie is
+`SameSite=Lax` on path `/api/auth`.
+
+Two new environment variables, both in `.env.example`: `API_PUBLIC_URL` (the origin the IdP
+redirects to — the settings screen shows `<API_PUBLIC_URL>/api/auth/sso/callback` for pasting into
+the IdP) and `WEB_APP_URL` (where the callback sends the browser, defaulting to `CORS_ORIGIN`).
+
+### Enforcement
+
+`enforced` is a property of the provider, not of `Organization`. `AuthService.login` refuses a
+password login when it is set — **unless the account holds `organization:manage`**, checked against
+the user's own permission union rather than a role name. The refusal is a named 403, not a generic
+one, so the login screen can say *"Your organization signs in through {provider}"* rather than
+"something went wrong". `PUT /sso/settings` refuses `enforced` without `enabled` and a stored
+secret, and refuses `enabled` unless a discovery fetch has succeeded.
+
+### Shared
+
+`packages/shared/src/sso.ts`, exported from `index.ts`: `SsoProtocol`, `SsoPublicState`,
+`SsoSettings`, `UpdateSsoSettingsRequest`, `SsoTestResult`, `SsoErrorCode`. No new permission —
+`organization:manage` already covers this, per the rule above the phase list.
+
+### Web
+
+- **`/settings/sso`**, gated on `organization:manage` and linked from `/settings/organization`:
+  display name, issuer URL, client id, client secret (write-only, placeholder "unchanged" once
+  stored), scopes, allowed domains, the read-only redirect URI with a copy button, a *Test
+  connection* button that surfaces the discovered issuer and endpoints, and the two switches —
+  *Enabled*, then *Require SSO* behind explicit copy about the admin exemption. Undesigned; take
+  it to the canvas with the rest of the admin surface.
+- **`/login`** asks `GET /auth/sso` alongside the `GET /auth/setup` it already asks, renders
+  *Sign in with {displayName}*, and hides the password form when `enforced` — with a quiet
+  *sign in with a password* escape link (`/login?password=1`) for the exempt admins, and a mapping
+  from `?error=` onto localized copy.
+- Copy in `en` **and** `de`; the button is a real `<button>` in the form's tab order, and the
+  error alert is announced.
+
+### Tests
+
+- **Unit** — the crypto helper round-trips and rejects a tampered ciphertext; an attempt is
+  single-use and expires; `login` refuses under enforcement and still admits `organization:manage`;
+  the settings mapper never emits the secret; DTO validation rejects a non-HTTPS issuer.
+- **API e2e** — `sso.e2e-spec.ts` with a **fake IdP**: a throwaway HTTP server in the spec serving
+  a discovery document, a JWKS and a token endpoint, signing ID tokens with a locally generated key
+  (`jose`, dev dependency). It covers the happy path end to end, an unknown address, a replayed
+  `state`, a wrong `nonce`, a domain outside the allow-list, and the settings routes' permissions.
+  This is the only layer where the whole redirect chain is visible.
+- **Browser e2e** — the button appears when SSO is enabled and the password form disappears under
+  enforcement. No real IdP; the redirect itself is the API suite's job.
+
+### Dependencies
+
+`openid-client@^6` in `apps/api` — ESM-only, which suits an ESM Nest app, and it owns discovery,
+PKCE, the exchange and ID-token validation. Hand-rolling ID-token verification is the one part of
+this phase where a subtle mistake is silent.
+
+### Open questions
+
+1. **An `invited` user who signs in through the IdP.** The IdP proves the address far better than
+   an emailed token does, so the attractive answer is that a first SSO login *accepts* the pending
+   invitation — applying its roles and flipping `invited` → `active`. The conservative answer is to
+   refuse and make them use their invitation link. Worth settling before building, and it touches
+   the invitation work that is in flight.
+2. Group-to-role mapping from IdP claims — deferred deliberately: roles stay a decision someone
+   makes in Beacon, which is what "invitation only" means.
+3. IdP-initiated sign-in and back-channel logout (`end_session_endpoint`) are not supported; a
+   Beacon logout ends the Beacon session only.
+4. `SSO_ENCRYPTION_KEY` rotation has no story yet — re-entering the client secret is the answer
+   until one exists.
+5. Multiple providers in one installation. One row today; the unique key is on `organization`, so
+   lifting it is a migration and a picker on the login screen.
+---
+
 ## Cross-cutting, once the verticals exist
 
 **Notifications** — `NotificationService` behind an interface, an in-app `Notification` entity with
@@ -376,8 +523,8 @@ a component. This is the prerequisite for mobile push.
 
 **Auth expansion** — in ascending cost: TOTP 2FA (`User.totpSecret`, a verification step in
 `AuthService.login`), passkeys (WebAuthn; `Credential` entity — `passwordHash` is already nullable
-for this), social login (OAuth2 per provider), SSO (OIDC first, SAML only on demand, with
-per-organization configuration and domain-based routing). Password reset over emailed one-use
+for this), social login (OAuth2 per provider). **SSO is specified in full as phase 7** — OIDC first,
+one provider per installation, SAML only on demand. Password reset over emailed one-use
 tokens is a phase-1-shaped prerequisite and should land with notifications.
 
 **Audit log** — an append-only `AuditEvent` (actor, action, subject, `before`/`after`, ip) written
