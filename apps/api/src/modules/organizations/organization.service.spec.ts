@@ -9,10 +9,12 @@ interface FakeRole {
 }
 
 function fakeEm(roles: FakeRole[]) {
-  return {
+  const fork = {
     find: vi.fn().mockResolvedValue(roles),
     flush: vi.fn().mockResolvedValue(undefined),
   };
+
+  return { fork: vi.fn().mockReturnValue(fork), ...fork };
 }
 
 describe('OrganizationService.onModuleInit', () => {

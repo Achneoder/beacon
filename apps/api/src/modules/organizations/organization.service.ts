@@ -54,7 +54,11 @@ export class OrganizationService implements OnModuleInit {
   }
 
   private async reconcileSystemRoles(): Promise<void> {
-    const roles = await this.em.find(Role, { isSystem: true });
+    // Runs at boot, outside any request — the injected EntityManager is the global
+    // instance, and MikroORM refuses instance methods on that one outside a request
+    // context. A fork is a real, usable EntityManager regardless of context.
+    const em = this.em.fork();
+    const roles = await em.find(Role, { isSystem: true });
     let changed = 0;
 
     for (const role of roles) {
@@ -72,7 +76,7 @@ export class OrganizationService implements OnModuleInit {
     }
 
     if (changed > 0) {
-      await this.em.flush();
+      await em.flush();
       this.logger.log(`reconciled permissions for ${changed} system role(s)`);
     }
   }
