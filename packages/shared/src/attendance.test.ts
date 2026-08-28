@@ -190,14 +190,15 @@ describe('the week lock', () => {
   it('stays unlocked until 09:00 on the following Monday', () => {
     const monday = '2026-08-24';
 
-    expect(weekLocksAt(monday).toISOString()).toBe('2026-09-01T09:00:00.000Z');
-    expect(isWeekLocked(monday, new Date('2026-09-01T08:59:00Z'))).toBe(false);
-    expect(isWeekLocked(monday, new Date('2026-09-01T09:00:00Z'))).toBe(true);
+    // The week runs Mon 24 – Sun 30 August; the Monday after it is the 31st.
+    expect(weekLocksAt(monday).toISOString()).toBe('2026-08-31T09:00:00.000Z');
+    expect(isWeekLocked(monday, new Date('2026-08-31T08:59:00Z'))).toBe(false);
+    expect(isWeekLocked(monday, new Date('2026-08-31T09:00:00Z'))).toBe(true);
   });
 
   it('means 09:00 where the person works, not 09:00 UTC', () => {
     // Berlin in summer is UTC+2, so the lock lands two hours earlier in UTC.
-    expect(weekLocksAt('2026-08-24', 120).toISOString()).toBe('2026-09-01T07:00:00.000Z');
+    expect(weekLocksAt('2026-08-24', 120).toISOString()).toBe('2026-08-31T07:00:00.000Z');
   });
 
   it('leaves the current week unlocked', () => {

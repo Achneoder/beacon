@@ -366,7 +366,7 @@ export function dayBalance(
  * runs past the end of the week so Friday evening can still be tidied up on Monday
  * morning. After that a change is a correction request, not an edit.
  */
-export const WEEK_LOCK_GRACE_MINUTES = 8 * MINUTES_PER_DAY + 9 * MINUTES_PER_HOUR;
+export const WEEK_LOCK_GRACE_MINUTES = 7 * MINUTES_PER_DAY + 9 * MINUTES_PER_HOUR;
 
 /**
  * The instant the week starting at `monday` locks.
