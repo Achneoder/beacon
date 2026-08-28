@@ -25,6 +25,7 @@
 		{ href: '/', key: 'nav.today', permission: 'attendance:read' },
 		{ href: '/timesheet', key: 'nav.timesheet', permission: 'attendance:read' },
 		{ href: '/calendar', key: 'nav.calendar', permission: 'attendance:read' },
+		{ href: '/documents', key: 'nav.documents', permission: 'document:read' },
 		// Read, not write: the default `manager` role approves time without ever
 		// booking any, and gating the screen on `attendance:write` hid it from exactly
 		// the people it exists for. The page itself decides whether it shows a queue

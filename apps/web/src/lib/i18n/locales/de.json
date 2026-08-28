@@ -9,6 +9,7 @@
 		"settings": "Einstellungen",
 		"timesheet": "Zeitkonto",
 		"calendar": "Kalender",
+		"documents": "Dokumente",
 		"approvals": "Freigaben"
 	},
 	"shell": {
@@ -400,5 +401,64 @@
 		"pendingDays": "Offen",
 		"remaining": "Rest",
 		"noTypes": "Es sind noch keine Abwesenheitsarten eingerichtet."
+	},
+	"documents": {
+		"kicker": "Dokumente",
+		"title": "Dokumente",
+		"loading": "Dokumente werden geladen…",
+		"all": "Alle",
+		"filterLabel": "Nach Kategorie filtern",
+		"empty": "Noch keine Dokumente.",
+		"emptyFiltered": "Keine Dokumente in dieser Kategorie.",
+		"columnName": "Name",
+		"columnCategory": "Kategorie",
+		"columnDate": "Hochgeladen",
+		"columnSize": "Größe",
+		"open": "Öffnen",
+		"opening": "Wird geöffnet…",
+		"owner": "Eigentümer",
+		"organizationWide": "Unternehmensweit",
+		"retention": "Aufbewahrt bis {date}",
+		"delete": "Löschen",
+		"confirmDelete": "Dieses Dokument löschen? Das kann nicht rückgängig gemacht werden.",
+		"deleted": "Dokument gelöscht.",
+		"dropzone": {
+			"title": "Datei hierher ziehen oder auswählen",
+			"hint": "PDF, DOCX oder JPG · max. {size}",
+			"encrypted": "Verschlüsselt gespeichert.",
+			"browse": "Dateien durchsuchen",
+			"drop": "Datei zum Hochladen loslassen"
+		},
+		"upload": {
+			"title": "Dokument hochladen",
+			"name": "Titel",
+			"category": "Kategorie",
+			"submit": "Hochladen",
+			"uploading": "Wird hochgeladen…",
+			"done": "Dokument hochgeladen.",
+			"cancel": "Abbrechen"
+		},
+		"versions": {
+			"title": "Versionsverlauf",
+			"current": "Aktuell",
+			"number": "v{number}",
+			"empty": "Keine früheren Versionen.",
+			"newVersion": "Neue Version hochladen"
+		},
+		"access": {
+			"title": "Wer dies sehen kann",
+			"subjectType": "Gewähren an",
+			"empty": "Nur der Eigentümer und Administratoren können dieses Dokument sehen.",
+			"subjectUser": "Person",
+			"subjectDepartment": "Abteilung",
+			"subjectRole": "Rolle",
+			"level": "Zugriff",
+			"levelRead": "Kann ansehen",
+			"levelWrite": "Kann neue Versionen hochladen",
+			"grant": "Zugriff gewähren",
+			"revoke": "Entfernen",
+			"granted": "Zugriff gewährt.",
+			"revoked": "Zugriff entfernt."
+		}
 	}
 }

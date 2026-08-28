@@ -9,6 +9,7 @@
 		"settings": "Settings",
 		"timesheet": "Timesheet",
 		"calendar": "Calendar",
+		"documents": "Documents",
 		"approvals": "Approvals"
 	},
 	"shell": {
@@ -400,5 +401,64 @@
 		"pendingDays": "Pending",
 		"remaining": "Remaining",
 		"noTypes": "No absence types have been set up yet."
+	},
+	"documents": {
+		"kicker": "Documents",
+		"title": "Documents",
+		"loading": "Loading your documents…",
+		"all": "All",
+		"filterLabel": "Filter by category",
+		"empty": "No documents yet.",
+		"emptyFiltered": "No documents in this category.",
+		"columnName": "Name",
+		"columnCategory": "Category",
+		"columnDate": "Uploaded",
+		"columnSize": "Size",
+		"open": "Open",
+		"opening": "Opening…",
+		"owner": "Owner",
+		"organizationWide": "Organization-wide",
+		"retention": "Retained until {date}",
+		"delete": "Delete",
+		"confirmDelete": "Delete this document? This cannot be undone.",
+		"deleted": "Document deleted.",
+		"dropzone": {
+			"title": "Drag a file here, or browse",
+			"hint": "PDF, DOCX or JPG · max {size}",
+			"encrypted": "Encrypted at rest.",
+			"browse": "Browse files",
+			"drop": "Drop the file to upload"
+		},
+		"upload": {
+			"title": "Upload document",
+			"name": "Title",
+			"category": "Category",
+			"submit": "Upload",
+			"uploading": "Uploading…",
+			"done": "Document uploaded.",
+			"cancel": "Cancel"
+		},
+		"versions": {
+			"title": "Version history",
+			"current": "Current",
+			"number": "v{number}",
+			"empty": "No earlier versions.",
+			"newVersion": "Upload new version"
+		},
+		"access": {
+			"title": "Who can see this",
+			"subjectType": "Grant to",
+			"empty": "Only the owner and admins can see this document.",
+			"subjectUser": "Person",
+			"subjectDepartment": "Department",
+			"subjectRole": "Role",
+			"level": "Access",
+			"levelRead": "Can view",
+			"levelWrite": "Can upload new versions",
+			"grant": "Grant access",
+			"revoke": "Remove",
+			"granted": "Access granted.",
+			"revoked": "Access removed."
+		}
 	}
 }
