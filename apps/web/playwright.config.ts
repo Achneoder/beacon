@@ -41,7 +41,18 @@ export default defineConfig({
 		{
 			name: 'chromium',
 			use: { ...devices['Desktop Chrome'] },
-			dependencies: ['setup']
+			dependencies: ['setup'],
+			testIgnore: /sso\.spec\.ts$/
+		},
+		// sso.spec.ts is the only file that flips the shared organization's SSO
+		// settings, so it gets its own project: `dependencies` waits for every other
+		// spec to finish before this one starts, and its own describe.serial keeps its
+		// tests from racing each other within the project. See tests/sso.spec.ts.
+		{
+			name: 'sso',
+			testMatch: /sso\.spec\.ts$/,
+			use: { ...devices['Desktop Chrome'] },
+			dependencies: ['chromium']
 		}
 	],
 
