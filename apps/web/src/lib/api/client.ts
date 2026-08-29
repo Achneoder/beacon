@@ -120,3 +120,60 @@ export function apiSend<T>(path: string, method: string, body?: unknown): Promis
 export function apiUpload<T>(path: string, form: FormData, method = 'POST'): Promise<T> {
 	return api<T>(path, { method, body: form });
 }
+
+/**
+ * A file download — the CSV export, so far.
+ *
+ * It cannot be an `<a href>`. The access token lives in memory and travels in an
+ * `Authorization` header, and a plain link sends neither, so the browser would be
+ * handed a 401 page named `export.csv`. The bytes come back through the same
+ * refresh-and-retry path as every other call and are handed to the browser as a
+ * blob; `saveBlob` below does the handing.
+ */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string | null }> {
+	const attempt = async () => {
+		const headers = new Headers();
+		if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+
+		const response = await fetch(`${BASE_URL}${path}`, { credentials: 'include', headers });
+		if (!response.ok) throw await toApiError(response, path, 'GET');
+
+		return { blob: await response.blob(), filename: filenameOf(response) };
+	};
+
+	try {
+		return await attempt();
+	} catch (error) {
+		const expired = error instanceof ApiError && error.status === 401;
+		if (!expired || !(await refreshAccessToken())) throw error;
+
+		return attempt();
+	}
+}
+
+/** The server names the file; the client should not have to guess the range back. */
+function filenameOf(response: Response): string | null {
+	const match = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '');
+
+	return match?.[1] ?? null;
+}
+
+/**
+ * Hands a downloaded blob to the browser.
+ *
+ * The object URL is revoked on the next frame rather than immediately: Safari has
+ * not started reading it when `click()` returns, and revoking too early produces a
+ * silently empty file.
+ */
+export function saveBlob(blob: Blob, filename: string): void {
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+
+	link.href = url;
+	link.download = filename;
+	document.body.append(link);
+	link.click();
+	link.remove();
+
+	requestAnimationFrame(() => URL.revokeObjectURL(url));
+}

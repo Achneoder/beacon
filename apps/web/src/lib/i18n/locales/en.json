@@ -10,7 +10,8 @@
 		"timesheet": "Timesheet",
 		"calendar": "Calendar",
 		"documents": "Documents",
-		"approvals": "Approvals"
+		"approvals": "Approvals",
+		"reports": "Reports"
 	},
 	"shell": {
 		"navLabel": "Main navigation",
@@ -476,6 +477,67 @@
 			"revoke": "Remove",
 			"granted": "Access granted.",
 			"revoked": "Access removed."
+		}
+	},
+	"reports": {
+		"kicker": "Overview",
+		"title": "Reports",
+		"dashboard": "Today at a glance",
+		"loading": "Loading…",
+		"total": "Total",
+		"export": "Export CSV",
+		"exporting": "Preparing…",
+		"range": {
+			"legend": "Reporting period",
+			"thisMonth": "This month",
+			"lastMonth": "Last month",
+			"thisQuarter": "This quarter",
+			"thisYear": "This year"
+		},
+		"groupBy": {
+			"legend": "Group rows by",
+			"user": "Person",
+			"department": "Department"
+		},
+		"tiles": {
+			"pending": "Awaiting you",
+			"pendingHint": "Corrections and absence requests",
+			"pendingLink": "Open approvals",
+			"out": "Out this week",
+			"outHint": "Anyone with an absence booked",
+			"more": "+{count} more",
+			"people": "{count} people",
+			"overtime": "Overtime bank",
+			"overtimeHint": "Across everyone you can see",
+			"overCap": "{count} over their cap"
+		},
+		"attendance": {
+			"title": "Attendance",
+			"caption": "Worked, credited and expected hours for the selected period",
+			"chartTitle": "Hours worked",
+			"chartSubtitle": "Against the schedule for the period",
+			"worked": "Worked",
+			"credited": "Credited",
+			"expected": "Expected",
+			"balance": "Balance",
+			"overtime": "Bank",
+			"overCap": "Over cap",
+			"unassigned": "Unassigned",
+			"empty": "Nobody to report on in this period."
+		},
+		"absence": {
+			"title": "Holiday",
+			"yearLegend": "Reporting year",
+			"caption": "Holiday entitlement, taken and remaining for the selected year",
+			"chartTitle": "Holiday used in {year}",
+			"chartSubtitle": "Days, against each entitlement",
+			"person": "Person",
+			"entitlement": "Entitlement",
+			"taken": "Taken",
+			"pending": "Pending",
+			"remaining": "Remaining",
+			"daysUnit": "d",
+			"empty": "Nobody to report on for this year."
 		}
 	}
 }
