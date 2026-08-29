@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: build, lint, typecheck, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      # corepack installs the pnpm the root package.json pins via `packageManager`.
+      - name: enable corepack
+        run: corepack enable
+      - name: install
+        run: pnpm install --frozen-lockfile
+      - name: build
+        run: pnpm -r build
+      - name: lint
+        run: pnpm -r lint
+      - name: typecheck
+        run: pnpm -r typecheck
+      - name: unit tests
+        run: pnpm -r test
+
+  e2e:
+    name: e2e (api + browser)
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: enable corepack
+        run: corepack enable
+      - name: install
+        run: pnpm install --frozen-lockfile
+      - name: playwright browser
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      # Both suites bring up their own throwaway services (docker compose e2e project
+      # on fixed ports), so they run sequentially in one job rather than in parallel.
+      - name: api e2e
+        run: pnpm --filter api test:e2e
+      - name: browser e2e
+        run: pnpm e2e
+      - name: upload playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
