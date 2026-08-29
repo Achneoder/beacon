@@ -203,6 +203,29 @@ export interface ClockRequest {
   note?: string | null;
 }
 
+/**
+ * Stopping the clock, optionally at an instant that has already passed.
+ *
+ * The web app never sends `at` — it is clocking out now, and the server's own clock is
+ * the more trustworthy of the two. The desktop client does: a machine going into
+ * standby may sleep before its request lands, so the clock-out is recorded locally
+ * first and replayed on resume, naming the instant the machine actually went away.
+ * Without that, an entry would either stay open or bank the whole sleep as work.
+ *
+ * The server still bounds it: never in the future, never before the entry started.
+ */
+export interface ClockOutRequest {
+  /** An ISO-8601 instant. Defaults to now. */
+  at?: string;
+}
+
+/**
+ * How far a client's clock may run ahead of the server's before a backdated clock-out
+ * is refused. Machines drift and NTP corrects in steps; a minute absorbs that without
+ * letting a client bank time it has not worked yet.
+ */
+export const CLOCK_SKEW_TOLERANCE_MS = 60_000;
+
 export const CORRECTION_KINDS = ['add', 'amend', 'remove'] as const;
 
 export type CorrectionKind = (typeof CORRECTION_KINDS)[number];
