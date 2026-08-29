@@ -32,6 +32,23 @@
 	--bc-light-warning-soft: #faede5;
 	--bc-light-info: #3b5ba5;
 	--bc-light-info-soft: #e9eef8;
+	/*
+	 * Chart series. The canvas draws no charts, so unlike everything above these
+	 * are not extracted from it — they are stepped from the accent and warning
+	 * hues and then *validated*: OKLCH lightness band, chroma floor, colour-vision
+	 * separation (ΔE 21.2 normal, 19.6 protan) and 3:1 against the surface. The
+	 * plain `--bc-*-accent` and `--bc-*-warning` pass in light and fail the dark
+	 * band, which is why the dark steps below are deeper than their token
+	 * counterparts rather than being reused.
+	 *
+	 * Two series is the whole set. A third is not a hue someone picks — it is a
+	 * step run back through the validator, because two colours that look distinct
+	 * on a designer's screen routinely are not under deuteranopia.
+	 */
+	--bc-light-chart-1: #6b4e9e;
+	--bc-light-chart-2: #b0542c;
+	--bc-light-chart-track: #f1ece6;
+
 	--bc-light-shadow-card: 0 1px 2px rgb(31 27 24 / 0.05), 0 8px 24px -12px rgb(31 27 24 / 0.14);
 	--bc-light-shadow-overlay: 0 2px 4px rgb(31 27 24 / 0.06), 0 24px 48px -20px rgb(31 27 24 / 0.22);
 
@@ -52,6 +69,10 @@
 	--bc-dark-warning-soft: #332620;
 	--bc-dark-info: #8faae4;
 	--bc-dark-info-soft: #212a3d;
+	--bc-dark-chart-1: #9576cb;
+	--bc-dark-chart-2: #cb8050;
+	--bc-dark-chart-track: #2a2833;
+
 	--bc-dark-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
 	--bc-dark-shadow-overlay: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 48px -20px rgb(0 0 0 / 0.7);
 
@@ -73,6 +94,9 @@
 	--bc-warning-soft: var(--bc-light-warning-soft);
 	--bc-info: var(--bc-light-info);
 	--bc-info-soft: var(--bc-light-info-soft);
+	--bc-chart-1: var(--bc-light-chart-1);
+	--bc-chart-2: var(--bc-light-chart-2);
+	--bc-chart-track: var(--bc-light-chart-track);
 	--bc-shadow-card: var(--bc-light-shadow-card);
 	--bc-shadow-overlay: var(--bc-light-shadow-overlay);
 }
@@ -96,6 +120,9 @@
 		--bc-warning-soft: var(--bc-dark-warning-soft);
 		--bc-info: var(--bc-dark-info);
 		--bc-info-soft: var(--bc-dark-info-soft);
+		--bc-chart-1: var(--bc-dark-chart-1);
+		--bc-chart-2: var(--bc-dark-chart-2);
+		--bc-chart-track: var(--bc-dark-chart-track);
 		--bc-shadow-card: var(--bc-dark-shadow-card);
 		--bc-shadow-overlay: var(--bc-dark-shadow-overlay);
 	}
@@ -119,6 +146,9 @@
 	--bc-warning-soft: var(--bc-dark-warning-soft);
 	--bc-info: var(--bc-dark-info);
 	--bc-info-soft: var(--bc-dark-info-soft);
+	--bc-chart-1: var(--bc-dark-chart-1);
+	--bc-chart-2: var(--bc-dark-chart-2);
+	--bc-chart-track: var(--bc-dark-chart-track);
 	--bc-shadow-card: var(--bc-dark-shadow-card);
 	--bc-shadow-overlay: var(--bc-dark-shadow-overlay);
 }
@@ -146,6 +176,9 @@
 	--color-warning-soft: var(--bc-warning-soft);
 	--color-info: var(--bc-info);
 	--color-info-soft: var(--bc-info-soft);
+	--color-chart-1: var(--bc-chart-1);
+	--color-chart-2: var(--bc-chart-2);
+	--color-chart-track: var(--bc-chart-track);
 
 	--font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
