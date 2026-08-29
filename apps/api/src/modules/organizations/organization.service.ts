@@ -93,7 +93,10 @@ export class OrganizationService implements OnModuleInit {
    * organization" is unambiguous; null before `createWithOwner` has ever run.
    */
   async theOnlyOrganization(): Promise<Organization | null> {
-    return this.em.findOne(Organization, {});
+    // MikroORM refuses `findOne` with an empty where, so fetch by `find` with a
+    // limit — the installation holds exactly one organization, so this returns it.
+    const [organization] = await this.em.find(Organization, {}, { limit: 1 });
+    return organization ?? null;
   }
 
   /**
