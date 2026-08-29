@@ -19,6 +19,8 @@ import { DocumentCategory } from './modules/documents/document-category.entity.j
 import { Document } from './modules/documents/document.entity.js';
 import { DocumentVersion } from './modules/documents/document-version.entity.js';
 import { DocumentAccess } from './modules/documents/document-access.entity.js';
+import { SsoProvider } from './modules/sso/sso-provider.entity.js';
+import { SsoLoginAttempt } from './modules/sso/sso-login-attempt.entity.js';
 
 /**
  * Explicit entity registry. MikroORM's glob-based discovery would need to require()
@@ -47,4 +49,6 @@ export const ENTITIES = [
   Document,
   DocumentVersion,
   DocumentAccess,
+  SsoProvider,
+  SsoLoginAttempt,
 ];
