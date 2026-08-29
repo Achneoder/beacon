@@ -72,6 +72,11 @@ export default defineConfig({
       MAIL_SECURE: 'false',
       MAIL_FROM: 'Beacon <beacon@e2e.local>',
       WEB_BASE_URL: 'http://localhost:4173',
+      // A fixed key: this suite's ciphertexts never need to outlive the throwaway
+      // database. API_PUBLIC_URL points nowhere real — sso.e2e-spec.ts drives the
+      // callback directly rather than following a redirect through it.
+      SSO_ENCRYPTION_KEY: '4FRKhSQf1jnMcFpYuNqjKrC0YWYCjFbud52rd0I9pFE=',
+      API_PUBLIC_URL: 'http://localhost:3210',
       ...E2E_STORAGE_ENV,
       ...E2E_SEARCH_ENV,
     },

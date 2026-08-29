@@ -70,5 +70,10 @@ export const API_ENV = {
 	MAIL_PORT: String(MAILPIT_SMTP_PORT),
 	MAIL_SECURE: 'false',
 	MAIL_FROM: 'Beacon <beacon@e2e.local>',
-	WEB_BASE_URL: WEB_URL
+	WEB_BASE_URL: WEB_URL,
+
+	// A fixed key, not a generated one — this run's ciphertexts never need to outlive
+	// the throwaway database. Real enough to exercise SecretCipher end to end.
+	SSO_ENCRYPTION_KEY: '4FRKhSQf1jnMcFpYuNqjKrC0YWYCjFbud52rd0I9pFE=',
+	API_PUBLIC_URL: API_URL.replace(/\/api$/, '')
 };
