@@ -357,4 +357,13 @@
 			{/each}
 		</ul>
 	</Card>
+
+	<Card variant="panel" as="section" class="mt-6">
+		<h2 class="text-sm font-bold">{$_('settings.ssoTitle')}</h2>
+		<p class="mt-1 text-xs text-ink-muted">{$_('settings.ssoHint')}</p>
+
+		<Button size="sm" class="mt-5" href="/settings/sso">
+			{$_('settings.ssoManage')}
+		</Button>
+	</Card>
 {/if}

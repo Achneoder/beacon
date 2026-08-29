@@ -90,7 +90,11 @@
 		"noAccount": "Noch keine Organisation?",
 		"createOrganization": "Jetzt anlegen",
 		"haveAccount": "Sie haben bereits ein Konto?",
-		"restoring": "Sitzung wird wiederhergestellt…"
+		"restoring": "Sitzung wird wiederhergestellt…",
+		"signInWith": "Anmelden mit {provider}",
+		"redirecting": "Weiterleitung…",
+		"usePassword": "Stattdessen mit Passwort anmelden",
+		"usePasswordDivider": "oder"
 	},
 	"register": {
 		"title": "Organisation anlegen",
@@ -137,7 +141,18 @@
 		"documentRetained": "Dieses Dokument unterliegt einer Aufbewahrungsfrist und kann noch nicht gelöscht werden.",
 		"documentStorageDown": "Der Dokumentenspeicher ist nicht erreichbar. Versuchen Sie es in Kürze erneut.",
 		"documentVersionRace": "Es wurde gleichzeitig eine weitere Version hochgeladen. Versuchen Sie es erneut.",
-		"documentCategoryKey": "Dieser Schlüssel wird bereits verwendet."
+		"documentCategoryKey": "Dieser Schlüssel wird bereits verwendet.",
+		"sso": {
+			"sso_disabled": "Single Sign-on ist derzeit nicht verfügbar.",
+			"invalid_state": "Dieser Anmeldelink ist abgelaufen oder wurde bereits verwendet. Bitte melden Sie sich erneut an.",
+			"exchange_failed": "Bei der Anmeldung über Ihren Identitätsanbieter ist ein Fehler aufgetreten. Versuchen Sie es erneut.",
+			"invalid_token": "Die Antwort Ihres Identitätsanbieters konnte nicht überprüft werden. Versuchen Sie es erneut.",
+			"no_email": "Ihr Identitätsanbieter hat keine E-Mail-Adresse übermittelt. Wenden Sie sich an Ihre Administratorin oder Ihren Administrator.",
+			"domain_not_allowed": "Mit dieser E-Mail-Adresse ist keine Anmeldung auf diesem Weg möglich.",
+			"no_account": "Für diese Adresse wurde weder ein Konto noch eine offene Einladung gefunden. Bitten Sie eine Administratorin oder einen Administrator, Sie einzuladen.",
+			"account_disabled": "Ihr Konto wurde deaktiviert. Wenden Sie sich an Ihre Administratorin oder Ihren Administrator.",
+			"sso_required": "Ihre Organisation meldet sich über Single Sign-on an."
+		}
 	},
 	"org": {
 		"label": "Organisation",
@@ -270,7 +285,10 @@
 		"holidayDate": "Datum",
 		"holidayName": "Name",
 		"addHoliday": "Feiertag hinzufügen",
-		"noHolidays": "Für dieses Jahr sind noch keine Feiertage hinterlegt."
+		"noHolidays": "Für dieses Jahr sind noch keine Feiertage hinterlegt.",
+		"ssoTitle": "Single Sign-on",
+		"ssoHint": "Ermöglichen Sie die Anmeldung über Ihren Identitätsanbieter statt mit einem Beacon-Passwort.",
+		"ssoManage": "Single Sign-on verwalten"
 	},
 	"timesheet": {
 		"kicker": "Zeiterfassung",
@@ -539,5 +557,43 @@
 			"daysUnit": "T",
 			"empty": "Für dieses Jahr gibt es niemanden zu berichten."
 		}
+	},
+	"sso": {
+		"kicker": "Organisation",
+		"title": "Single Sign-on",
+		"back": "Zurück zu den Einstellungen",
+		"loading": "Wird geladen…",
+		"notConfigured": "Es ist noch kein Anbieter eingerichtet. Füllen Sie das Formular aus und speichern Sie, um einen anzulegen.",
+		"displayName": "Beschriftung der Schaltfläche",
+		"displayNameHint": "Wird auf dem Anmeldebildschirm angezeigt – „Anmelden mit {example}“.",
+		"issuerUrl": "Issuer-URL",
+		"issuerUrlHint": "Der OIDC-Issuer des Identitätsanbieters, z. B. https://ihre-org.okta.com.",
+		"clientId": "Client-ID",
+		"clientSecret": "Client-Secret",
+		"clientSecretPlaceholder": "Unverändert",
+		"clientSecretHint": "Leer lassen, um das gespeicherte Secret zu behalten.",
+		"scopes": "Scopes",
+		"emailClaim": "E-Mail-Claim",
+		"allowedDomains": "Erlaubte E-Mail-Domains",
+		"allowedDomainsHint": "Eine pro Zeile. Leer lassen, um jede Domain zuzulassen.",
+		"redirectUri": "Redirect-URI",
+		"redirectUriHint": "In die Anwendungskonfiguration Ihres Identitätsanbieters einfügen.",
+		"copy": "Kopieren",
+		"copied": "Kopiert",
+		"testConnection": "Verbindung testen",
+		"testing": "Wird getestet…",
+		"testSucceeded": "Verbunden. Issuer: {issuer}",
+		"lastTested": "Zuletzt geprüft am {date}",
+		"neverTested": "Noch nicht geprüft.",
+		"enabled": "Aktiviert",
+		"enabledHint": "Anmeldung über diesen Anbieter auf dem Anmeldebildschirm anbieten.",
+		"enforced": "Single Sign-on erzwingen",
+		"enforcedHint": "Blendet das Passwortformular für alle außer Administratorinnen und Administratoren aus – diese können weiterhin „Mit Passwort anmelden“ nutzen, falls der Anbieter nicht erreichbar ist.",
+		"save": "Speichern",
+		"saving": "Wird gespeichert…",
+		"saved": "Single-Sign-on-Einstellungen gespeichert.",
+		"delete": "Anbieter entfernen",
+		"deleteConfirm": "Diesen SSO-Anbieter entfernen? Wer sich darüber anmeldet, benötigt danach ein Passwort, sobald eines für die Person vergeben ist.",
+		"deleted": "SSO-Anbieter entfernt."
 	}
 }

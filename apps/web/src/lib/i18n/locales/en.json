@@ -90,7 +90,11 @@
 		"noAccount": "Need an organization?",
 		"createOrganization": "Create one",
 		"haveAccount": "Already have an account?",
-		"restoring": "Restoring your session…"
+		"restoring": "Restoring your session…",
+		"signInWith": "Sign in with {provider}",
+		"redirecting": "Redirecting…",
+		"usePassword": "Sign in with a password instead",
+		"usePasswordDivider": "or"
 	},
 	"register": {
 		"title": "Create your organization",
@@ -137,7 +141,18 @@
 		"documentRetained": "This document is under retention and cannot be deleted yet.",
 		"documentStorageDown": "The document store is unavailable. Try again shortly.",
 		"documentVersionRace": "Another version was uploaded at the same time. Try again.",
-		"documentCategoryKey": "That key is already in use."
+		"documentCategoryKey": "That key is already in use.",
+		"sso": {
+			"sso_disabled": "Single sign-on is not available right now.",
+			"invalid_state": "That sign-in link has expired or was already used. Try signing in again.",
+			"exchange_failed": "Something went wrong completing sign-in with your identity provider. Try again.",
+			"invalid_token": "Your identity provider's response could not be verified. Try again.",
+			"no_email": "Your identity provider did not share an email address. Contact your administrator.",
+			"domain_not_allowed": "That email address is not allowed to sign in this way.",
+			"no_account": "We could not find an account or a pending invitation for that address. Ask an administrator to invite you.",
+			"account_disabled": "Your account has been disabled. Contact your administrator.",
+			"sso_required": "Your organization signs in through single sign-on."
+		}
 	},
 	"org": {
 		"label": "Organization",
@@ -270,7 +285,10 @@
 		"holidayDate": "Date",
 		"holidayName": "Name",
 		"addHoliday": "Add holiday",
-		"noHolidays": "No public holidays for this year yet."
+		"noHolidays": "No public holidays for this year yet.",
+		"ssoTitle": "Single sign-on",
+		"ssoHint": "Let people sign in through your identity provider instead of a Beacon password.",
+		"ssoManage": "Manage single sign-on"
 	},
 	"timesheet": {
 		"kicker": "Time tracking",
@@ -539,5 +557,43 @@
 			"daysUnit": "d",
 			"empty": "Nobody to report on for this year."
 		}
+	},
+	"sso": {
+		"kicker": "Organization",
+		"title": "Single sign-on",
+		"back": "Back to settings",
+		"loading": "Loading…",
+		"notConfigured": "No provider is configured yet. Fill in the form below and save to create one.",
+		"displayName": "Button label",
+		"displayNameHint": "Shown on the sign-in screen — \"Sign in with {example}\".",
+		"issuerUrl": "Issuer URL",
+		"issuerUrlHint": "The identity provider's OIDC issuer, e.g. https://your-org.okta.com.",
+		"clientId": "Client ID",
+		"clientSecret": "Client secret",
+		"clientSecretPlaceholder": "Unchanged",
+		"clientSecretHint": "Leave blank to keep the secret already stored.",
+		"scopes": "Scopes",
+		"emailClaim": "Email claim",
+		"allowedDomains": "Allowed email domains",
+		"allowedDomainsHint": "One per line. Leave empty to allow any domain.",
+		"redirectUri": "Redirect URI",
+		"redirectUriHint": "Paste this into your identity provider's application configuration.",
+		"copy": "Copy",
+		"copied": "Copied",
+		"testConnection": "Test connection",
+		"testing": "Testing…",
+		"testSucceeded": "Connected. Issuer: {issuer}",
+		"lastTested": "Last verified {date}",
+		"neverTested": "Not verified yet.",
+		"enabled": "Enabled",
+		"enabledHint": "Offer sign-in through this provider on the login screen.",
+		"enforced": "Require single sign-on",
+		"enforcedHint": "Hide the password form for everyone except administrators — who can still use \"sign in with a password\" if the provider is unreachable.",
+		"save": "Save",
+		"saving": "Saving…",
+		"saved": "Single sign-on settings saved.",
+		"delete": "Remove provider",
+		"deleteConfirm": "Remove this SSO provider? Anyone who signs in through it will need a password instead, once one is set for them.",
+		"deleted": "SSO provider removed."
 	}
 }
