@@ -1,3 +1,4 @@
+import { uptime } from 'node:os';
 import { isRunning, type ClockState, type TodayStatus } from '@beacon/shared';
 import { isRefusal, isSignedOut } from './errors.js';
 import type { OutboxPort } from './outbox.js';
@@ -32,6 +33,8 @@ export interface TrackerOptions {
   /** Read on every decision, so the tray's toggle takes effect immediately. */
   autoTrack: () => boolean;
   now?: () => Date;
+  /** When the machine last booted. See {@link systemBootedAt}. */
+  bootedAt?: () => Date;
   onStatus?: (status: TrackerStatus) => void;
   log?: (message: string) => void;
 }
@@ -182,12 +185,30 @@ export class Tracker {
     await this.#apply(() => this.options.clock.clockIn());
   }
 
-  /** The heartbeat fallback is worth exactly one attempt, on the first flush. */
+  /**
+   * The heartbeat fallback is worth exactly one attempt, on the first flush — and
+   * only when the machine itself went away.
+   *
+   * A heartbeat with no clock-out beside it means this process stopped without
+   * recording one. That is evidence of a crash, but *not* of the machine leaving: if
+   * it has been up continuously since the heartbeat was written, only the app died,
+   * and the user may well have carried on working in the browser. Closing their entry
+   * at the heartbeat would throw that work away — so the reboot is what licenses the
+   * guess, and without one the entry is left to the reconcile.
+   */
   #takeUnreported(): Date | null {
     const at = this.#unreported;
     this.#unreported = null;
 
-    return this.options.autoTrack() ? at : null;
+    if (!at || !this.options.autoTrack()) return null;
+
+    if (this.#bootedAt().getTime() <= at.getTime()) {
+      this.options.log?.('ignoring a heartbeat from a crash the machine outlived');
+
+      return null;
+    }
+
+    return at;
   }
 
   async #read(): Promise<TodayStatus | null> {
@@ -234,6 +255,10 @@ export class Tracker {
     return this.options.now?.() ?? new Date();
   }
 
+  #bootedAt(): Date {
+    return this.options.bootedAt?.() ?? systemBootedAt();
+  }
+
   /** One network conversation at a time, in the order they were asked for. */
   #serial<T>(work: () => Promise<T>): Promise<T> {
     const next = this.#queue.then(work, work);
@@ -245,6 +270,18 @@ export class Tracker {
 
     return next;
   }
+}
+
+/**
+ * When the machine last booted, from its uptime.
+ *
+ * `node:os`, not Electron, so the state machine above stays testable outside a
+ * browser process. Note that macOS and Windows count time asleep as uptime, which is
+ * exactly what is wanted here: the question is whether the machine *restarted*, not
+ * whether it rested.
+ */
+export function systemBootedAt(now: Date = new Date()): Date {
+  return new Date(now.getTime() - uptime() * 1_000);
 }
 
 /** When the entry that is currently running began. */

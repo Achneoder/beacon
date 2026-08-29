@@ -190,6 +190,10 @@ people in and out from the machine's own lifecycle.
   and the entry closes there instead: wrong by one tick rather than by a weekend. Reconciling
   against `GET /attendance/me/today` before every decision is what makes a replay safe to repeat,
   and is why no idempotency key was needed.
+- **The heartbeat needs a reboot to license it.** A recorded clock-out is a decision and is always
+  replayed; the heartbeat is only a *guess* that the machine vanished, so `systemBootedAt()` has to
+  agree. Without that check, an app that crashed while the machine stayed up would close the entry
+  at the crash — throwing away however long the user then went on working in the browser.
 - **A screen lock has a grace period.** Locking for the length of a corridor must not cut the day
   into two segments; only a lock that outlasts `lockGraceSeconds` stops the clock.
 - **Native copy is en/de in `locales.ts`**, a pure function like `invitation-email.ts` —
