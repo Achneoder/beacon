@@ -32,6 +32,10 @@
 		// the people it exists for. The page itself decides whether it shows a queue
 		// or the requests you raised.
 		{ href: '/approvals', key: 'nav.approvals', permission: 'attendance:read' },
+		// The one entry gated on `report:read`, which the default `employee` role does
+		// not hold — so the reports screen simply is not there for most people, and
+		// the exception to the correction above rather than another instance of it.
+		{ href: '/reports', key: 'nav.reports', permission: 'report:read' },
 		{ href: '/people', key: 'nav.people', permission: 'employee:read' },
 		{ href: '/settings/organization', key: 'nav.settings', permission: 'organization:manage' },
 		// Everyone has a profile — no permission gates your own account.

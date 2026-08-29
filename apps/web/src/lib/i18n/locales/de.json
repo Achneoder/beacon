@@ -10,7 +10,8 @@
 		"timesheet": "Zeitkonto",
 		"calendar": "Kalender",
 		"documents": "Dokumente",
-		"approvals": "Freigaben"
+		"approvals": "Freigaben",
+		"reports": "Berichte"
 	},
 	"shell": {
 		"navLabel": "Hauptnavigation",
@@ -476,6 +477,67 @@
 			"revoke": "Entfernen",
 			"granted": "Zugriff gewährt.",
 			"revoked": "Zugriff entfernt."
+		}
+	},
+	"reports": {
+		"kicker": "Überblick",
+		"title": "Berichte",
+		"dashboard": "Heute auf einen Blick",
+		"loading": "Wird geladen…",
+		"total": "Gesamt",
+		"export": "CSV exportieren",
+		"exporting": "Wird vorbereitet…",
+		"range": {
+			"legend": "Berichtszeitraum",
+			"thisMonth": "Dieser Monat",
+			"lastMonth": "Letzter Monat",
+			"thisQuarter": "Dieses Quartal",
+			"thisYear": "Dieses Jahr"
+		},
+		"groupBy": {
+			"legend": "Zeilen gruppieren nach",
+			"user": "Person",
+			"department": "Abteilung"
+		},
+		"tiles": {
+			"pending": "Wartet auf Sie",
+			"pendingHint": "Korrekturen und Abwesenheitsanträge",
+			"pendingLink": "Freigaben öffnen",
+			"out": "Diese Woche abwesend",
+			"outHint": "Alle mit gebuchter Abwesenheit",
+			"more": "+{count} weitere",
+			"people": "{count} Personen",
+			"overtime": "Überstundenkonto",
+			"overtimeHint": "Über alle sichtbaren Personen",
+			"overCap": "{count} über der Obergrenze"
+		},
+		"attendance": {
+			"title": "Arbeitszeit",
+			"caption": "Gearbeitete, angerechnete und erwartete Stunden im gewählten Zeitraum",
+			"chartTitle": "Gearbeitete Stunden",
+			"chartSubtitle": "Gegen den Arbeitszeitplan des Zeitraums",
+			"worked": "Gearbeitet",
+			"credited": "Angerechnet",
+			"expected": "Erwartet",
+			"balance": "Saldo",
+			"overtime": "Konto",
+			"overCap": "Über Obergrenze",
+			"unassigned": "Ohne Abteilung",
+			"empty": "In diesem Zeitraum gibt es niemanden zu berichten."
+		},
+		"absence": {
+			"title": "Urlaub",
+			"yearLegend": "Berichtsjahr",
+			"caption": "Urlaubsanspruch, genommene und verbleibende Tage im gewählten Jahr",
+			"chartTitle": "Genommener Urlaub {year}",
+			"chartSubtitle": "Tage, gegen den jeweiligen Anspruch",
+			"person": "Person",
+			"entitlement": "Anspruch",
+			"taken": "Genommen",
+			"pending": "Offen",
+			"remaining": "Verbleibend",
+			"daysUnit": "T",
+			"empty": "Für dieses Jahr gibt es niemanden zu berichten."
 		}
 	}
 }
