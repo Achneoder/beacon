@@ -75,6 +75,16 @@ export interface AttendanceSummary {
   rows: AttendanceSummaryRow[];
   /** The same figures across every row, so the screen never re-adds them itself. */
   total: AttendanceSummaryRow;
+  /**
+   * The overtime bank summed across everyone the caller may see, and how many of them
+   * stand over their cap. Reported beside the rows rather than inside `total` because
+   * the bank is a lifetime figure that the range does not scope, and because the
+   * dashboard's team-overtime card needs it whichever grouping the table is showing.
+   */
+  overtimeMinutes: number;
+  overCapCount: number;
+  /** How many people the figures above cover. */
+  headcount: number;
 }
 
 /** One person's year of holiday, as the absence report prints it. */

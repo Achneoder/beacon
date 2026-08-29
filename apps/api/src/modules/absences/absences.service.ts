@@ -406,6 +406,61 @@ export class AbsencesService {
   }
 
   /**
+   * A year's quota for a set of people, in three queries rather than three per head.
+   *
+   * Unlike {@link balanceOf} this **writes nothing**: `ensureBalance` materialises a
+   * row on first read, which is right for a screen someone is standing in front of and
+   * wrong for a report — running the absence report would otherwise create a quota row
+   * for every employee who has never asked for a day off, and a read that writes is a
+   * read that can block behind an approval. A person with no row reports the default
+   * entitlement, computed in memory.
+   *
+   * The map holds an entry for every id asked about, so the caller never distinguishes
+   * "no quota" from "not asked".
+   */
+  async balancesFor(
+    organizationId: string,
+    userIds: readonly string[],
+    year: number,
+    on: string,
+  ): Promise<Map<string, LeaveBalanceSummary>> {
+    const summaries = new Map<string, LeaveBalanceSummary>();
+    if (userIds.length === 0) return summaries;
+
+    const ids = [...userIds];
+    const from = `${year}-01-01`;
+    const to = `${year}-12-31`;
+
+    const [rows, pending, holidays] = await Promise.all([
+      this.em.find(LeaveBalance, { organization: organizationId, user: { $in: ids }, year }),
+      this.em.find(AbsenceRequest, {
+        organization: organizationId,
+        user: { $in: ids },
+        status: 'pending',
+        startsOn: { $lte: to },
+        endsOn: { $gte: from },
+      }),
+      this.holidayDates(organizationId, from, to),
+    ]);
+
+    const byUser = new Map(rows.map((row) => [row.user.id, row]));
+    const pendingDays = new Map<string, number>();
+    for (const request of pending) {
+      const days = absenceCostByYear(request, holidays).get(year) ?? 0;
+      pendingDays.set(request.user.id, (pendingDays.get(request.user.id) ?? 0) + days);
+    }
+
+    for (const id of ids) {
+      const row = byUser.get(id);
+      const days = round(pendingDays.get(id) ?? 0);
+
+      summaries.set(id, row ? toBalanceSummary(row, days, on) : defaultBalance(year, days, on));
+    }
+
+    return summaries;
+  }
+
+  /**
    * The absence covering each date in a range, for the timesheet.
    *
    * Attendance asks this rather than reaching into the tables itself: the tag on a
@@ -745,6 +800,22 @@ export function toAbsenceSummary(
     documentTitle: document?.title ?? null,
     createdAt: request.createdAt.toISOString(),
   };
+}
+
+/**
+ * The quota someone has before anyone sets them one, computed rather than stored.
+ * {@link AbsencesService.balancesFor} reports this for a person with no row instead of
+ * creating one — a report must not write.
+ */
+function defaultBalance(year: number, pendingDays: number, on: string): LeaveBalanceSummary {
+  const figures = {
+    entitlementDays: DEFAULT_ENTITLEMENT_DAYS,
+    carryOverDays: 0,
+    carryOverExpiresOn: null,
+    takenDays: 0,
+  };
+
+  return { year, ...figures, pendingDays, remainingDays: remainingLeaveDays(figures, on) };
 }
 
 export function toBalanceSummary(
