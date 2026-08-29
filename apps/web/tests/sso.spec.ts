@@ -32,7 +32,7 @@ test.describe.serial('sso', () => {
 		await page.goto('/login');
 		await page.getByLabel('Email address').fill(owner.email);
 		await page.getByLabel('Password', { exact: true }).fill(owner.password);
-		await page.getByRole('button', { name: 'Sign in' }).click();
+		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 		await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
 
 		await page.goto('/settings/sso');
@@ -60,7 +60,7 @@ test.describe.serial('sso', () => {
 		await page.goto('/login');
 		await page.getByLabel('Email address').fill(owner.email);
 		await page.getByLabel('Password', { exact: true }).fill(owner.password);
-		await page.getByRole('button', { name: 'Sign in' }).click();
+		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 		await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
 
 		await page.goto('/settings/sso');
@@ -92,7 +92,7 @@ test.describe.serial('sso', () => {
 		await page.goto('/login?password=1');
 		await page.getByLabel('Email address').fill(member.email);
 		await page.getByLabel('Password', { exact: true }).fill(member.password);
-		await page.getByRole('button', { name: 'Sign in' }).click();
+		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
 		await expect(
 			page.getByText('Your organization signs in through single sign-on.')
@@ -107,7 +107,7 @@ test.describe.serial('sso', () => {
 		await page.goto('/login?password=1');
 		await page.getByLabel('Email address').fill(owner.email);
 		await page.getByLabel('Password', { exact: true }).fill(owner.password);
-		await page.getByRole('button', { name: 'Sign in' }).click();
+		await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
 		await expect(page.getByRole('heading', { level: 1, name: 'Today' })).toBeVisible();
 
