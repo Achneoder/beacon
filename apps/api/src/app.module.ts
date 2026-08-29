@@ -22,6 +22,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module.js';
 import { AbsencesModule } from './modules/absences/absences.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
 import { SearchModule as SearchFeatureModule } from './modules/search/search.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { SearchModule as SearchFeatureModule } from './modules/search/search.mod
     AbsencesModule,
     DocumentsModule,
     SearchFeatureModule,
+    ReportsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
