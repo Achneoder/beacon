@@ -151,8 +151,12 @@ their own roles.
 
 Authentication supports multiple methods — email/password, passkeys, social login, and single sign-on
 (SSO) via OAuth2 or SAML — with two-factor authentication (2FA) for added security. *(Email/password
-is implemented; the rest are planned. `User.passwordHash` is nullable so an account can authenticate
-another way.)*
+and SSO over OIDC are implemented; passkeys, social login, SAML and 2FA are planned.
+`User.passwordHash` is nullable so an account can authenticate another way.)* SSO never creates an
+account by itself — the IdP proves who is signing in, and a first login either resolves an existing
+account or accepts a pending invitation, never a self-service signup. Beacon holds one provider per
+installation, and an admin can enforce it while staying exempt themselves, so a broken IdP cannot
+lock every administrator out of an on-premise install whose only other door is a database edit.
 
 Signing in returns a short-lived JWT access token, which the SPA keeps in memory only, plus a
 long-lived refresh token in an `HttpOnly` cookie. Refreshing rotates the token: the presented one is
