@@ -11,6 +11,7 @@ const NAV = [
 	{ label: 'Calendar', url: '/calendar', heading: 'Calendar' },
 	{ label: 'Documents', url: '/documents', heading: 'Documents' },
 	{ label: 'Approvals', url: '/approvals', heading: 'Approvals' },
+	{ label: 'Reports', url: '/reports', heading: 'Reports' },
 	{ label: 'People', url: '/people', heading: 'People' },
 	{ label: 'Settings', url: '/settings/organization', heading: 'Settings' },
 	{ label: 'Profile', url: '/profile', heading: 'Profile' }

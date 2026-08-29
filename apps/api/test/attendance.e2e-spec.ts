@@ -3,6 +3,12 @@ import request from 'supertest';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
+import {
+  defaultExpectedMinutes,
+  targetMinutesFor,
+  weekdayOf,
+  type WorkScheduleSummary,
+} from '@beacon/shared';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/main.js';
 import { resetInstance } from './instance.js';
@@ -87,8 +93,16 @@ describe('Attendance (e2e)', () => {
 
       expect(today.body).toMatchObject({ state: 'out', since: null, workedMinutes: 0 });
       expect(today.body.segments).toEqual([]);
-      // A user with no schedule of their own measures against a full-time default.
-      expect(today.body.targetMinutes).toBe(480);
+      // A user with no schedule of their own measures against a full-time default —
+      // which is eight hours on a weekday and none at the weekend. Hard-coding 480
+      // made this spec fail every Saturday and Sunday, so the expectation is derived
+      // from the same shared table the API answers from.
+      expect(today.body.targetMinutes).toBe(
+        targetMinutesFor(
+          { expectedMinutes: defaultExpectedMinutes(40 * 60) } as WorkScheduleSummary,
+          weekdayOf(today.body.date),
+        ),
+      );
     });
 
     it('clocks in, and reports the instant the browser should tick from', async () => {
