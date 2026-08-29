@@ -6,7 +6,8 @@ module, shared types, web module, tests. A phase is done when `pnpm -r build | l
 test`, `pnpm --filter api test:e2e` and `pnpm e2e` are green, the copy exists in `en` **and**
 `de`, and the feature is reachable from the app shell.
 
-Phases 1–6 are ordered by dependency; everything after phase 6 is genuinely parallelizable.
+Phases 1–6 are ordered by dependency and are all done; everything after phase 6 is genuinely
+parallelizable.
 
 ## The design
 
@@ -47,6 +48,8 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | Absence (calendar, quota, approvals, public holidays) | shipped |
 | Documents (categories, versions, access grants) | shipped |
 | Search (sidebar field over documents and people) | shipped |
+| Reporting (attendance and absence summaries, CSV export) | shipped |
+| Manager dashboard (pending approvals, who is out, team overtime) | shipped |
 | Employee data | shipped as part of People — the employment fields and the Profile screen |
 | Storage (`StorageService` → MinIO) | shipped — `DocumentsService` is its first caller |
 | Search (`SearchService` → Meilisearch) | shipped — `NoopSearchService` when `SEARCH_HOST` is unset |
@@ -438,18 +441,75 @@ Escape, `/` to focus, a polite live region for the count — because the canvas'
 affordances would otherwise leave the whole feature unreachable by keyboard, the same trap phase 3's
 calendar cells had.
 
-## Phase 6 — Reporting and dashboard
+## Phase 6 — Reporting and dashboard — **done**
 
-`report:read` finally gets a consumer. `apps/api/src/modules/reports`:
+`report:read` finally got its consumer. `apps/api/src/modules/reports`:
 
 - `GET /reports/attendance/summary?from&to&groupBy=user|department` — worked vs. expected, overtime
 - `GET /reports/absences/summary?year` — taken, remaining, pending per user
-- `GET /reports/attendance/export?format=csv` — streamed, never buffered
+- `GET /reports/attendance/export?from&to&format=csv` — streamed, never buffered
 
-The employee's own dashboard is already specified (phase 2's Today screen). What is missing is the
-manager's: pending approvals, who is out this week, team overtime. Entirely undesigned — it is the
-largest gap in the canvas and should be drawn before it is built. Charts go through one shared
-component so theme and locale formatting stay consistent.
+Exactly those three. The manager's dashboard — pending approvals, who is out this week, team
+overtime — is a band at the top of `/reports` composed from calls that already existed: the two
+approval queues `/approvals` reads, and `GET /absences/calendar?scope=organization` for the week.
+It is still undesigned, and now so are the reports; both go on the list below.
+
+**No entity and no migration**, for the same reason as the search index: every figure is
+recomputed, so there is nothing here that can drift out of step with the screen it came from.
+No new permission either.
+
+Seven things settled while building, worth knowing before the next phase that touches attendance,
+absence or a chart:
+
+- **It reports from the entries, not from the `AttendanceDay` ledger.** That table looks like the
+  obvious aggregate source and says in its own docblock that it is not one: a row exists only for a
+  day that was clocked *out*, so a person who never clocked in on Monday has no row at all, and
+  summing the ledger would silently drop their expected minutes and flatter every average it
+  produced. The fold uses the same `targetMinutesFor` / `dayBalance` / `totalsOf` the timesheet
+  uses, so a figure here and a figure on `/timesheet` cannot disagree.
+- **Every lookup is batched, which is what the refactor was for.** `AttendanceService.week()`
+  queried the schedule once per day and the coverage once per person — right for seven days and one
+  person, tens of thousands of round trips for a quarter across an organization. `scheduleInForce()`
+  (`modules/attendance/schedules.ts`) and `AbsencesService.coverageOfMany()` now own those
+  decisions, and the timesheet calls the same two, so the effective-dating rule and the credited
+  flag each still have one definition.
+- **A report writes nothing.** `AttendanceService.balanceOf` and `AbsencesService.balanceOf` both
+  materialise a row on first read, which is right for a screen someone is standing in front of and
+  wrong here: running the report would have created an overtime bank and a leave quota for every
+  employee it touched, and a read that writes can block behind a clock-out.
+  `AbsencesService.balancesFor` is the non-writing twin, and a missing row reports its default.
+- **`worked + credited − expected === balance`, on every row.** Keeping worked and credited apart
+  is what makes a holiday neither absenteeism nor hours nobody worked; the invariant is asserted at
+  both test layers because it is the one thing three columns on screen can quietly break.
+- **A public holiday expects nothing — and attendance still disagrees.** The timesheet never
+  consults the holiday calendar, so a week containing Christmas prints a full target and books the
+  day as negative. A report that told a manager the whole company was eight hours short on
+  25 December would be worse than useless, so the report excludes them. **Making the two agree is
+  the follow-up**: it means either crediting holidays in `recomputeBalance`, which rewrites balances
+  already banked, or a migration that restates them. Written down rather than done inside a
+  reporting phase.
+- **The export is streamed and defended.** `StreamableFile` over a generator, because a year across
+  an organization is hundreds of thousands of lines. Two details carry tests: a UTF-8 BOM, without
+  which Excel renders every German name as mojibake, and `csvCell()` in `packages/shared`, which
+  disarms a leading `=`/`+`/`-`/`@` — every name, note and reason in the file is user-supplied text
+  and a spreadsheet runs a cell that opens with one. A negative *number* is exempt, or the balance
+  column becomes text and cannot be summed. The download cannot be an `<a href>` either: the access
+  token lives in memory and travels in a header, so `apiDownload` fetches it through the same
+  refresh-and-retry path and `saveBlob` hands it over.
+- **Charts are LayerCake for the geometry and ours for the ink.** The library supplies the
+  responsive box, the padding and the x scale; `BarMarks.svelte` draws every rectangle, tick and
+  label from `tokens.css`, so the appearance toggle re-themes a chart with no JavaScript. A
+  batteries-included library would have shipped its own theme to argue with on every screen.
+  `--bc-*-chart-1/2` are new tokens rather than reused ones: `accent` and `warning` pass the OKLCH
+  checks against the light surface and fail the lightness band and chroma floor against the dark
+  one. The pair validates at ΔE 21.2 normal / 19.6 protan, 3:1 against both surfaces. **Two series
+  is the whole set** — a third is a step run back through the validator, never a colour someone
+  picks. The plot is `aria-hidden` and the figure points at the real table beside it; a bar chart
+  is a picture of a table and a second invisible copy of every value helps nobody.
+
+One thing fixed in passing: `attendance.e2e-spec.ts` asserted a full-time default of `480`
+target minutes for "today", which is zero at the weekend — the spec failed every Saturday and
+Sunday. It derives the expectation from the shared table now.
 
 ---
 
@@ -654,7 +714,7 @@ throwaway database up; CI needs Docker and `playwright install --with-deps chrom
 
 ```
 0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Clients
-                       └─ 3  Absence ────┘   (0–5 done)
+                       └─ 3  Absence ────┘   (0–6 done)
                        └─ 4  Documents ── 5  Search
 Cross-cutting: notifications + audit log after 3; auth expansion any time; hardening before launch.
 ```
@@ -669,8 +729,9 @@ a question instead.
 Take these back to the canvas before the phase that needs them:
 
 1. The manager/admin surface in full — approval queue, people directory, org and role settings,
-   team reports, the document version history and access panels. Phases 1, 2, 3, 4 and 6 all have
-   an undesigned half.
+   the document version history and access panels, and now `/reports`: the dashboard band, the two
+   report tables, the filter rows and the charts. Phases 1, 2, 3, 4 and 6 all have an undesigned
+   half, and phase 6 has no designed half at all — it is the largest single gap left in the canvas.
 2. What the sidebar looks like for a user with `attendance:approve` or `employee:manage` — the
    canvas only ever draws the five employee entries.
 3. Search. Phase 5 shipped an entry point the canvas does not have — a field in the sidebar
@@ -682,3 +743,6 @@ Take these back to the canvas before the phase that needs them:
 5. Empty, loading and error states — every screen in the canvas is drawn full of data.
 6. Mobile layout. The canvas is a fixed 258px sidebar beside a `1180px` column; the breakpoint
    behaviour is unspecified, and the web SPA needs it before the mobile client is even discussed.
+7. Charts. Phase 6 introduced the first ones and had to invent their palette — two validated
+   series steps and a track, in `tokens.css`. The canvas has no chart at all, so mark specs,
+   density and what a third series would look like are all unspecified.
