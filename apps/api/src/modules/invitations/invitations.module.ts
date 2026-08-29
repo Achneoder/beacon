@@ -13,5 +13,8 @@ import { InvitationsService } from './invitations.service.js';
   imports: [AuthModule, MikroOrmModule.forFeature([Invitation, User, Role, Department, Team])],
   controllers: [InvitationsController],
   providers: [InvitationsService],
+  // `SsoModule` needs `acceptForFederatedEmail`; a provider is private to its module
+  // unless exported.
+  exports: [InvitationsService],
 })
 export class InvitationsModule {}
