@@ -166,6 +166,7 @@ export class AttendanceService {
     const segments = entries.flatMap((entry) => toSegments(entry));
     const totals = totalsOf(segments);
     const schedule = await this.scheduleFor(caller.organizationId, caller.id, date);
+    const holidays = await this.holidaysBetween(caller.organizationId, date, date);
 
     const open = entries.find((entry) => !entry.endedAt);
     const pause = open?.breaks.getItems().find((item) => !item.endedAt);
@@ -178,7 +179,7 @@ export class AttendanceService {
       since: (pause?.startedAt ?? open?.startedAt ?? null)?.toISOString() ?? null,
       segments,
       ...totals,
-      targetMinutes: targetMinutesFor(schedule, weekdayOf(date)),
+      targetMinutes: holidays.has(date) ? 0 : targetMinutesFor(schedule, weekdayOf(date)),
     };
   }
 
@@ -214,6 +215,11 @@ export class AttendanceService {
       monday,
       dates[6],
     );
+    // A public holiday expects nothing, the same rule the attendance report already
+    // applies — see `foldUser` in `reports.service.ts`. Without it, a week containing
+    // one prints a full target and books the day as a shortfall nobody could have
+    // worked off.
+    const holidays = await this.holidaysBetween(caller.organizationId, monday, dates[6]);
     // Every schedule row the week can need, in one query; the effective-dating
     // decision stays in `scheduleInForce` so this agrees with the reports by
     // construction. Seven `findOne`s here was the per-person cousin of the
@@ -234,12 +240,16 @@ export class AttendanceService {
       const segments = forDay.flatMap((entry) => toSegments(entry));
       const totals = totalsOf(segments);
       const schedule = scheduleInForce(scheduleRows, date);
-      const targetMinutes = targetMinutesFor(schedule, weekdayOf(date));
+      const holiday = holidays.get(date) ?? null;
+      const targetMinutes = holiday ? 0 : targetMinutesFor(schedule, weekdayOf(date));
       const bounds = forDay
         .map((entry) => entry.startedAt.getTime())
         .sort((left, right) => left - right);
 
       const absence = coverage.get(date) ?? null;
+      // Hours worked on a holiday are pure overtime, not the target the absence would
+      // otherwise have credited — matching `foldUser`'s `credited = !holiday && ...`.
+      const credited = !holiday && (absence?.credited ?? false);
 
       days.push({
         date,
@@ -248,9 +258,10 @@ export class AttendanceService {
         endedAt: closingInstant(forDay),
         ...totals,
         targetMinutes,
-        balanceMinutes: dayBalance(totals.workedMinutes, targetMinutes, absence?.credited ?? false),
+        balanceMinutes: dayBalance(totals.workedMinutes, targetMinutes, credited),
         absenceTag: absence?.tag ?? null,
-        credited: absence?.credited ?? false,
+        credited,
+        holiday,
         hasPendingCorrection: pendingDates.has(date),
       });
     }
@@ -509,6 +520,24 @@ export class AttendanceService {
   }
 
   /**
+   * The organization's public holidays in a span, keyed by date.
+   *
+   * Attendance used not to consult this at all — a week containing Christmas printed
+   * a full target and booked the day as a shortfall. `AbsencesService.listHolidays` is
+   * the one place the calendar is read; the report already reads it the same way.
+   */
+  private async holidaysBetween(
+    organizationId: string,
+    from: string,
+    to: string,
+    em: EntityManager = this.em,
+  ): Promise<Map<string, string>> {
+    const holidays = await this.absences.listHolidays(organizationId, from, to, em);
+
+    return new Map(holidays.map((holiday) => [holiday.date, holiday.name]));
+  }
+
+  /**
    * The schedule in force on `date`, or a full-time default. Effective dating means
    * the newest row that started on or before the day wins — a decision
    * {@link scheduleInForce} owns, so the report resolving a quarter in memory and the
@@ -584,7 +613,12 @@ export class AttendanceService {
     const entries = await this.entriesBetween(caller.organizationId, caller.id, date, date, em);
     const { workedMinutes } = totalsOf(entries.flatMap((entry) => toSegments(entry)));
     const schedule = await this.scheduleFor(caller.organizationId, caller.id, date, em);
-    const targetMinutes = targetMinutesFor(schedule, weekdayOf(date));
+    // A public holiday expects nothing — see `holidaysBetween` — so hours worked on
+    // one bank as pure overtime rather than as a shortfall nobody could have worked
+    // off, the same rule `week()` and the attendance report apply.
+    const holidays = await this.holidaysBetween(caller.organizationId, date, date, em);
+    const holiday = holidays.has(date);
+    const targetMinutes = holiday ? 0 : targetMinutesFor(schedule, weekdayOf(date));
     // A credited day met its target through the absence, not through worked time, so
     // it must not book a full day of negative balance against the person who was off.
     const coverage = await this.absences.coverageOf(
@@ -594,7 +628,8 @@ export class AttendanceService {
       date,
       em,
     );
-    const balanceMinutes = dayBalance(workedMinutes, targetMinutes, coverage.get(date)?.credited ?? false);
+    const credited = !holiday && (coverage.get(date)?.credited ?? false);
+    const balanceMinutes = dayBalance(workedMinutes, targetMinutes, credited);
 
     let day = await em.findOne(AttendanceDay, {
       organization: caller.organizationId,

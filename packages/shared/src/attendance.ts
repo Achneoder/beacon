@@ -174,6 +174,11 @@ export interface TimesheetDay {
   absenceTag: string | null;
   /** Whether the target was met by an absence rather than by worked time. */
   credited: boolean;
+  /**
+   * The public holiday's name, if this day is one — `targetMinutes` is then `0` and
+   * any hours worked read as pure overtime, the same rule the attendance report uses.
+   */
+  holiday: string | null;
   hasPendingCorrection: boolean;
 }
 
