@@ -169,7 +169,7 @@ Invitations are emailed; every other notification will follow the same path.
 
 ## MikroORM specifics
 
-Three non-obvious constraints, each of which caused a real failure during setup:
+Non-obvious constraints, each of which caused a real failure during setup:
 
 - **A derived property must be named in `OptionalProps`.** `BaseEntity<Optional>` takes a type
   parameter for this — `class User extends OrganizationScopedEntity<'permissions'>` keeps
@@ -189,6 +189,11 @@ Three non-obvious constraints, each of which caused a real failure during setup:
   is read. `mikro-orm.cli.ts` is the CLI's entry and loads `.env` itself. Reading
   `process.env.DATABASE_URL` at module scope in the shared config would evaluate before
   `ConfigModule` runs.
+- **`em.upsert` hydrates without running the constructor**, so field initializers never fire:
+  `BaseEntity`'s `id = randomUUID()` and its timestamp defaults must be passed as data, or the
+  not-null constraints bite. And naming the conflict fields matters — with a client-generated id
+  in the data the driver conflicts on the primary key unless `onConflictFields` says otherwise
+  (`ensureBalance` in `absences.service.ts` is the worked example).
 
 Schema changes ship as migrations; auto-synchronisation is off.
 
