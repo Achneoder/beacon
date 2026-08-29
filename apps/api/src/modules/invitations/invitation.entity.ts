@@ -1,4 +1,4 @@
-import { Collection, Entity, Enum, ManyToMany, ManyToOne, Property, type Ref } from '@mikro-orm/core';
+import { Collection, Entity, Enum, Index, ManyToMany, ManyToOne, Property, type Ref } from '@mikro-orm/core';
 import type { ContractType, WorkLocation } from '@beacon/shared';
 import { CONTRACT_TYPES, WORK_LOCATIONS } from '@beacon/shared';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
@@ -15,6 +15,7 @@ import { User } from '../users/user.entity.js';
  * unaccepted invitation never appears in the people list or a permission check.
  */
 @Entity({ tableName: 'invitations' })
+@Index({ properties: ['email'] })
 export class Invitation extends OrganizationScopedEntity {
   @Property({ type: 'string', length: 320 })
   email!: string;

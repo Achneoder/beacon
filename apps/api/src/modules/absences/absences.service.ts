@@ -521,8 +521,9 @@ export class AbsencesService {
     userId: string,
     from: string,
     to: string,
+    em: EntityManager = this.em,
   ): Promise<DayCoverage> {
-    const byUser = await this.coverageOfMany(organizationId, [userId], from, to);
+    const byUser = await this.coverageOfMany(organizationId, [userId], from, to, em);
 
     return byUser.get(userId) ?? new Map();
   }
@@ -541,11 +542,12 @@ export class AbsencesService {
     userIds: readonly string[],
     from: string,
     to: string,
+    em: EntityManager = this.em,
   ): Promise<Map<string, DayCoverage>> {
     const byUser = new Map<string, DayCoverage>(userIds.map((id) => [id, new Map()]));
     if (userIds.length === 0) return byUser;
 
-    const requests = await this.em.find(
+    const requests = await em.find(
       AbsenceRequest,
       {
         organization: organizationId,

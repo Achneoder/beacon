@@ -12,6 +12,7 @@ import { AttendanceEntry } from './attendance-entry.entity.js';
  */
 @Entity({ tableName: 'attendance_corrections' })
 @Index({ properties: ['organization', 'status'] })
+@Index({ properties: ['user', 'localDate'] })
 export class AttendanceCorrection extends OrganizationScopedEntity {
   @ManyToOne(() => User, { ref: true })
   user!: Ref<User>;

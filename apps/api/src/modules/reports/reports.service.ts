@@ -123,25 +123,17 @@ export class ReportsService {
    *
    * One line per person per day — the grain a spreadsheet can pivot, which is the
    * whole reason anyone asks for a CSV rather than reading the table on screen. The
-   * controller streams these; nothing here buffers the file.
+   * rows come back as a lazy iterable, not an array: the controller streams them, and
+   * materialising the flat list up front would hold a year across an organization —
+   * hundreds of thousands of row objects — in the heap before the first byte left.
    */
   async attendanceRows(
     caller: Caller,
     filter: AttendanceReportFilter = {},
-  ): Promise<{ range: ReportRange; rows: AttendanceCsvRow[] }> {
+  ): Promise<{ range: ReportRange; rows: Iterable<AttendanceCsvRow> }> {
     const { range, folded } = await this.fold(caller, filter);
 
-    const rows = folded.flatMap((one) =>
-      one.days.map<AttendanceCsvRow>((day) => ({
-        employeeNumber: one.user.employeeNumber,
-        name: fullName(one.user),
-        email: one.user.email,
-        department: one.user.department?.getEntity().name ?? null,
-        ...day,
-      })),
-    );
-
-    return { range, rows };
+    return { range, rows: csvRowsOf(folded) };
   }
 
   async absenceSummary(caller: Caller, year?: number): Promise<AbsenceSummary> {
@@ -288,6 +280,27 @@ export interface AttendanceCsvRow extends FoldedDay {
   name: string;
   email: string;
   department: string | null;
+}
+
+/**
+ * The folded report, flattened one row at a time as the consumer asks for them.
+ *
+ * Kept lazy on purpose: `attendanceCsvStream` feeds these to a socket a chunk at a
+ * time, and the alternative — `folded.flatMap` over every person's every day — would
+ * build the whole file's worth of row objects before the header had been written.
+ */
+function* csvRowsOf(folded: Folded[]): Generator<AttendanceCsvRow> {
+  for (const one of folded) {
+    for (const day of one.days) {
+      yield {
+        employeeNumber: one.user.employeeNumber,
+        name: fullName(one.user),
+        email: one.user.email,
+        department: one.user.department?.getEntity().name ?? null,
+        ...day,
+      };
+    }
+  }
 }
 
 /**

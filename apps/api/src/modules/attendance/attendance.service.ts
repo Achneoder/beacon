@@ -1,7 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { ref } from '@mikro-orm/core';
+import { randomUUID } from 'node:crypto';
 import {
+  DEFAULT_OVERTIME_CAP_MINUTES,
   addDays,
   dayBalance,
   fullName,
@@ -36,7 +38,7 @@ import { AttendanceEntry } from './attendance-entry.entity.js';
 import { BreakEntry } from './break-entry.entity.js';
 import { OvertimeBalance } from './overtime-balance.entity.js';
 import { WorkSchedule } from './work-schedule.entity.js';
-import { fallbackSchedule, toScheduleSummary } from './schedules.js';
+import { fallbackSchedule, scheduleInForce, toScheduleSummary } from './schedules.js';
 
 export interface AttendanceRangeFilter {
   userId?: string;
@@ -93,18 +95,26 @@ export class AttendanceService {
     return this.today(caller);
   }
 
-  /** Closing the entry, and any break still running inside it. */
+  /**
+   * Closing the entry, and any break still running inside it.
+   *
+   * The entry and the balance move commit together: a clock-out that committed the
+   * entry and then failed its balance flush would leave the day finished but the
+   * bank stale, with no second chance short of a correction.
+   */
   async clockOut(caller: Caller): Promise<TodayStatus> {
-    const entry = await this.requireOpenEntry(caller);
-    const now = new Date();
+    await this.em.transactional(async (em) => {
+      const entry = await this.requireOpenEntry(caller, em);
+      const now = new Date();
 
-    for (const pause of entry.breaks) {
-      if (!pause.endedAt) pause.endedAt = now;
-    }
-    entry.endedAt = now;
+      for (const pause of entry.breaks) {
+        if (!pause.endedAt) pause.endedAt = now;
+      }
+      entry.endedAt = now;
 
-    await this.em.flush();
-    await this.recomputeBalance(caller, entry.localDate);
+      await em.flush();
+      await this.recomputeBalance(caller, entry.localDate, em);
+    });
 
     return this.today(caller);
   }
@@ -195,13 +205,26 @@ export class AttendanceService {
       monday,
       dates[6],
     );
+    // Every schedule row the week can need, in one query; the effective-dating
+    // decision stays in `scheduleInForce` so this agrees with the reports by
+    // construction. Seven `findOne`s here was the per-person cousin of the
+    // per-organization explosion the reports module already documented.
+    const scheduleRows = await this.em.find(
+      WorkSchedule,
+      {
+        organization: caller.organizationId,
+        user: subjectId,
+        effectiveFrom: { $lte: dates[6] },
+      },
+      { orderBy: { effectiveFrom: 'desc' } },
+    );
 
     const days: TimesheetDay[] = [];
     for (const date of dates) {
       const forDay = entries.filter((entry) => entry.localDate === date);
       const segments = forDay.flatMap((entry) => toSegments(entry));
       const totals = totalsOf(segments);
-      const schedule = await this.scheduleFor(caller.organizationId, subjectId, date);
+      const schedule = scheduleInForce(scheduleRows, date);
       const targetMinutes = targetMinutesFor(schedule, weekdayOf(date));
       const bounds = forDay
         .map((entry) => entry.startedAt.getTime())
@@ -358,16 +381,19 @@ export class AttendanceService {
 
       await em.flush();
 
+      // The balance move is part of the same transaction as the decision: an
+      // approval whose balance flush failed used to leave the timesheet changed
+      // and the bank not, with no retry that would not double-count.
+      if (approved) {
+        await this.recomputeBalance({ ...caller, id: correction.user.id }, correction.localDate, em);
+      }
+
       return {
         summary: toCorrectionSummary(correction),
         localDate: correction.localDate,
         userId: correction.user.id,
       };
     });
-
-    if (approved) {
-      await this.recomputeBalance({ ...caller, id: decided.userId }, decided.localDate);
-    }
 
     return decided.summary;
   }
@@ -436,16 +462,19 @@ export class AttendanceService {
     });
   }
 
-  private async openEntry(caller: Caller): Promise<AttendanceEntry | null> {
-    return this.em.findOne(
+  private async openEntry(
+    caller: Caller,
+    em: EntityManager = this.em,
+  ): Promise<AttendanceEntry | null> {
+    return em.findOne(
       AttendanceEntry,
       { organization: caller.organizationId, user: caller.id, endedAt: null },
       { populate: ['breaks'] },
     );
   }
 
-  private async requireOpenEntry(caller: Caller): Promise<AttendanceEntry> {
-    const entry = await this.openEntry(caller);
+  private async requireOpenEntry(caller: Caller, em?: EntityManager): Promise<AttendanceEntry> {
+    const entry = await this.openEntry(caller, em);
     if (!entry) throw new BadRequestException('you are not clocked in');
 
     return entry;
@@ -456,8 +485,9 @@ export class AttendanceService {
     userId: string,
     from: string,
     to: string,
+    em: EntityManager = this.em,
   ): Promise<AttendanceEntry[]> {
-    return this.em.find(
+    return em.find(
       AttendanceEntry,
       {
         organization: organizationId,
@@ -479,8 +509,9 @@ export class AttendanceService {
     organizationId: string,
     userId: string,
     date: string,
+    em: EntityManager = this.em,
   ): Promise<WorkScheduleSummary> {
-    const schedule = await this.em.findOne(
+    const schedule = await em.findOne(
       WorkSchedule,
       { organization: organizationId, user: userId, effectiveFrom: { $lte: date } },
       { orderBy: { effectiveFrom: 'desc' } },
@@ -489,20 +520,39 @@ export class AttendanceService {
     return schedule ? toScheduleSummary(schedule) : fallbackSchedule(date);
   }
 
-  private async balanceOf(organizationId: string, userId: string): Promise<OvertimeBalance> {
-    const existing = await this.em.findOne(OvertimeBalance, {
-      organization: organizationId,
-      user: userId,
-    });
+  private async balanceOf(
+    organizationId: string,
+    userId: string,
+    em: EntityManager = this.em,
+  ): Promise<OvertimeBalance> {
+    const where = { organization: organizationId, user: userId };
+    const existing = await em.findOne(OvertimeBalance, where);
     if (existing) return existing;
 
-    const created = this.em.create(OvertimeBalance, {
-      organization: this.em.getReference(Organization, organizationId, { wrapped: true }),
-      user: this.em.getReference(User, userId, { wrapped: true }),
-    });
-    await this.em.flush();
+    // Two concurrent first reads — the timesheet and a clock-out, say — would both
+    // pass the findOne above and collide on the (user) unique constraint. The upsert
+    // turns the loser's insert into a no-op, and the refresh re-reads the row the
+    // winner committed instead of returning the discarded stub.
+    await em.upsert(
+      OvertimeBalance,
+      {
+        // upsert hydrates without running the constructor, so the field initializers
+        // never run — every constructor-assigned column (the id, both timestamps and
+        // both defaults) has to be provided, or the not-null constraints bite.
+        id: randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organization: organizationId,
+        user: userId,
+        balanceMinutes: 0,
+        capMinutes: DEFAULT_OVERTIME_CAP_MINUTES,
+      },
+      // Without this the driver would conflict on the primary key we just generated;
+      // the guard that matters is the (user) unique constraint.
+      { onConflictAction: 'ignore', onConflictFields: ['user'] },
+    );
 
-    return created;
+    return em.findOneOrFail(OvertimeBalance, where, { refresh: true });
   }
 
   /**
@@ -512,11 +562,19 @@ export class AttendanceService {
    * against what that day last contributed — the figure kept on {@link AttendanceDay}.
    * An incremental `+= worked` would double-count the moment a correction amended a
    * day that had already been counted.
+   *
+   * Every query runs through the `em` it is given: the callers that hold a
+   * transaction (`clockOut`, `decideCorrection`) pass its fork, and a read through
+   * `this.em` from inside one would run outside it.
    */
-  private async recomputeBalance(caller: Caller, date: string): Promise<void> {
-    const entries = await this.entriesBetween(caller.organizationId, caller.id, date, date);
+  private async recomputeBalance(
+    caller: Caller,
+    date: string,
+    em: EntityManager = this.em,
+  ): Promise<void> {
+    const entries = await this.entriesBetween(caller.organizationId, caller.id, date, date, em);
     const { workedMinutes } = totalsOf(entries.flatMap((entry) => toSegments(entry)));
-    const schedule = await this.scheduleFor(caller.organizationId, caller.id, date);
+    const schedule = await this.scheduleFor(caller.organizationId, caller.id, date, em);
     const targetMinutes = targetMinutesFor(schedule, weekdayOf(date));
     // A credited day met its target through the absence, not through worked time, so
     // it must not book a full day of negative balance against the person who was off.
@@ -525,10 +583,11 @@ export class AttendanceService {
       caller.id,
       date,
       date,
+      em,
     );
     const balanceMinutes = dayBalance(workedMinutes, targetMinutes, coverage.get(date)?.credited ?? false);
 
-    let day = await this.em.findOne(AttendanceDay, {
+    let day = await em.findOne(AttendanceDay, {
       organization: caller.organizationId,
       user: caller.id,
       localDate: date,
@@ -540,9 +599,9 @@ export class AttendanceService {
       day.targetMinutes = targetMinutes;
       day.balanceMinutes = balanceMinutes;
     } else {
-      day = this.em.create(AttendanceDay, {
-        organization: this.em.getReference(Organization, caller.organizationId, { wrapped: true }),
-        user: this.em.getReference(User, caller.id, { wrapped: true }),
+      day = em.create(AttendanceDay, {
+        organization: em.getReference(Organization, caller.organizationId, { wrapped: true }),
+        user: em.getReference(User, caller.id, { wrapped: true }),
         localDate: date,
         workedMinutes,
         targetMinutes,
@@ -550,10 +609,10 @@ export class AttendanceService {
       });
     }
 
-    const balance = await this.balanceOf(caller.organizationId, caller.id);
+    const balance = await this.balanceOf(caller.organizationId, caller.id, em);
     balance.balanceMinutes += balanceMinutes - previous;
 
-    await this.em.flush();
+    await em.flush();
   }
 
   /** Own record always; a report's or anyone's, depending on the caller's reach. */

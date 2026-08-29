@@ -1,4 +1,4 @@
-import { Entity, Property, Unique } from '@mikro-orm/core';
+import { Entity, Index, Property, Unique } from '@mikro-orm/core';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
 
 /**
@@ -12,6 +12,7 @@ import { OrganizationScopedEntity } from '../../common/entities/organization-sco
  * worthless without the matching authorization code and a live row.
  */
 @Entity({ tableName: 'sso_login_attempts' })
+@Index({ properties: ['expiresAt'] })
 export class SsoLoginAttempt extends OrganizationScopedEntity {
   @Unique()
   @Property({ type: 'string', length: 64 })

@@ -17,7 +17,15 @@ function limitFrom(name: string, fallback: number): number {
 /** A baseline for every route. */
 export const DEFAULT_THROTTLE_LIMIT = limitFrom('THROTTLE_LIMIT', 120);
 
-/** Password endpoints are the obvious brute-force target, so they are limited hard. */
+/**
+ * Password endpoints are the obvious brute-force target, so they are limited hard.
+ *
+ * The key is `default` on purpose: `@Throttle` stores its options under the tracker
+ * name, and `ThrottlerGuard` only reads the trackers `ThrottlerModule.forRoot`
+ * registered — which is `default` alone (`app.module.ts`). Under an `auth` key the
+ * override was never consulted, and every auth route silently ran at the 120/min
+ * baseline instead of 10. Overriding `default` applies to the tracker that exists.
+ */
 export const PASSWORD_THROTTLE = {
-  auth: { ttl: 60_000, limit: limitFrom('AUTH_THROTTLE_LIMIT', 10) },
+  default: { ttl: 60_000, limit: limitFrom('AUTH_THROTTLE_LIMIT', 10) },
 };

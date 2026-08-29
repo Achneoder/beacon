@@ -450,16 +450,17 @@ describe('ReportsService.attendanceRows', () => {
     );
 
     const { rows } = await service.attendanceRows(caller(), RANGE);
+    const materialized = [...rows];
 
-    expect(rows).toHaveLength(5);
-    expect(rows[0]).toMatchObject({
+    expect(materialized).toHaveLength(5);
+    expect(materialized[0]).toMatchObject({
       name: 'Ada Lovelace',
       department: 'Engineering',
       date: '2026-08-03',
       workedMinutes: 455,
     });
-    expect(rows[1]).toMatchObject({ absenceTag: 'Vacation', creditedMinutes: 480 });
-    expect(rows[4]).toMatchObject({ holiday: 'A holiday', expectedMinutes: 0 });
+    expect(materialized[1]).toMatchObject({ absenceTag: 'Vacation', creditedMinutes: 480 });
+    expect(materialized[4]).toMatchObject({ holiday: 'A holiday', expectedMinutes: 0 });
   });
 });
 

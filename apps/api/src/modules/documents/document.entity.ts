@@ -19,6 +19,7 @@ import { DocumentAccess } from './document-access.entity.js';
 @Entity({ tableName: 'documents' })
 @Index({ properties: ['organization', 'owner'] })
 @Index({ properties: ['organization', 'category'] })
+@Index({ properties: ['deletedAt'] })
 export class Document extends OrganizationScopedEntity {
   @ManyToOne(() => User, { ref: true, nullable: true, deleteRule: 'restrict' })
   owner: Ref<User> | null = null;

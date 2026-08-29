@@ -2,6 +2,7 @@ import {
   Collection,
   Entity,
   Enum,
+  Index,
   ManyToMany,
   ManyToOne,
   Property,
@@ -32,6 +33,9 @@ export enum UserStatus {
 @Entity({ tableName: 'users' })
 @Unique({ properties: ['organization', 'email'] })
 @Unique({ properties: ['organization', 'employeeNumber'] })
+@Index({ properties: ['manager'] })
+@Index({ properties: ['department'] })
+@Index({ properties: ['team'] })
 export class User extends OrganizationScopedEntity<'permissions'> {
   /** Always stored lower-cased so lookups can compare directly. */
   @Property({ type: 'string', length: 320 })

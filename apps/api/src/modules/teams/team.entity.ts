@@ -1,4 +1,4 @@
-import { Entity, ManyToOne, Property, Unique, type Ref } from '@mikro-orm/core';
+import { Entity, Index, ManyToOne, Property, Unique, type Ref } from '@mikro-orm/core';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
 import { Department } from '../departments/department.entity.js';
 
@@ -8,6 +8,7 @@ import { Department } from '../departments/department.entity.js';
  */
 @Entity({ tableName: 'teams' })
 @Unique({ properties: ['organization', 'name'] })
+@Index({ properties: ['department'] })
 export class Team extends OrganizationScopedEntity {
   @Property({ type: 'string', length: 120 })
   name!: string;
