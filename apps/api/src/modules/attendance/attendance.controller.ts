@@ -10,7 +10,7 @@ import type {
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { AttendanceService, type Caller } from './attendance.service.js';
-import { ClockDto } from './dto/clock.dto.js';
+import { ClockDto, ClockOutDto } from './dto/clock.dto.js';
 import { CreateCorrectionDto } from './dto/create-correction.dto.js';
 import { DecideCorrectionDto } from './dto/decide-correction.dto.js';
 
@@ -32,8 +32,8 @@ export class AttendanceController {
 
   @Post('clock-out')
   @RequirePermissions('attendance:write')
-  clockOut(@CurrentUser() user: AuthenticatedUser): Promise<TodayStatus> {
-    return this.attendance.clockOut(callerOf(user));
+  clockOut(@CurrentUser() user: AuthenticatedUser, @Body() dto: ClockOutDto): Promise<TodayStatus> {
+    return this.attendance.clockOut(callerOf(user), dto);
   }
 
   @Post('breaks/start')

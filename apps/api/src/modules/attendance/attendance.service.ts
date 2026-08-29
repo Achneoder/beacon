@@ -3,6 +3,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import { ref } from '@mikro-orm/core';
 import { randomUUID } from 'node:crypto';
 import {
+  CLOCK_SKEW_TOLERANCE_MS,
   DEFAULT_OVERTIME_CAP_MINUTES,
   addDays,
   dayBalance,
@@ -17,6 +18,7 @@ import {
   weekLocksAt,
   weekdayOf,
   type AttendanceSegment,
+  type ClockOutRequest,
   type ClockRequest,
   type ClockState,
   type CorrectionSummary,
@@ -101,16 +103,23 @@ export class AttendanceService {
    * The entry and the balance move commit together: a clock-out that committed the
    * entry and then failed its balance flush would leave the day finished but the
    * bank stale, with no second chance short of a correction.
+   *
+   * `request.at` lets a client close the entry at an instant that has already passed —
+   * the desktop app replaying a standby it could not report before the machine slept.
+   * It is bounded rather than trusted: see {@link resolveClockOutAt}.
    */
-  async clockOut(caller: Caller): Promise<TodayStatus> {
+  async clockOut(caller: Caller, request: ClockOutRequest = {}): Promise<TodayStatus> {
     await this.em.transactional(async (em) => {
       const entry = await this.requireOpenEntry(caller, em);
-      const now = new Date();
+      const at = resolveClockOutAt(request.at, entry.startedAt);
 
       for (const pause of entry.breaks) {
-        if (!pause.endedAt) pause.endedAt = now;
+        // A break cannot end before it began. It also cannot have started after `at`,
+        // since `at` is at or after the entry's own start and the break sits inside
+        // it — but clamping is cheaper than trusting that as the code moves.
+        if (!pause.endedAt) pause.endedAt = pause.startedAt > at ? pause.startedAt : at;
       }
-      entry.endedAt = now;
+      entry.endedAt = at;
 
       await em.flush();
       await this.recomputeBalance(caller, entry.localDate, em);
@@ -639,6 +648,37 @@ export class AttendanceService {
 
     return resolveTimezone(user?.timezone ?? null, organization?.timezone ?? 'UTC');
   }
+}
+
+/**
+ * The instant a clock-out closes at, bounded so a client cannot invent one.
+ *
+ * A client-supplied `at` is only ever a *correction downwards* — the desktop app
+ * saying "the machine actually went to sleep at 17:02, not now". So it may not run
+ * ahead of the server's clock by more than the drift two machines legitimately have,
+ * and it may not precede the clock-in, which would produce a negative day.
+ *
+ * Exported for the unit test: the rule is worth pinning down without a database.
+ */
+export function resolveClockOutAt(at: string | undefined, startedAt: Date, now = new Date()): Date {
+  if (at === undefined) return now;
+
+  const instant = new Date(at);
+
+  if (Number.isNaN(instant.getTime())) {
+    throw new BadRequestException('at must be a valid instant');
+  }
+  if (instant.getTime() > now.getTime() + CLOCK_SKEW_TOLERANCE_MS) {
+    throw new BadRequestException('a clock-out cannot be in the future');
+  }
+  if (instant.getTime() < startedAt.getTime()) {
+    throw new BadRequestException('a clock-out cannot precede the clock-in');
+  }
+
+  // Inside the tolerance but still ahead of the server: accept the clock-out, but
+  // record the server's own instant. Storing the future would leave a segment that
+  // reads as still running for the next few seconds.
+  return instant.getTime() > now.getTime() ? now : instant;
 }
 
 function sum<T>(items: T[], of: (item: T) => number): number {
