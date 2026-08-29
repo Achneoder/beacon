@@ -6,6 +6,13 @@ import { Tracker, type ClockPort } from './tracker.js';
 
 const NOW = new Date('2026-08-29T17:30:00.000Z');
 const STARTED_AT = new Date('2026-08-29T09:00:00.000Z');
+/**
+ * The machine rebooted at 16:00 by default, so a heartbeat written before then is a
+ * crash the machine did *not* outlive — which is what licenses the recovery below.
+ * Always passed explicitly: reading the real uptime would make these tests depend on
+ * how long the build agent happened to have been running.
+ */
+const BOOTED_AT = new Date('2026-08-29T16:00:00.000Z');
 
 /** An in-memory outbox with the same contract as the file-backed one. */
 class FakeOutbox implements OutboxPort {
@@ -114,8 +121,15 @@ function trackerFor(
   clock: FakeClock,
   outbox: FakeOutbox,
   autoTrack = true,
+  bootedAt: Date = BOOTED_AT,
 ): Tracker {
-  return new Tracker({ clock, outbox, autoTrack: () => autoTrack, now: () => NOW });
+  return new Tracker({
+    clock,
+    outbox,
+    autoTrack: () => autoTrack,
+    now: () => NOW,
+    bootedAt: () => bootedAt,
+  });
 }
 
 describe('Tracker', () => {
@@ -230,6 +244,7 @@ describe('Tracker', () => {
         outbox,
         autoTrack: () => true,
         now: () => woke,
+        bootedAt: () => BOOTED_AT,
       });
 
       await resumed.resume();
@@ -301,14 +316,41 @@ describe('Tracker', () => {
   });
 
   describe('recovering from a process that was killed outright', () => {
-    it('closes the entry at the last heartbeat', async () => {
+    it('closes the entry at the last heartbeat when the machine restarted', async () => {
       const clock = new FakeClock('in', STARTED_AT);
-      // No pending record — this process never got to make one.
+      // No pending record — this process never got to make one. The machine booted at
+      // 16:00, after the heartbeat, so it really did go away.
       outbox.lastSeenAt = new Date('2026-08-29T14:00:00.000Z');
 
       await trackerFor(clock, outbox).start();
 
       expect(clock.clockedOutAt).toEqual(outbox.lastSeenAt);
+    });
+
+    it('leaves the entry alone when the machine outlived the crash', async () => {
+      // The app died at 14:00 but the machine has been up since yesterday, so the
+      // user may have carried on working in the browser for the last three and a half
+      // hours. Closing at the heartbeat would silently throw that away.
+      const clock = new FakeClock('in', STARTED_AT);
+      outbox.lastSeenAt = new Date('2026-08-29T14:00:00.000Z');
+      const bootedBeforeTheCrash = new Date('2026-08-28T08:00:00.000Z');
+
+      await trackerFor(clock, outbox, true, bootedBeforeTheCrash).start();
+
+      expect(clock.clockedOutAt).toBeNull();
+      expect(clock.calls).not.toContain('clockOut');
+    });
+
+    it('still delivers a clock-out it actually recorded, reboot or not', async () => {
+      // A recorded suspend is a decision, not a guess: the machine staying up since
+      // does not make it wrong. Only the heartbeat needs the reboot to license it.
+      const clock = new FakeClock('in', STARTED_AT);
+      const owed = new Date('2026-08-29T17:00:00.000Z');
+      outbox.pendingAt = owed;
+
+      await trackerFor(clock, outbox, true, new Date('2026-08-28T08:00:00.000Z')).start();
+
+      expect(clock.clockedOutAt).toEqual(owed);
     });
 
     it('ignores a heartbeat older than the entry that is open now', async () => {
