@@ -105,7 +105,12 @@ Email/password and SSO over OIDC today; passkeys, social login and 2FA are plann
 - **Two tokens.** A 15-minute JWT access token (the SPA holds it in memory, never in
   `localStorage`) and a 30-day opaque refresh token in an `HttpOnly` cookie. Only the SHA-256 hash
   of the refresh token is stored. Refreshing rotates; replaying a spent token revokes the user's
-  whole token family.
+  whole token family. Rotation serializes on an advisory lock keyed by the token hash
+  (`REFRESH_ROTATION_LOCK` in `auth.service.ts`), because two tabs share the cookie jar and can
+  present the same token at once; `REFRESH_REPLAY_GRACE_MS` (default 30s) tells a just-rotated
+  loser — a second tab — apart from a stolen-token replay, which still revokes the family.
+  The revocation runs *outside* the rotation transaction: a 401 thrown inside
+  `em.transactional` would roll it back.
 - **The access token carries the permission set**, so authorizing costs no query — the trade-off is
   that a permission change only takes effect when the token expires. `/auth/me` re-reads from the
   database, so the UI is not stale.
@@ -194,6 +199,14 @@ Non-obvious constraints, each of which caused a real failure during setup:
   not-null constraints bite. And naming the conflict fields matters — with a client-generated id
   in the data the driver conflicts on the primary key unless `onConflictFields` says otherwise
   (`ensureBalance` in `absences.service.ts` is the worked example).
+- **Check-then-write needs a lock.** Read-then-write flows with no row to lock serialize on
+  `lockAdvisory` (`common/db/advisory-lock.ts`) inside `em.transactional` — the idiom
+  `createWithOwner` and `nextEmployeeNumber` established. Refresh rotation, absence
+  create/decide/withdraw and correction decisions all take one now (their namespace constants
+  live next to each flow); concurrent pairs e2e-test exactly one winner. The fork's em must be
+  passed through to every query inside the transaction — using `this.em` there reads outside
+  it. And anything that must survive a 401/exception cannot run inside the transaction: the
+  throw rolls it back.
 
 Schema changes ship as migrations; auto-synchronisation is off.
 
