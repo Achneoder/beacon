@@ -4,7 +4,6 @@ import { ref } from '@mikro-orm/core';
 import {
   addDays,
   dayBalance,
-  defaultExpectedMinutes,
   fullName,
   isWeekLocked,
   minutesBetween,
@@ -36,9 +35,7 @@ import { AttendanceEntry } from './attendance-entry.entity.js';
 import { BreakEntry } from './break-entry.entity.js';
 import { OvertimeBalance } from './overtime-balance.entity.js';
 import { WorkSchedule } from './work-schedule.entity.js';
-
-/** The weekly hours a person gets until someone gives them a schedule of their own. */
-const FALLBACK_WEEKLY_MINUTES = 40 * 60;
+import { fallbackSchedule, toScheduleSummary } from './schedules.js';
 
 export interface AttendanceRangeFilter {
   userId?: string;
@@ -454,7 +451,9 @@ export class AttendanceService {
 
   /**
    * The schedule in force on `date`, or a full-time default. Effective dating means
-   * the newest row that started on or before the day wins.
+   * the newest row that started on or before the day wins — a decision
+   * {@link scheduleInForce} owns, so the report resolving a quarter in memory and the
+   * timesheet resolving one day from the database cannot drift apart.
    */
   private async scheduleFor(
     organizationId: string,
@@ -467,33 +466,7 @@ export class AttendanceService {
       { orderBy: { effectiveFrom: 'desc' } },
     );
 
-    if (!schedule) {
-      return {
-        id: 'default',
-        model: 'flextime',
-        weeklyMinutes: FALLBACK_WEEKLY_MINUTES,
-        expectedMinutes: defaultExpectedMinutes(FALLBACK_WEEKLY_MINUTES),
-        coreStart: null,
-        coreEnd: null,
-        startTime: null,
-        endTime: null,
-        rosterRef: null,
-        effectiveFrom: date,
-      };
-    }
-
-    return {
-      id: schedule.id,
-      model: schedule.model,
-      weeklyMinutes: schedule.weeklyMinutes,
-      expectedMinutes: schedule.expectedMinutes,
-      coreStart: schedule.coreStart,
-      coreEnd: schedule.coreEnd,
-      startTime: schedule.startTime,
-      endTime: schedule.endTime,
-      rosterRef: schedule.rosterRef,
-      effectiveFrom: schedule.effectiveFrom,
-    };
+    return schedule ? toScheduleSummary(schedule) : fallbackSchedule(date);
   }
 
   private async balanceOf(organizationId: string, userId: string): Promise<OvertimeBalance> {
