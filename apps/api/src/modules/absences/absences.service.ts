@@ -53,6 +53,12 @@ export interface Caller {
   canManageDocuments: boolean;
 }
 
+/**
+ * What each day of a range is covered by: the absence type's name for the tag, and
+ * whether the day's target was met by the absence rather than by worked time.
+ */
+export type DayCoverage = Map<string, { tag: string; credited: boolean }>;
+
 export interface CalendarFilter {
   from?: string;
   to?: string;
@@ -412,12 +418,35 @@ export class AbsencesService {
     userId: string,
     from: string,
     to: string,
-  ): Promise<Map<string, { tag: string; credited: boolean }>> {
+  ): Promise<DayCoverage> {
+    const byUser = await this.coverageOfMany(organizationId, [userId], from, to);
+
+    return byUser.get(userId) ?? new Map();
+  }
+
+  /**
+   * The same answer for a set of people, in one query.
+   *
+   * Reporting reads a quarter across an organization; asking {@link coverageOf} per
+   * person would be a round trip each, and doing the grouping here rather than in the
+   * report is what keeps `credited` a single decision. The per-user map is always
+   * present for every id asked about, so a caller never has to distinguish "no
+   * absences" from "not asked".
+   */
+  async coverageOfMany(
+    organizationId: string,
+    userIds: readonly string[],
+    from: string,
+    to: string,
+  ): Promise<Map<string, DayCoverage>> {
+    const byUser = new Map<string, DayCoverage>(userIds.map((id) => [id, new Map()]));
+    if (userIds.length === 0) return byUser;
+
     const requests = await this.em.find(
       AbsenceRequest,
       {
         organization: organizationId,
-        user: userId,
+        user: { $in: [...userIds] },
         status: { $in: ['approved', 'taken'] },
         startsOn: { $lte: to },
         endsOn: { $gte: from },
@@ -425,8 +454,10 @@ export class AbsencesService {
       { populate: ['type'] },
     );
 
-    const coverage = new Map<string, { tag: string; credited: boolean }>();
     for (const request of requests) {
+      const coverage = byUser.get(request.user.id);
+      if (!coverage) continue;
+
       const type = request.type.getEntity();
       for (const date of datesBetween(request.startsOn, request.endsOn)) {
         if (date < from || date > to || isWeekend(date)) continue;
@@ -434,7 +465,7 @@ export class AbsencesService {
       }
     }
 
-    return coverage;
+    return byUser;
   }
 
   // ---------------------------------------------------------------- internals
