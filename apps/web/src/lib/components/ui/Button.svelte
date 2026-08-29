@@ -38,9 +38,11 @@
 		lg: 'px-7 py-3.5 text-base'
 	};
 
+	// Fill tokens, not the plain accents: white text on `accent`/`success` fails
+	// WCAG AA in dark theme (2.8:1 / 2.1:1) — the fill steps are the deep variants.
 	const fills: Record<'accent' | 'success', string> = {
-		accent: 'bg-accent',
-		success: 'bg-success'
+		accent: 'bg-accent-fill',
+		success: 'bg-success-fill'
 	};
 
 	const variants: Record<Variant, string> = $derived({

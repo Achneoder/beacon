@@ -80,7 +80,7 @@
 				>
 					<span
 						class="font-mono text-2xs {day.date === today
-							? 'rounded-full bg-accent px-1.5 text-white'
+							? 'rounded-full bg-accent-fill px-1.5 text-white'
 							: 'text-ink-muted'}"
 					>
 						{dayNumber(day.date)}

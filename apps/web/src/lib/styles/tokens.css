@@ -65,6 +65,15 @@
 	--bc-dark-accent-soft: #2b2340;
 	--bc-dark-success: #7fbe9c;
 	--bc-dark-success-soft: #20302a;
+	/*
+	 * Filled-button grounds, deeper than the accents above: white text on the
+	 * accent/success tokens is 2.8:1 / 2.1:1 (WCAG AA wants 4.5:1), while the same
+	 * tokens as *text* on a dark surface are right where they should be. Fills get
+	 * their own step — 5.4:1 and 5.4:1 at rest, and still ≥ 4.5:1 under the
+	 * primary button's `hover:brightness-110`.
+	 */
+	--bc-dark-accent-fill: #7559b8;
+	--bc-dark-success-fill: #39755f;
 	--bc-dark-warning: #df9c78;
 	--bc-dark-warning-soft: #332620;
 	--bc-dark-info: #8faae4;
@@ -88,8 +97,10 @@
 	--bc-accent: var(--bc-light-accent);
 	--bc-accent-on-soft: var(--bc-light-accent-on-soft);
 	--bc-accent-soft: var(--bc-light-accent-soft);
+	--bc-accent-fill: var(--bc-light-accent);
 	--bc-success: var(--bc-light-success);
 	--bc-success-soft: var(--bc-light-success-soft);
+	--bc-success-fill: var(--bc-light-success);
 	--bc-warning: var(--bc-light-warning);
 	--bc-warning-soft: var(--bc-light-warning-soft);
 	--bc-info: var(--bc-light-info);
@@ -114,8 +125,10 @@
 		--bc-accent: var(--bc-dark-accent);
 		--bc-accent-on-soft: var(--bc-dark-accent-on-soft);
 		--bc-accent-soft: var(--bc-dark-accent-soft);
+		--bc-accent-fill: var(--bc-dark-accent-fill);
 		--bc-success: var(--bc-dark-success);
 		--bc-success-soft: var(--bc-dark-success-soft);
+		--bc-success-fill: var(--bc-dark-success-fill);
 		--bc-warning: var(--bc-dark-warning);
 		--bc-warning-soft: var(--bc-dark-warning-soft);
 		--bc-info: var(--bc-dark-info);
@@ -140,8 +153,10 @@
 	--bc-accent: var(--bc-dark-accent);
 	--bc-accent-on-soft: var(--bc-dark-accent-on-soft);
 	--bc-accent-soft: var(--bc-dark-accent-soft);
+	--bc-accent-fill: var(--bc-dark-accent-fill);
 	--bc-success: var(--bc-dark-success);
 	--bc-success-soft: var(--bc-dark-success-soft);
+	--bc-success-fill: var(--bc-dark-success-fill);
 	--bc-warning: var(--bc-dark-warning);
 	--bc-warning-soft: var(--bc-dark-warning-soft);
 	--bc-info: var(--bc-dark-info);
@@ -170,8 +185,11 @@
 	/* readable accent for text/icons sitting on `accent-soft` */
 	--color-accent-on-soft: var(--bc-accent-on-soft);
 	--color-accent-soft: var(--bc-accent-soft);
+	/* filled-button grounds, deep enough for white text in either theme */
+	--color-accent-fill: var(--bc-accent-fill);
 	--color-success: var(--bc-success);
 	--color-success-soft: var(--bc-success-soft);
+	--color-success-fill: var(--bc-success-fill);
 	--color-warning: var(--bc-warning);
 	--color-warning-soft: var(--bc-warning-soft);
 	--color-info: var(--bc-info);
