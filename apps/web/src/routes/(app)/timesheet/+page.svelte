@@ -158,7 +158,9 @@
 							<span class="ml-2 font-mono text-2xs font-normal text-ink-muted">
 								{formatDayLabel(day.date, lang)}
 							</span>
-							{#if day.absenceTag}
+							{#if day.holiday}
+								<Badge tone="neutral" class="ml-2">{day.holiday}</Badge>
+							{:else if day.absenceTag}
 								<Badge tone="info" class="ml-2">{day.absenceTag}</Badge>
 							{/if}
 							{#if day.hasPendingCorrection}
