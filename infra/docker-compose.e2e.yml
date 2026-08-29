@@ -26,7 +26,7 @@ services:
   # StorageService connects on boot (it creates its bucket), so the API will not start
   # without an object store — even though no feature writes to it yet.
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: beacon
@@ -64,7 +64,7 @@ services:
   # The invitation email has to go somewhere the suite can read it back; Mailpit's REST
   # API on 58025 is how the e2e specs assert that a message actually left the API.
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.0
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 'true'
       MP_SMTP_AUTH_ALLOW_INSECURE: 'true'
