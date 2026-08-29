@@ -56,7 +56,8 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | SSO (OIDC) | shipped — one provider per installation, invitation-gated, admin-exempt enforcement |
 | 2FA, passkeys | not started |
 | Notifications, monitoring | not started |
-| Mobile, desktop | not created; frameworks undecided |
+| Desktop (Electron, automatic tracking) | shipped — `apps/desktop` |
+| Mobile | not created; framework undecided |
 
 The permission union in `packages/shared/src/permissions.ts` already names every feature below
 (`attendance:*`, `holiday:*`, `document:*`, `employee:*`, `report:read`). Phases claim those
@@ -708,16 +709,35 @@ notes, status pills, and the lock notice. Add locales beyond `en`/`de` only afte
 
 ## Clients
 
-Neither client starts before the notification and reporting seams exist — both depend on them.
+**Mobile** — clock in/out, absence requests, push notifications. Not started; it waits on the
+notification seam. Framework undecided; the decision is between React Native and a Svelte-family
+wrapper, and hinges on whether the team wants to share `@beacon/shared` types only (either works)
+or components (neither does well). Requires a device registration endpoint and a push provider
+behind an interface.
 
-**Mobile** — clock in/out, absence requests, push notifications. Framework undecided; the decision
-is between React Native and a Svelte-family wrapper, and hinges on whether the team wants to share
-`@beacon/shared` types only (either works) or components (neither does well). Requires a device
-registration endpoint and a push provider behind an interface.
+**Desktop** — **done**, and it did not wait on notifications or reporting: it needs neither.
+`apps/desktop`, Electron, writing `AttendanceEntry` with `source: 'desktop'`.
 
-**Desktop** — automatic time tracking from activity, syncing `AttendanceEntry` with
-`source: 'desktop'`. Needs an offline queue and idempotent clock-in, so give the attendance API a
-client-supplied idempotency key when this phase starts.
+Three things settled differently from the plan above, and are worth knowing:
+
+- **No idempotency key.** The offline queue turned out not to need one. `attendance_entries` is
+  already unique on one open entry per user, and every decision the tracker makes reads
+  `GET /attendance/me/today` first — so a repeated call is either refused by the index or dropped
+  by the reconcile. A key would have added a column and a migration to guarantee what the index
+  guarantees already.
+- **A backdated clock-out instead.** What the API did need was a *timestamp*:
+  `POST /attendance/clock-out` takes an optional `at`. A machine can suspend faster than a request
+  can be sent, so the clock-out is written to disk first and replayed on resume carrying its
+  original instant. `at` is bounded — never ahead of the server past a minute of clock drift,
+  never before the entry started.
+- **Not "from activity".** Tracking follows the app and machine lifecycle — open, close, suspend,
+  resume, lock past a grace period — rather than keyboard or mouse activity. Idle detection was
+  left out deliberately: it needs a policy for whether idle time is a break or a clock-out, and
+  that is a question for the canvas, not for the client.
+
+The shell loads the served web app rather than bundling a copy, so `apps/web` was not touched and
+no installation needs a CORS or cookie change to support it. See the Desktop section of
+`CLAUDE.md`.
 
 ## Deployment
 
@@ -732,10 +752,11 @@ throwaway database up; CI needs Docker and `playwright install --with-deps chrom
 ## Suggested order
 
 ```
-0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Clients
-                       └─ 3  Absence ────┘   (0–6 done)
+0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Mobile
+                       └─ 3  Absence ────┘   (0–6 done)      (waits on notifications)
                        └─ 4  Documents ── 5  Search
 7  SSO — done, and ran independently of the chain above; any auth-expansion phase can.
+8  Desktop — done, and depends on 2 alone: it is a client for the clock, nothing else.
 Cross-cutting: notifications + audit log after 3; auth expansion any time; hardening before launch.
 ```
 
