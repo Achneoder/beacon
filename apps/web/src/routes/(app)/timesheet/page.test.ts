@@ -16,6 +16,7 @@ function day(overrides: Partial<TimesheetDay> & Pick<TimesheetDay, 'date' | 'wee
 		balanceMinutes: -360,
 		absenceTag: null,
 		credited: false,
+		holiday: null,
 		hasPendingCorrection: false,
 		...overrides
 	} satisfies TimesheetDay;
@@ -107,6 +108,28 @@ describe('timesheet page', () => {
 		// Wednesday is tagged and still balances on the hours actually worked.
 		expect(screen.getByText('5:35')).toBeInTheDocument();
 		expect(screen.getByText('-0:25')).toBeInTheDocument();
+	});
+
+	it('shows a public holiday with no target, and hours worked on it as overtime', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({
+			...week,
+			days: week.days.map((entry) =>
+				entry.date === '2026-08-28'
+					? {
+							...entry,
+							workedMinutes: 90,
+							targetMinutes: 0,
+							balanceMinutes: 90,
+							holiday: 'Founders Day'
+						}
+					: entry
+			)
+		});
+
+		render(TimesheetPage);
+
+		expect(await screen.findByText('Founders Day')).toBeInTheDocument();
+		expect(screen.getByText('+1:30')).toBeInTheDocument();
 	});
 
 	it('names the moment the week stops being editable', async () => {
