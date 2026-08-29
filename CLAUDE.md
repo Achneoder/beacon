@@ -98,8 +98,9 @@ Linting is asymmetric because the generators disagree: **web uses ESLint** (flat
 
 ## Auth
 
-Email/password today; passkeys, social login and SSO are planned, which is why `User.passwordHash`
-is nullable and hashing sits behind `PasswordService` rather than calling `@node-rs/argon2` directly.
+Email/password and SSO over OIDC today; passkeys, social login and 2FA are planned, which is why
+`User.passwordHash` is nullable and hashing sits behind `PasswordService` rather than calling
+`@node-rs/argon2` directly.
 
 - **Two tokens.** A 15-minute JWT access token (the SPA holds it in memory, never in
   `localStorage`) and a 30-day opaque refresh token in an `HttpOnly` cookie. Only the SHA-256 hash
@@ -113,6 +114,40 @@ is nullable and hashing sits behind `PasswordService` rather than calling `@node
   `AuthService.login` is a single lookup.
 - **Web guards are UX only.** The redirects in `src/routes/(app)/+layout.svelte` are convenience;
   the API re-checks every request. `session.can()` decides what to *offer*, never what to allow.
+
+## SSO
+
+OIDC, one provider per installation — Beacon runs one organization per deployment, so there is no
+per-organization routing decision to make, and `SsoProvider` is `@Unique` on `organization` to make
+that a database fact rather than a convention. `apps/api/src/modules/sso/`.
+
+- **`openid-client` is the only thing that verifies an ID token.** `OidcClient`
+  (`modules/sso/oidc-client.ts`) is the one seam onto it — feature code never imports the SDK
+  directly, the same containment `StorageService` and `MailService` give their own vendor SDKs.
+  Hand-rolling issuer, audience, expiry or `nonce` checks is the one place in this feature a subtle
+  mistake would be silent.
+- **The client secret is encrypted, not hashed.** Unlike `passwordHash`, Beacon has to present it
+  back to the IdP on every token exchange, so it must be recoverable. `SecretCipher`
+  (`common/crypto/`), AES-256-GCM under `SSO_ENCRYPTION_KEY`, is optional the same way `MAIL_HOST`
+  and `SEARCH_HOST` are: unset, `isConfigured()` is false and the settings routes refuse to save
+  rather than the app refusing to boot. No endpoint ever returns the secret —
+  `SsoSettings.hasClientSecret` is all a reader sees.
+- **SSO never creates an account.** The IdP proves *who* is signing in, not *that they belong
+  here*. The callback resolves an existing `active` user, or accepts a pending invitation for the
+  address — `InvitationsService.acceptForFederatedEmail` — because the IdP has already proved the
+  address more strongly than an emailed token does. An address the installation does not know is
+  refused.
+- **`enforced` exempts `organization:manage`**, checked against the caller's own permission union
+  in `AuthService.login`, never a role name. A broken IdP must not be able to lock every admin out
+  of an on-premise install whose only other door is a database edit; `/login?password=1` is the
+  escape hatch the web app offers them.
+- **`state` is stored as its SHA-256 hash**, like `RefreshToken.tokenHash` and the invitation
+  token; the PKCE verifier is stored as-is, because the token exchange has to send it and it is
+  worthless without the matching authorization code and a live, unconsumed `SsoLoginAttempt` row.
+- **The issuer must be https, except on a loopback host** — `IsIssuerUrl`
+  (`modules/sso/dto/issuer-url.validator.ts`), the same exemption RFC 8252 makes for a native-app
+  redirect URI. Without it neither a developer's own local IdP nor the API e2e suite's fake one
+  (`test/fake-idp.ts`, which signs real ID tokens against a real JWKS) could ever be configured.
 
 ## Email
 
@@ -202,6 +237,11 @@ token, and the `@beacon/shared` shapes actually agreeing at runtime.
   same reason the database guard exists — a documents spec writes and deletes real objects.
   `apps/api/test/search.ts` is the third rail of the same shape, refusing any index not
   named `*-e2e`.
+- **`sso.spec.ts` runs alone, after every other browser spec.** It is the only file that flips the
+  shared organization's SSO settings, and `fullyParallel` would otherwise race a password sign-in
+  in another spec against this one hiding the password form under enforcement. It gets its own
+  Playwright project in `playwright.config.ts`, `dependencies: ['chromium']`, rather than living
+  inside the `chromium` project like every other spec.
 - **Search is asserted by polling, not by waiting.** `SearchSubscriber` never blocks a write
   on the search backend, so a spec that uploads and then searches is racing a write it
   deliberately did not wait for. `until()` in `apps/api/test/search.ts` is the honest way to

@@ -53,7 +53,8 @@ formatter in `packages/shared`, so the API, the web app and the future clients a
 | Employee data | shipped as part of People — the employment fields and the Profile screen |
 | Storage (`StorageService` → MinIO) | shipped — `DocumentsService` is its first caller |
 | Search (`SearchService` → Meilisearch) | shipped — `NoopSearchService` when `SEARCH_HOST` is unset |
-| SSO (OIDC), 2FA, passkeys | not started — phase 7 specifies SSO |
+| SSO (OIDC) | shipped — one provider per installation, invitation-gated, admin-exempt enforcement |
+| 2FA, passkeys | not started |
 | Notifications, monitoring | not started |
 | Mobile, desktop | not created; frameworks undecided |
 
@@ -513,7 +514,7 @@ Sunday. It derives the expectation from the shared table now.
 
 ---
 
-## Phase 7 — SSO (OIDC)
+## Phase 7 — SSO (OIDC) — **done**
 
 *As an admin, I want to enable SSO for my organization.* The first slice of the "auth expansion"
 line below, and the only one an admin configures from inside the app.
@@ -642,21 +643,39 @@ secret, and refuses `enabled` unless a discovery fetch has succeeded.
 PKCE, the exchange and ID-token validation. Hand-rolling ID-token verification is the one part of
 this phase where a subtle mistake is silent.
 
+### Settled while building
+
+- **A pending invitation is accepted on first SSO login, not refused.** Question 1 below is
+  answered: the IdP has already proved the address more strongly than an emailed token does, so
+  the callback applies the invitation's roles, department, manager and employee number and creates
+  an `active` user with a null `passwordHash`, the same way `User.passwordHash` was already
+  nullable for exactly this. `InvitationsService.acceptForFederatedEmail` shares its transaction
+  body (`materialize()`) with the token-based `accept()` rather than duplicating it.
+- **No `WEB_APP_URL`.** `WEB_BASE_URL` already existed (`InvitationsService.webBaseUrl`, falling
+  back to `CORS_ORIGIN`) and means exactly the same thing — where an emailed or a redirected link
+  points the browser. Only `API_PUBLIC_URL` is new.
+- **`enabled: true` is gated by a discovery fetch inside the same request, not a separately stored
+  "last test succeeded" flag.** `PUT /sso/settings` always runs discovery against the values it is
+  saving; a failure blocks `enabled: true` but still saves the row with `enabled: false`, so an
+  admin mid-setup keeps what they typed. `POST /sso/settings/test` is the same fetch on demand,
+  without saving anything, for a "Test connection" click before a first save exists.
+- **The issuer has to be https, except on a loopback host.** `IsIssuerUrl` and `OidcClient.discover`
+  both carve out the same exemption RFC 8252 makes for native-app redirect URIs — otherwise neither
+  a developer's own local IdP nor the API e2e suite's fake one (`test/fake-idp.ts`, which signs
+  real ID tokens against a real JWKS) could ever be configured at all.
+
 ### Open questions
 
-1. **An `invited` user who signs in through the IdP.** The IdP proves the address far better than
-   an emailed token does, so the attractive answer is that a first SSO login *accepts* the pending
-   invitation — applying its roles and flipping `invited` → `active`. The conservative answer is to
-   refuse and make them use their invitation link. Worth settling before building, and it touches
-   the invitation work that is in flight.
-2. Group-to-role mapping from IdP claims — deferred deliberately: roles stay a decision someone
+1. Group-to-role mapping from IdP claims — deferred deliberately: roles stay a decision someone
    makes in Beacon, which is what "invitation only" means.
-3. IdP-initiated sign-in and back-channel logout (`end_session_endpoint`) are not supported; a
+2. IdP-initiated sign-in and back-channel logout (`end_session_endpoint`) are not supported; a
    Beacon logout ends the Beacon session only.
-4. `SSO_ENCRYPTION_KEY` rotation has no story yet — re-entering the client secret is the answer
+3. `SSO_ENCRYPTION_KEY` rotation has no story yet — re-entering the client secret is the answer
    until one exists.
-5. Multiple providers in one installation. One row today; the unique key is on `organization`, so
+4. Multiple providers in one installation. One row today; the unique key is on `organization`, so
    lifting it is a migration and a picker on the login screen.
+5. `/settings/sso` is undesigned, like the rest of the manager/admin surface — built to the
+   existing tokens for now; see "Open design questions" below.
 ---
 
 ## Cross-cutting, once the verticals exist
@@ -669,8 +688,8 @@ a component. This is the prerequisite for mobile push.
 
 **Auth expansion** — in ascending cost: TOTP 2FA (`User.totpSecret`, a verification step in
 `AuthService.login`), passkeys (WebAuthn; `Credential` entity — `passwordHash` is already nullable
-for this), social login (OAuth2 per provider). **SSO is specified in full as phase 7** — OIDC first,
-one provider per installation, SAML only on demand. Password reset over emailed one-use
+for this), social login (OAuth2 per provider). **SSO shipped as phase 7** — OIDC, one provider per
+installation, SAML only on demand if it is ever needed. Password reset over emailed one-use
 tokens is a phase-1-shaped prerequisite and should land with notifications.
 
 **Audit log** — an append-only `AuditEvent` (actor, action, subject, `before`/`after`, ip) written
@@ -716,6 +735,7 @@ throwaway database up; CI needs Docker and `playwright install --with-deps chrom
 0  Shell ── 1  People ─┬─ 2  Attendance ─┬─ 6  Reporting ── Clients
                        └─ 3  Absence ────┘   (0–6 done)
                        └─ 4  Documents ── 5  Search
+7  SSO — done, and ran independently of the chain above; any auth-expansion phase can.
 Cross-cutting: notifications + audit log after 3; auth expansion any time; hardening before launch.
 ```
 
@@ -729,9 +749,9 @@ a question instead.
 Take these back to the canvas before the phase that needs them:
 
 1. The manager/admin surface in full — approval queue, people directory, org and role settings,
-   the document version history and access panels, and now `/reports`: the dashboard band, the two
-   report tables, the filter rows and the charts. Phases 1, 2, 3, 4 and 6 all have an undesigned
-   half, and phase 6 has no designed half at all — it is the largest single gap left in the canvas.
+   the document version history and access panels, `/reports`'s dashboard band and two report
+   tables, and now `/settings/sso`. Phases 1, 2, 3, 4, 6 and 7 all have an undesigned half, and
+   phase 6 has no designed half at all — it is the largest single gap left in the canvas.
 2. What the sidebar looks like for a user with `attendance:approve` or `employee:manage` — the
    canvas only ever draws the five employee entries.
 3. Search. Phase 5 shipped an entry point the canvas does not have — a field in the sidebar
