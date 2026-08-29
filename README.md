@@ -57,10 +57,13 @@ pnpm -r build          # or lint / typecheck / test, across the whole workspace
 
 pnpm --filter web dev
 pnpm --filter api start:dev
+pnpm --filter desktop dev                       # builds, then launches the Electron shell
+pnpm --filter desktop dist                      # installers, built per OS on that OS
 
-# Both apps use Vitest
+# All three apps use Vitest
 pnpm --filter web test -- src/lib/api/client.test.ts
 pnpm --filter api test -- -t "requires every declared permission"
+pnpm --filter desktop test -- tracker.test.ts
 pnpm --filter api test:e2e                      # needs infra up
 
 pnpm e2e                                        # browser e2e: the built SPA against a
@@ -73,20 +76,21 @@ pnpm infra:up
 pnpm infra:down
 ```
 
-Linting is intentionally asymmetric: the frontend uses ESLint, the backend uses oxlint — each
-follows what its generator ships.
+Linting is intentionally asymmetric: the frontend uses ESLint, the backend and the desktop shell
+use oxlint — each follows what its generator ships.
 
 ## Project structure
 
 ```
 apps/web         SvelteKit + Svelte 5 + TailwindCSS — client-only SPA
 apps/api         NestJS + MikroORM + PostgreSQL
+apps/desktop     Electron — the desktop client, tracking time from the app lifecycle
 packages/shared  @beacon/shared — permissions and tenant types shared by both apps
 packages/config  @beacon/config — shared TypeScript base config
 infra            docker-compose: Postgres, MinIO, Meilisearch, Mailpit, Prometheus, Loki, Alloy, Grafana
 ```
 
-`apps/mobile` and `apps/desktop` are planned; their frameworks are not yet chosen.
+`apps/mobile` is planned; its framework is not yet chosen.
 
 Contributor-facing conventions and the reasoning behind them live in [CLAUDE.md](CLAUDE.md).
 
@@ -114,12 +118,22 @@ keyword or metadata.
 
 ### Clients
 
-Alongside the web application, mobile and desktop clients will provide access from anywhere, at any
-time:
+Alongside the web application, mobile and desktop clients provide access from anywhere, at any
+time. The desktop client is built; the mobile one is planned:
 
 - **Mobile** — push notifications for important events such as upcoming holidays or breaks, and
   clock in/out from a phone.
 - **Desktop** — automatic time tracking, so users do not have to clock in and out manually.
+  Opening the app starts the clock; closing it, sending the computer to sleep or hibernate, or
+  leaving the screen locked stops it. A short lock does not count as leaving. Everything the app
+  shows is the web application itself, so there is one interface to learn and one to maintain.
+
+  Because a computer can go to sleep faster than a request can be sent, the desktop client records
+  a clock-out before it tries to send one, and delivers it when the machine wakes — stamped with
+  the moment it actually stopped, not the moment it woke up. An evening's sleep is never banked as
+  work, and a machine that loses power closes its entry at the last minute it was known to be
+  awake. Automatic tracking can be switched off at any time, and clocking in and out by hand
+  still works from the app or from the tray.
 
 ### Across the application
 
@@ -134,7 +148,8 @@ designed to deploy to cloud platforms such as AWS or Azure as well as to custom 
 
 ### Frontend
 
-Svelte 5, SvelteKit, TailwindCSS, TypeScript, Vite, Vitest, svelte-i18n.
+Svelte 5, SvelteKit, TailwindCSS, TypeScript, Vite, Vitest, svelte-i18n. The desktop client adds
+Electron around the same frontend.
 
 The frontend **runs client-only and contains no backend code** — it ships as a static SPA and gets
 all of its data from the REST API. Code is organized into modules, one per feature, on top of a set

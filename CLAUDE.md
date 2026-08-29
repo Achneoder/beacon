@@ -9,7 +9,7 @@ application for organizations. `README.md` holds the product spec; this file hol
 rules.
 
 The monorepo is green (build, lint, typecheck, unit tests, e2e). Authentication, organization
-setup, people, attendance, holidays, documents and search are implemented.
+setup, people, attendance, holidays, documents, search and the desktop client are implemented.
 
 ## Layout
 
@@ -18,12 +18,13 @@ pnpm workspaces. `apps/*` and `packages/*` are the workspace globs.
 ```
 apps/web         SvelteKit + Svelte 5 + Tailwind 4 — client-only SPA
 apps/api         NestJS 12 (ESM) + MikroORM 6 + PostgreSQL
+apps/desktop     Electron (ESM) — a native shell that tracks time from the app lifecycle
 packages/shared  @beacon/shared — permissions, tenant types shared by both apps
 packages/config  @beacon/config — shared tsconfig base
 infra            docker-compose: postgres, MinIO, Meilisearch, Mailpit, Prometheus/Loki/Alloy/Grafana
 ```
 
-`apps/mobile` and `apps/desktop` are planned but not created; their frameworks are undecided.
+`apps/mobile` is planned but not created; its framework is undecided.
 
 ## Commands
 
@@ -33,11 +34,14 @@ pnpm -r build | lint | typecheck | test        # whole workspace
 
 pnpm --filter web dev                          # http://localhost:5173
 pnpm --filter api start:dev                    # http://localhost:3000/api
+pnpm --filter desktop dev                      # builds, then launches Electron
+pnpm --filter desktop dist                     # installers — by hand, per OS, never in CI
 
-# single test — BOTH apps use Vitest
+# single test — ALL THREE apps use Vitest
 pnpm --filter web test -- src/lib/api/client.test.ts
 pnpm --filter api test -- permissions.guard.spec.ts
 pnpm --filter api test -- -t "requires every declared permission"
+pnpm --filter desktop test -- tracker.test.ts
 
 pnpm --filter api test:e2e                     # brings up its own throwaway db, like `pnpm e2e`
 pnpm e2e                                       # browser e2e: SPA + real API + real db
@@ -53,7 +57,8 @@ Copy `apps/api/.env.example` to `apps/api/.env` and `apps/web/.env.example` to `
 before running either app.
 
 Linting is asymmetric because the generators disagree: **web uses ESLint** (flat config,
-`eslint.config.js`) and **api uses oxlint** (`oxlint.json`). Don't unify them without a reason.
+`eslint.config.js`) while **api and desktop use oxlint** (`oxlint.json`). Don't unify them without
+a reason.
 
 ## Architecture rules
 
@@ -154,6 +159,47 @@ that a database fact rather than a convention. `apps/api/src/modules/sso/`.
   redirect URI. Without it neither a developer's own local IdP nor the API e2e suite's fake one
   (`test/fake-idp.ts`, which signs real ID tokens against a real JWKS) could ever be configured.
 
+## Desktop
+
+`apps/desktop` — Electron, one window and a tray, doing one thing the web app cannot: clocking
+people in and out from the machine's own lifecycle.
+
+- **The window loads the served web app.** The user types their server's address once; from then
+  on the window is `apps/web`, unmodified. There is no desktop build of the frontend and no
+  `if (desktop)` branch in it — the SPA already re-reads the clock on window focus
+  (`routes/(app)/+layout.svelte`), which is how it notices a clock-out the shell made behind it.
+  A change here should almost never need a change there.
+- **The main process owns the clock.** Everything worth tracking — the app closing, the machine
+  sleeping, the screen locking — happens when there may be no window left to ask, and a renderer
+  being torn down cannot be trusted to finish an HTTP request. `tracker.ts` is that logic, and it
+  is deliberately Electron-free so it can be unit-tested; `main.ts` is only wiring.
+- **The credential is the window's.** The user signs in against the served app exactly as in a
+  browser, and `ApiClient` (`api.ts`) rides the same Electron cookie jar with
+  `useSessionCookies`. The app stores no password, no token and no refresh cookie — there is
+  nothing in `userData` worth stealing. Because `net` from the main process sends no `Origin`,
+  **CORS is not involved and an installation needs no configuration change** to support this
+  client. Never add a credential of its own; if a request needs auth, it goes through `ApiClient`.
+- **Electron stays behind ports.** `tracker.ts`, `outbox.ts`, `settings.ts` and `locales.ts` import
+  nothing from `electron`, which is what `vitest.config.ts` relies on. `api.ts`, `main.ts`,
+  `window.ts` and `tray.ts` are the only modules that may — the same containment `StorageService`,
+  `MailService` and `OidcClient` give their vendor SDKs.
+- **Correctness under standby is the outbox, not luck.** The OS may sleep before a clock-out is
+  sent, so `FileOutbox` writes it **synchronously, before** the request, and the tracker replays
+  it on the next resume or launch *still carrying its original instant* — which is why
+  `POST /attendance/clock-out` accepts `at`. A process killed outright leaves only the heartbeat,
+  and the entry closes there instead: wrong by one tick rather than by a weekend. Reconciling
+  against `GET /attendance/me/today` before every decision is what makes a replay safe to repeat,
+  and is why no idempotency key was needed.
+- **A screen lock has a grace period.** Locking for the length of a corridor must not cut the day
+  into two segments; only a lock that outlasts `lockGraceSeconds` stops the clock.
+- **Native copy is en/de in `locales.ts`**, a pure function like `invitation-email.ts` —
+  `svelte-i18n` does not reach a tray menu. Everything inside the window is the web app's own i18n.
+- **Known limitation, by design:** with the app on two machines, one going to sleep closes the
+  entry the other opened. That follows from the one-open-entry rule and is not worth breaking.
+- **Packaging is manual** (`pnpm --filter desktop dist`): each target needs its own runner. CI
+  installs with `ELECTRON_SKIP_BINARY_DOWNLOAD=1` and never launches Electron — build, lint,
+  typecheck and test all pass without the binary.
+
 ## Email
 
 Invitations are emailed; every other notification will follow the same path.
@@ -220,7 +266,7 @@ There are **three** suites, and they prove different things:
 
 | Suite | Command | What it covers |
 | --- | --- | --- |
-| Unit / component | `pnpm -r test` | Vitest. Web mounts components in jsdom against a mocked client. |
+| Unit / component | `pnpm -r test` | Vitest. Web mounts components in jsdom against a mocked client; desktop drives its tracker over fake ports. |
 | API e2e | `pnpm --filter api test:e2e` | Supertest against a booted Nest app and the throwaway database. |
 | Browser e2e | `pnpm e2e` | Playwright: the built SPA against a real API and a throwaway database. |
 
@@ -317,6 +363,6 @@ documents and people.
 
 ## Open questions
 
-- Mobile and desktop frameworks are unspecified.
+- The mobile framework is unspecified. Desktop settled on Electron; see the Desktop section.
 - The search UI is not in the design canvas. The sidebar field is specified by the roadmap alone
   and still owes a canvas pass.
