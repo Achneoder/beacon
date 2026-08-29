@@ -145,37 +145,71 @@ export class InvitationsService {
         throw new BadRequestException('this invitation is no longer valid');
       }
 
-      const organizationId = invitation.organization.id;
-
-      if (await em.count(User, { organization: organizationId, email: invitation.email })) {
+      if (await em.count(User, { organization: invitation.organization.id, email: invitation.email })) {
         throw new ConflictException('a user with that email already exists');
       }
 
-      const user = em.create(User, {
-        organization: invitation.organization,
-        email: invitation.email,
-        passwordHash,
-        firstName: invitation.firstName,
-        lastName: invitation.lastName,
-        status: UserStatus.Active,
-        locale: invitation.locale,
-        timezone: invitation.timezone,
-        employeeNumber: await nextEmployeeNumber(em, organizationId),
-        jobTitle: invitation.jobTitle,
-        department: invitation.department,
-        team: invitation.team,
-        manager: invitation.manager,
-        contractType: invitation.contractType,
-        office: invitation.office,
-        workLocation: invitation.workLocation,
-        startsOn: invitation.startsOn,
-      });
-
-      user.roles.set(invitation.roles.getItems());
-      invitation.acceptedAt = new Date();
-
-      return user;
+      return this.materialize(em, invitation, passwordHash);
     });
+  }
+
+  /**
+   * The IdP has already proved the address — more strongly than an emailed link does —
+   * so a pending invitation for it is accepted here rather than refused. Returns null
+   * when there is nothing to accept (no invitation, or an expired one); the caller
+   * (the SSO callback) maps that to its own `no_account` outcome, the same one an
+   * unknown address gets.
+   */
+  async acceptForFederatedEmail(organizationId: string, email: string): Promise<User | null> {
+    return this.em.transactional(async (em) => {
+      const invitation = await em.findOne(
+        Invitation,
+        { organization: organizationId, email, acceptedAt: null },
+        { populate: ['roles', 'organization'], orderBy: { createdAt: 'desc' } },
+      );
+      if (!invitation || !isAcceptable(invitation)) return null;
+
+      if (await em.count(User, { organization: organizationId, email })) {
+        throw new ConflictException('a user with that email already exists');
+      }
+
+      return this.materialize(em, invitation, null);
+    });
+  }
+
+  /** Shared by both acceptance paths: creates the account, carries the invitation's
+   * roles and employment fields over, and marks the invitation spent. */
+  private async materialize(
+    em: EntityManager,
+    invitation: Invitation,
+    passwordHash: string | null,
+  ): Promise<User> {
+    const organizationId = invitation.organization.id;
+
+    const user = em.create(User, {
+      organization: invitation.organization,
+      email: invitation.email,
+      passwordHash,
+      firstName: invitation.firstName,
+      lastName: invitation.lastName,
+      status: UserStatus.Active,
+      locale: invitation.locale,
+      timezone: invitation.timezone,
+      employeeNumber: await nextEmployeeNumber(em, organizationId),
+      jobTitle: invitation.jobTitle,
+      department: invitation.department,
+      team: invitation.team,
+      manager: invitation.manager,
+      contractType: invitation.contractType,
+      office: invitation.office,
+      workLocation: invitation.workLocation,
+      startsOn: invitation.startsOn,
+    });
+
+    user.roles.set(invitation.roles.getItems());
+    invitation.acceptedAt = new Date();
+
+    return user;
   }
 
   private webBaseUrl(): string {

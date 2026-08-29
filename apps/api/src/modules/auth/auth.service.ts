@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { createHash, randomBytes } from 'node:crypto';
-import type { AuthResponse, SessionUser, SetupState } from '@beacon/shared';
+import type { AuthResponse, SessionUser, SetupState, SsoErrorCode } from '@beacon/shared';
 import { OrganizationService } from '../organizations/organization.service.js';
+import { SsoProvider } from '../sso/sso-provider.entity.js';
 import { User, UserStatus } from '../users/user.entity.js';
 import { RefreshToken } from './refresh-token.entity.js';
 import { PasswordService } from './password.service.js';
@@ -74,10 +75,30 @@ export class AuthService {
 
     if (user.status !== UserStatus.Active) throw new UnauthorizedException('account is not active');
 
+    await this.refuseIfSsoEnforced(user);
+
     user.lastLoginAt = new Date();
     await this.em.flush();
 
     return this.issueSession(user, userAgent);
+  }
+
+  /**
+   * An admin can require SSO for everyone else while staying able to sign in with a
+   * password themselves — a broken IdP must not be able to lock every administrator
+   * out of an on-premise install whose only other door is a database edit. Checked
+   * against the user's own permission union, never a role name, per the roadmap's
+   * "check permissions, never role names" rule.
+   *
+   * Queried directly rather than through `SsoService`, which depends on `AuthModule`
+   * for `startSessionFor` — injecting it back here would be a module cycle.
+   */
+  private async refuseIfSsoEnforced(user: User): Promise<void> {
+    const provider = await this.em.findOne(SsoProvider, { organization: user.organization.id });
+    if (!provider?.enabled || !provider.enforced) return;
+    if (user.permissions.includes('organization:manage')) return;
+
+    throw new ForbiddenException('sso_required' satisfies SsoErrorCode);
   }
 
   /**

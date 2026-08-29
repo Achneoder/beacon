@@ -87,6 +87,16 @@ export class OrganizationService implements OnModuleInit {
   }
 
   /**
+   * Resolves the organization without a caller to scope by — for the handful of
+   * `@Public()` routes (SSO's discovery and callback) that run before anyone is
+   * signed in. Beacon installs exactly one organization per deployment, so "the
+   * organization" is unambiguous; null before `createWithOwner` has ever run.
+   */
+  async theOnlyOrganization(): Promise<Organization | null> {
+    return this.em.findOne(Organization, {});
+  }
+
+  /**
    * Bootstraps the installation: the organization, its four built-in roles, and the
    * owner — all or nothing, because an organization without an owner is unreachable.
    *
