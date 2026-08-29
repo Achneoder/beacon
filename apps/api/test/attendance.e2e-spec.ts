@@ -320,6 +320,51 @@ describe('Attendance (e2e)', () => {
     });
   });
 
+  describe('a public holiday', () => {
+    it('expects nothing, and books hours worked on it as pure overtime', async () => {
+      const before = await http().get('/api/attendance/me/week').set(as(staffToken)).expect(200);
+      // Tuesday of the current, still-unlocked week — untouched by any other test.
+      const holidayDate = before.body.days[1].date;
+
+      await http()
+        .post('/api/public-holidays')
+        .set(as(ownerToken))
+        .send({ date: holidayDate, name: 'Founders Day' })
+        .expect(201);
+
+      const correction = await http()
+        .post('/api/attendance/corrections')
+        .set(as(staffToken))
+        .send({
+          kind: 'add',
+          startedAt: `${holidayDate}T07:00:00.000Z`,
+          endedAt: `${holidayDate}T10:00:00.000Z`,
+          breakMinutes: 0,
+          reason: 'Covered an incident on the public holiday.',
+        })
+        .expect(201);
+
+      await http()
+        .post(`/api/attendance/corrections/${correction.body.id}/approve`)
+        .set(as(ownerToken))
+        .send({})
+        .expect(201);
+
+      const after = await http().get('/api/attendance/me/week').set(as(staffToken)).expect(200);
+      const day = after.body.days.find((entry: { date: string }) => entry.date === holidayDate);
+
+      // A holiday expects nothing — the target is zero, not the fallback schedule's
+      // 480 — so the 3 hours actually worked read as pure overtime, not a shortfall.
+      expect(day).toMatchObject({
+        holiday: 'Founders Day',
+        targetMinutes: 0,
+        credited: false,
+        workedMinutes: 180,
+        balanceMinutes: 180,
+      });
+    });
+  });
+
   describe('who may read whom', () => {
     it('refuses an employee a colleague they do not manage', async () => {
       await http().get(`/api/attendance?userId=${outsiderId}`).set(as(staffToken)).expect(403);

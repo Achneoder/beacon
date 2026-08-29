@@ -307,15 +307,15 @@ function* csvRowsOf(folded: Folded[]): Generator<AttendanceCsvRow> {
  * One person's range, day by day.
  *
  * The day arithmetic is the shared `totalsOf` / `targetMinutesFor` / `dayBalance` the
- * timesheet already uses. Two rules it adds, both of which only a range makes visible:
+ * timesheet already uses. One rule below is now shared with it too, and one is still
+ * this function's own:
  *
- * - **A public holiday expects nothing.** Attendance itself does not consult the
- *   holiday calendar — a timesheet week containing Christmas still prints a full
- *   target and books the day as negative — but a report that told a manager the whole
- *   company was eight hours short on 25 December would be worse than useless. Hours
- *   actually worked on a holiday still count as worked, so the day reads as pure
- *   overtime, which is what it is. Making the timesheet agree means changing balances
- *   already banked, so it is written down as a follow-up rather than done here.
+ * - **A public holiday expects nothing.** `AttendanceService` reads the same calendar
+ *   now (`holidaysBetween`, mirroring the `holidays` map below), so this is no longer
+ *   a divergence the report papers over — a timesheet week containing Christmas prints
+ *   a zero target too, and `Migration20260829150000` restated the balances the old
+ *   rule had already banked. Hours actually worked on a holiday still count as worked,
+ *   so the day reads as pure overtime, which is what it is.
  * - **A credited day is credited at most up to its target.** `creditedMinutes` is what
  *   the absence supplied *instead of* work, so worked + credited − expected is always
  *   the balance, whether the person was off, at home, or clocked in on a day off.

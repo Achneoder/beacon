@@ -483,13 +483,18 @@ absence or a chart:
 - **`worked + credited − expected === balance`, on every row.** Keeping worked and credited apart
   is what makes a holiday neither absenteeism nor hours nobody worked; the invariant is asserted at
   both test layers because it is the one thing three columns on screen can quietly break.
-- **A public holiday expects nothing — and attendance still disagrees.** The timesheet never
-  consults the holiday calendar, so a week containing Christmas prints a full target and books the
-  day as negative. A report that told a manager the whole company was eight hours short on
-  25 December would be worse than useless, so the report excludes them. **Making the two agree is
-  the follow-up**: it means either crediting holidays in `recomputeBalance`, which rewrites balances
-  already banked, or a migration that restates them. Written down rather than done inside a
-  reporting phase.
+- **A public holiday expects nothing — and attendance used to disagree.** The timesheet never
+  consulted the holiday calendar, so a week containing Christmas printed a full target and booked
+  the day as negative. A report that told a manager the whole company was eight hours short on
+  25 December would be worse than useless, so the report excluded them from the start. **Fixed**:
+  `AttendanceService.today`, `.week` and `.recomputeBalance` now read the same holiday calendar
+  through a new `holidaysBetween` (mirroring `foldUser`'s `holidays` map) — a holiday's target is
+  zero and hours worked on one bank as pure overtime, never a shortfall. `TimesheetDay.holiday`
+  carries the name through to the timesheet row, next to `absenceTag`. Balances already banked
+  under the old rule needed the second option written down here: `Migration20260829150000`
+  restates every affected `AttendanceDay` and the `OvertimeBalance` it fed, computing the move from
+  the pre-restatement figures before overwriting them, idempotently. It has no `down` — the target
+  a holiday used to carry is not preserved anywhere to restore it from.
 - **The export is streamed and defended.** `StreamableFile` over a generator, because a year across
   an organization is hundreds of thousands of lines. Two details carry tests: a UTF-8 BOM, without
   which Excel renders every German name as mojibake, and `csvCell()` in `packages/shared`, which
