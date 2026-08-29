@@ -458,6 +458,7 @@
 		"delete": "Löschen",
 		"confirmDelete": "Dieses Dokument löschen? Das kann nicht rückgängig gemacht werden.",
 		"deleted": "Dokument gelöscht.",
+		"detailRetry": "Erneut versuchen",
 		"dropzone": {
 			"title": "Datei hierher ziehen oder auswählen",
 			"hint": "PDF, DOCX oder JPG · max. {size}",

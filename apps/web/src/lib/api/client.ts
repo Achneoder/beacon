@@ -38,6 +38,18 @@ function isAuthPath(path: string): boolean {
  */
 let inFlightRefresh: Promise<boolean> | null = null;
 
+/**
+ * The refresh failing means the session is over, not just expired — the cookie that is
+ * the only surviving credential is gone or refused. The session module registers here
+ * so it can drop to `anonymous`; the client cannot import the session module itself
+ * without a cycle.
+ */
+let refreshFailureHandler: (() => void) | null = null;
+
+export function onRefreshFailure(handler: (() => void) | null): void {
+	refreshFailureHandler = handler;
+}
+
 async function refreshAccessToken(): Promise<boolean> {
 	inFlightRefresh ??= (async () => {
 		try {
@@ -48,6 +60,7 @@ async function refreshAccessToken(): Promise<boolean> {
 			return true;
 		} catch {
 			setAccessToken(null);
+			refreshFailureHandler?.();
 			return false;
 		} finally {
 			inFlightRefresh = null;

@@ -37,6 +37,7 @@
 
 	let newDepartment = $state('');
 	let departmentErrorKey = $state<string | null>(null);
+	let departmentActionErrorKey = $state<string | null>(null);
 
 	/**
 	 * Absence types and public holidays live under organization settings rather than
@@ -44,10 +45,12 @@
 	 * permission union only grows when a phase says so.
 	 */
 	let absenceTypes = $state<AbsenceTypeSummary[]>([]);
+	let typeActionErrorKey = $state<string | null>(null);
 	let holidays = $state<HolidaySummary[]>([]);
 	let holidayDate = $state('');
 	let holidayName = $state('');
 	let holidayErrorKey = $state<string | null>(null);
+	let holidayActionErrorKey = $state<string | null>(null);
 
 	const lang = $derived($locale ?? 'en');
 	const year = new Date().getUTCFullYear();
@@ -105,14 +108,24 @@
 	}
 
 	async function removeDepartment(id: string) {
-		await deleteDepartment(id);
-		departments = departments.filter((department) => department.id !== id);
+		departmentActionErrorKey = null;
+		try {
+			await deleteDepartment(id);
+			departments = departments.filter((department) => department.id !== id);
+		} catch (error) {
+			departmentActionErrorKey = errorKey(error);
+		}
 	}
 
 	/** Retiring, never deleting — old requests must keep naming their type. */
 	async function retireType(id: string) {
-		const updated = await retireAbsenceType(id);
-		absenceTypes = absenceTypes.map((type) => (type.id === id ? updated : type));
+		typeActionErrorKey = null;
+		try {
+			const updated = await retireAbsenceType(id);
+			absenceTypes = absenceTypes.map((type) => (type.id === id ? updated : type));
+		} catch (error) {
+			typeActionErrorKey = errorKey(error);
+		}
 	}
 
 	async function addHoliday(event: SubmitEvent) {
@@ -131,8 +144,13 @@
 	}
 
 	async function removeHoliday(id: string) {
-		await deleteHoliday(id);
-		holidays = holidays.filter((holiday) => holiday.id !== id);
+		holidayActionErrorKey = null;
+		try {
+			await deleteHoliday(id);
+			holidays = holidays.filter((holiday) => holiday.id !== id);
+		} catch (error) {
+			holidayActionErrorKey = errorKey(error);
+		}
 	}
 
 	/**
@@ -210,6 +228,10 @@
 		<h2 class="text-sm font-bold">{$_('settings.departments')}</h2>
 		<p class="mt-1 text-xs text-ink-muted">{$_('settings.departmentsHint')}</p>
 
+		{#if departmentActionErrorKey}
+			<Alert tone="warning" class="mt-3">{$_(departmentActionErrorKey)}</Alert>
+		{/if}
+
 		{#if departments.length === 0}
 			<p class="mt-4 text-sm text-ink-muted">{$_('settings.noDepartments')}</p>
 		{:else}
@@ -248,6 +270,10 @@
 		<h2 class="text-sm font-bold">{$_('settings.absenceTypes')}</h2>
 		<p class="mt-1 text-xs text-ink-muted">{$_('settings.absenceTypesHint')}</p>
 
+		{#if typeActionErrorKey}
+			<Alert tone="warning" class="mt-3">{$_(typeActionErrorKey)}</Alert>
+		{/if}
+
 		<ul class="mt-4 flex flex-col gap-3">
 			{#each absenceTypes as type (type.id)}
 				<li class="flex flex-wrap items-center justify-between gap-3">
@@ -278,6 +304,10 @@
 	<Card variant="panel" as="section" class="mt-6">
 		<h2 class="text-sm font-bold">{$_('settings.holidays')}</h2>
 		<p class="mt-1 text-xs text-ink-muted">{$_('settings.holidaysHint')}</p>
+
+		{#if holidayActionErrorKey}
+			<Alert tone="warning" class="mt-3">{$_(holidayActionErrorKey)}</Alert>
+		{/if}
 
 		{#if holidays.length === 0}
 			<p class="mt-4 text-sm text-ink-muted">{$_('settings.noHolidays')}</p>

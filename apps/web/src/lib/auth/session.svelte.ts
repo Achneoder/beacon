@@ -7,7 +7,7 @@ import type {
 	RegisterOrganizationRequest,
 	SessionUser
 } from '@beacon/shared';
-import { api, apiSend, setAccessToken } from '$lib/api/client';
+import { api, apiSend, onRefreshFailure, setAccessToken } from '$lib/api/client';
 
 export type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -24,6 +24,14 @@ export type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 class SessionState {
 	#user = $state<SessionUser | null>(null);
 	#status = $state<SessionStatus>('loading');
+
+	constructor() {
+		// A mid-session refresh failing means the refresh cookie is gone or expired —
+		// the session is over. Leaving `authenticated` up would strand the user in a
+		// shell where every request 401s; the layout watches this state and sends
+		// them to the login screen instead.
+		onRefreshFailure(() => this.clear());
+	}
 
 	get user(): SessionUser | null {
 		return this.#user;

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { SessionUser } from '@beacon/shared';
 import { session } from './session.svelte';
-import { getAccessToken } from '$lib/api/client';
+import { apiSend, getAccessToken } from '$lib/api/client';
 
 const user: SessionUser = {
 	id: 'u1',
@@ -71,6 +71,21 @@ describe('session', () => {
 
 		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 		await expect(session.logout()).rejects.toThrow('offline');
+
+		expect(session.status).toBe('anonymous');
+		expect(getAccessToken()).toBeNull();
+	});
+
+	it('drops to anonymous when a mid-session refresh fails', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(authResponse()));
+		await session.login({ email: user.email, password: 'correct-horse-battery' });
+
+		// The access token is dead and the refresh cookie has expired with it: every
+		// request 401s, including the refresh. The user must land on the login screen,
+		// not sit inside an authenticated shell that can only fail.
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
+
+		await expect(apiSend('/timesheet', 'GET')).rejects.toMatchObject({ status: 401 });
 
 		expect(session.status).toBe('anonymous');
 		expect(getAccessToken()).toBeNull();

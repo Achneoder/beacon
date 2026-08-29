@@ -59,6 +59,7 @@
 	let pendingAbsences = $state<AbsenceRequestSummary[]>([]);
 	let outThisWeek = $state<AbsenceRequestSummary[]>([]);
 	let dashboardErrorKey = $state<string | null>(null);
+	let loadingDashboard = $state(true);
 
 	let exporting = $state(false);
 	let exportErrorKey = $state<string | null>(null);
@@ -69,6 +70,9 @@
 	const pendingCount = $derived(
 		corrections.filter((item) => item.status === 'pending').length + pendingAbsences.length
 	);
+
+	/** The dashboard tiles print nothing — not "0" — until their load landed. */
+	const dashboardReady = $derived(!loadingDashboard && dashboardErrorKey === null);
 
 	$effect(() => {
 		void loadAttendance(range.from, range.to, groupBy);
@@ -115,6 +119,7 @@
 	 */
 	async function loadDashboard(approveTime: boolean, approveLeave: boolean) {
 		dashboardErrorKey = null;
+		loadingDashboard = true;
 
 		const monday = mondayOf(today);
 		const sunday = addDays(monday, 6);
@@ -131,6 +136,8 @@
 			outThisWeek = uniqueByPerson(calendar.days.flatMap((day) => day.absences));
 		} catch (error) {
 			dashboardErrorKey = errorKey(error);
+		} finally {
+			loadingDashboard = false;
 		}
 	}
 
@@ -225,32 +232,37 @@
 <section class="mt-6" aria-labelledby="reports-dashboard">
 	<h2 id="reports-dashboard" class="sr-only">{$_('reports.dashboard')}</h2>
 	<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+		<!-- "0" would be a lie while the dashboard band is still loading, and a
+		     worse one after it failed — the alert above says why, the tiles stay
+		     quiet rather than pretend the queues are empty. -->
 		<StatTile
 			label={$_('reports.tiles.pending')}
-			value={String(pendingCount)}
+			value={dashboardReady ? String(pendingCount) : '—'}
 			hint={$_('reports.tiles.pendingHint')}
-			tone={pendingCount > 0 ? 'warning' : 'neutral'}
+			tone={dashboardReady && pendingCount > 0 ? 'warning' : 'neutral'}
 		>
 			{#snippet footer()}
-				<a
-					href="/approvals"
-					class="rounded-control text-2xs font-semibold text-accent-on-soft underline
-					       underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2
-					       focus-visible:outline-accent"
-				>
-					{$_('reports.tiles.pendingLink')}
-				</a>
+				{#if dashboardReady}
+					<a
+						href="/approvals"
+						class="rounded-control text-2xs font-semibold text-accent-on-soft underline
+						       underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2
+						       focus-visible:outline-accent"
+					>
+						{$_('reports.tiles.pendingLink')}
+					</a>
+				{/if}
 			{/snippet}
 		</StatTile>
 
 		<StatTile
 			label={$_('reports.tiles.out')}
-			value={String(outThisWeek.length)}
+			value={dashboardReady ? String(outThisWeek.length) : '—'}
 			hint={$_('reports.tiles.outHint')}
-			tone={outThisWeek.length > 0 ? 'info' : 'neutral'}
+			tone={dashboardReady && outThisWeek.length > 0 ? 'info' : 'neutral'}
 		>
 			{#snippet footer()}
-				{#if outThisWeek.length}
+				{#if dashboardReady && outThisWeek.length}
 					<ul class="flex flex-wrap gap-1.5">
 						{#each outThisWeek.slice(0, 4) as item (item.id)}
 							<li><Badge tone="info">{item.userName}</Badge></li>
@@ -269,13 +281,15 @@
 
 		<StatTile
 			label={$_('reports.tiles.overtime')}
-			value={formatSignedDuration(attendance?.overtimeMinutes ?? 0)}
+			value={attendance ? formatSignedDuration(attendance.overtimeMinutes) : '—'}
 			aside={attendance
 				? $_('reports.tiles.people', { values: { count: attendance.headcount } })
 				: ''}
-			hint={attendance && attendance.overCapCount > 0
-				? $_('reports.tiles.overCap', { values: { count: attendance.overCapCount } })
-				: $_('reports.tiles.overtimeHint')}
+			hint={attendance
+				? attendance.overCapCount > 0
+					? $_('reports.tiles.overCap', { values: { count: attendance.overCapCount } })
+					: $_('reports.tiles.overtimeHint')
+				: ''}
 			tone={attendance && attendance.overCapCount > 0 ? 'warning' : 'neutral'}
 		/>
 	</div>

@@ -47,6 +47,10 @@
 	 * screen, and it must not go dark because a side panel could not answer.
 	 */
 	async function loadWeek() {
+		// The banner reports the latest failure, not the oldest: a successful reload
+		// clears what the previous one left on the screen.
+		errorMessageKey = null;
+
 		try {
 			week = await getWeek(0);
 		} catch (error) {
@@ -84,10 +88,12 @@
 		<ClockPanel {today} onError={onClockError} />
 
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+			<!-- "0:00" would be a lie while the week is still loading, and a worse one
+			     after it failed — a missing row and a failed fetch must not read alike. -->
 			<StatTile
 				label={$_('today.weekBalance')}
-				value={formatSignedDuration(week?.balanceMinutes ?? 0)}
-				tone={balanceTone(week?.balanceMinutes ?? 0)}
+				value={week ? formatSignedDuration(week.balanceMinutes) : '—'}
+				tone={week ? balanceTone(week.balanceMinutes) : 'neutral'}
 				hint={week
 					? $_('today.weekWorked', {
 							values: { worked: formatDuration(week.workedMinutes) }
@@ -96,7 +102,7 @@
 			/>
 			<StatTile
 				label={$_('today.overtimeBank')}
-				value={formatSignedDuration(week?.overtime.balanceMinutes ?? 0)}
+				value={week ? formatSignedDuration(week.overtime.balanceMinutes) : '—'}
 				aside={week
 					? $_('today.cap', {
 							values: { cap: formatDuration(week.overtime.capMinutes) }

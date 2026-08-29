@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { _, locale } from 'svelte-i18n';
+	import { page } from '$app/stores';
+	import { replaceState } from '$app/navigation';
 	import type {
 		DocumentAccessLevel,
 		DocumentAccessSubject,
@@ -45,6 +47,29 @@
 
 	$effect(() => {
 		void init();
+	});
+
+	/**
+	 * The search results deep-link with `?open=<id>`. The list has to have loaded
+	 * before the target exists, so this watches the param against `documents` rather
+	 * than racing `init` — and it re-runs if another search result lands while the
+	 * page is already mounted. The param is consumed once the panel is up; leaving it
+	 * would make a refresh re-open the document and make "close" not stick.
+	 */
+	$effect(() => {
+		// `$page.url` is absent outside the Kit runtime — the component tests mount
+		// the page directly, with no router behind it.
+		const openId = $page.url?.searchParams.get('open');
+		if (!openId || selected?.id === openId) return;
+
+		const target = documents.find((document) => document.id === openId);
+		if (!target) return;
+
+		const url = new URL($page.url.href);
+		url.searchParams.delete('open');
+		replaceState(url, {});
+
+		void selectDocument(target);
 	});
 
 	async function init() {
@@ -162,6 +187,11 @@
 		}
 
 		selected = document;
+		await loadDetail(document);
+	}
+
+	/** Shared by a row click and the retry after a failed load. */
+	async function loadDetail(document: DocumentSummary) {
 		detail = null;
 		detailErrorKey = null;
 		detailLoading = true;
@@ -173,6 +203,10 @@
 		} finally {
 			detailLoading = false;
 		}
+	}
+
+	function retryDetail() {
+		if (selected) void loadDetail(selected);
 	}
 
 	async function addVersion(file: File) {
@@ -322,6 +356,14 @@
 {:else if selected && detailLoading}
 	<Card variant="panel" as="section" class="mt-5">
 		<p class="text-sm text-ink-muted">{$_('documents.loading')}</p>
+	</Card>
+{:else if selected}
+	<!-- The load failed: `detail` is null, so show the failure rather than a blank
+	     panel — and keep the panel open, with a retry, so the selection is not
+	     silently swallowed by the next click toggling it closed. -->
+	<Card variant="panel" as="section" class="mt-5">
+		<Alert tone="warning">{$_(detailErrorKey ?? 'errors.unexpected')}</Alert>
+		<Button size="sm" class="mt-3" onclick={retryDetail}>{$_('documents.detailRetry')}</Button>
 	</Card>
 {/if}
 

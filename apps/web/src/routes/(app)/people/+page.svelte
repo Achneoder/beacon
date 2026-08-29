@@ -34,25 +34,37 @@
 	const canManage = $derived(session.can('employee:manage'));
 	const lang = $derived($locale ?? 'en');
 
-	// Re-runs whenever a filter changes; the API does the matching, so a large
-	// organization never ships its whole people list to the browser to filter locally.
+	/**
+	 * Re-runs whenever a filter changes; the API does the matching, so a large
+	 * organization never ships its whole people list to the browser to filter locally.
+	 *
+	 * Debounced: the search field is bound to `search`, and without the pause every
+	 * keystroke would be a round trip. The generation counter keeps a slow earlier
+	 * response from overwriting a newer one — the same guard `SearchField` uses.
+	 */
+	const DEBOUNCE_MS = 200;
+	let debounce: ReturnType<typeof setTimeout> | undefined;
+	let generation = 0;
+
 	$effect(() => {
 		const filter = { search: search.trim(), departmentId };
-		void reload(filter);
-	});
+		const mine = ++generation;
 
-	async function reload(filter: { search: string; departmentId: string }) {
 		loading = true;
 		loadErrorKey = null;
+		clearTimeout(debounce);
 
-		try {
-			people = await listPeople(filter);
-		} catch (error) {
-			loadErrorKey = errorKey(error);
-		} finally {
-			loading = false;
-		}
-	}
+		debounce = setTimeout(async () => {
+			try {
+				people = await listPeople(filter);
+			} catch (error) {
+				if (mine !== generation) return;
+				loadErrorKey = errorKey(error);
+			} finally {
+				if (mine === generation) loading = false;
+			}
+		}, DEBOUNCE_MS);
+	});
 
 	$effect(() => {
 		void loadSidecars();

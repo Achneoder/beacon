@@ -51,7 +51,12 @@ test.describe('search', () => {
 
 		await page.getByRole('option', { name: new RegExp(title) }).click();
 
-		await expect(page).toHaveURL(/\/documents\?open=/);
+		// The deep link must open the document, not merely land on the documents
+		// screen with an unconsumed `?open=` in the URL — that was the old assertion,
+		// and it passed for a page that never read the param. The detail panel's
+		// heading is only there once the document actually loaded.
+		await expect(page).toHaveURL(/\/documents$/);
+		await expect(page.getByRole('heading', { name: title })).toBeVisible();
 	});
 
 	test('walks the results with the arrow keys and opens one with Enter', async ({

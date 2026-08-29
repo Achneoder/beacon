@@ -458,6 +458,7 @@
 		"delete": "Delete",
 		"confirmDelete": "Delete this document? This cannot be undone.",
 		"deleted": "Document deleted.",
+		"detailRetry": "Retry",
 		"dropzone": {
 			"title": "Drag a file here, or browse",
 			"hint": "PDF, DOCX or JPG · max {size}",
