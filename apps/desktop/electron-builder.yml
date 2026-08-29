@@ -1,0 +1,35 @@
+# Packaging. Not run in CI: each target needs its own runner, and the four repo checks
+# (build, lint, typecheck, test) all pass without ever launching Electron. Build a
+# release with `pnpm --filter desktop dist` on the platform you are releasing for.
+appId: com.beacon.desktop
+productName: Beacon
+copyright: Beacon
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - dist/**/*
+  - assets/**/*
+  - package.json
+
+# pnpm's store is symlinked, which electron-builder cannot follow into a package.
+nodeGypRebuild: false
+
+mac:
+  category: public.app-category.productivity
+  icon: assets/icon.png
+  target: [dmg, zip]
+  # Time tracking should not need a Dock icon in the way — the tray is the surface.
+  extendInfo:
+    LSUIElement: false
+
+win:
+  icon: assets/icon.png
+  target: [nsis]
+
+linux:
+  icon: assets/icon.png
+  category: Office
+  target: [AppImage, deb]

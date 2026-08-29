@@ -1,0 +1,84 @@
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>Beacon</title>
+<style>
+  /* Deliberately plain and self-contained. This is the only screen the desktop app
+     draws itself — everything after it is the web app, with the real design system. */
+  :root { color-scheme: light dark; --ink: #16181d; --muted: #5c6370; --line: #d6dae1; --bg: #f7f8fa; --field: #ffffff; --accent: #2563eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #eceef2; --muted: #9aa1ad; --line: #343a45; --bg: #16181d; --field: #1e2229; --accent: #6a9bff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 2rem;
+         background: var(--bg); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: 100%; max-width: 22rem; }
+  h1 { margin: 0 0 .35rem; font-size: 1.15rem; }
+  p { margin: 0 0 1.25rem; color: var(--muted); }
+  label { display: block; margin-bottom: .35rem; font-weight: 600; }
+  input { width: 100%; padding: .55rem .7rem; border: 1px solid var(--line); border-radius: .5rem;
+          background: var(--field); color: inherit; font: inherit; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .actions { display: flex; gap: .5rem; margin-top: 1rem; }
+  button { flex: 1; padding: .55rem .9rem; border: 1px solid transparent; border-radius: .5rem;
+           background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button.secondary { background: transparent; border-color: var(--line); color: inherit; }
+  [role="alert"] { margin-top: .6rem; color: #c0392b; min-height: 1.4em; }
+  @media (prefers-color-scheme: dark) { [role="alert"] { color: #ff8f83; } }
+</style>
+
+<main>
+  <h1 id="title"></h1>
+  <p id="intro"></p>
+  <form id="form">
+    <label for="url" id="label"></label>
+    <input id="url" name="url" type="url" inputmode="url" autocomplete="url"
+           placeholder="https://beacon.example.com" aria-describedby="message" required />
+    <p id="message" role="alert"></p>
+    <div class="actions">
+      <button type="submit" id="submit"></button>
+      <button type="button" id="secondary" class="secondary" hidden></button>
+    </div>
+  </form>
+</main>
+
+<script>
+  const form = document.getElementById('form');
+  const field = document.getElementById('url');
+  const message = document.getElementById('message');
+  const secondary = document.getElementById('secondary');
+
+  async function render() {
+    const copy = await window.beaconSetup.copy();
+
+    document.documentElement.lang = copy.language;
+    document.title = copy.title;
+    document.getElementById('title').textContent = copy.title;
+    document.getElementById('intro').textContent = copy.intro;
+    document.getElementById('label').textContent = copy.label;
+    document.getElementById('submit').textContent = copy.submit;
+    field.value = copy.url ?? '';
+
+    if (copy.retry) {
+      secondary.hidden = false;
+      secondary.textContent = copy.retry;
+      secondary.onclick = () => window.beaconSetup.retry();
+    }
+
+    field.focus();
+    field.select();
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    message.textContent = '';
+
+    const result = await window.beaconSetup.submit(field.value.trim());
+    if (!result.ok) {
+      message.textContent = result.message;
+      field.focus();
+    }
+  });
+
+  render();
+</script>

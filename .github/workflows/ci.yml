@@ -17,8 +17,14 @@ jobs:
       # corepack installs the pnpm the root package.json pins via `packageManager`.
       - name: enable corepack
         run: corepack enable
+      # The desktop app's ~100 MB Electron binary is only needed to *launch* it. The
+      # four checks below compile, lint, typecheck and unit-test it without one, and
+      # packaging needs a runner per OS anyway — so it stays a manual `pnpm --filter
+      # desktop dist`.
       - name: install
         run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: build
         run: pnpm -r build
       - name: lint
@@ -41,6 +47,8 @@ jobs:
         run: corepack enable
       - name: install
         run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: playwright browser
         run: pnpm --filter web exec playwright install --with-deps chromium
       # Both suites bring up their own throwaway services (docker compose e2e project
