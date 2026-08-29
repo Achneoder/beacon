@@ -55,6 +55,33 @@ const E2E_SEARCH_ENV = {
   SEARCH_INDEX: 'beacon-e2e',
 };
 
+/**
+ * The auth settings, pinned for the third time and the same reason as the database,
+ * the bucket and the index above: `apps/api/.env` is a *developer's* file, and a suite
+ * must not depend on one.
+ *
+ * `JWT_SECRET` is the one the API refuses to boot without (`getOrThrow` in
+ * `auth.module.ts`), so leaving it to `.env` meant this suite passed on a machine that
+ * happened to have one and failed everywhere else — which is exactly what CI did, on
+ * every run since the workflow was added. The rest have defaults, but pinning them
+ * keeps a stray local setting from changing what the specs are testing: four of them
+ * hard-code the cookie name.
+ *
+ * Deliberately *not* pinned: `THROTTLE_LIMIT` and `AUTH_THROTTLE_LIMIT`.
+ * `throttle.e2e-spec.ts` exists to assert the shipped defaults, so setting them here
+ * would quietly make it prove nothing. The browser suite raises them instead, in
+ * `apps/web/tests/environment.mjs`, because a dozen parallel browsers really do need
+ * it.
+ */
+const E2E_AUTH_ENV = {
+  JWT_SECRET: 'e2e-secret-not-for-anything-else',
+  JWT_EXPIRES_IN: '15m',
+  JWT_REFRESH_EXPIRES_IN: '30d',
+  AUTH_COOKIE_NAME: 'beacon_refresh',
+  AUTH_COOKIE_SAME_SITE: 'lax',
+  AUTH_COOKIE_SECURE: 'false',
+};
+
 export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
@@ -77,6 +104,7 @@ export default defineConfig({
       // callback directly rather than following a redirect through it.
       SSO_ENCRYPTION_KEY: '4FRKhSQf1jnMcFpYuNqjKrC0YWYCjFbud52rd0I9pFE=',
       API_PUBLIC_URL: 'http://localhost:3210',
+      ...E2E_AUTH_ENV,
       ...E2E_STORAGE_ENV,
       ...E2E_SEARCH_ENV,
     },

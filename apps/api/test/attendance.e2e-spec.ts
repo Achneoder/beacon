@@ -24,6 +24,13 @@ const STAFF_EMAIL = `staff.${RUN}@clock.test`;
 const OUTSIDER_EMAIL = `outsider.${RUN}@clock.test`;
 const PASSWORD = 'correct-horse-battery';
 
+/**
+ * Real elapsed time, used only where a spec needs an entry to be measurably older than
+ * the instant it then replays. Faking the clock is not an option here: the assertion is
+ * about what *Postgres* stored against what the server's own `new Date()` said.
+ */
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 describe('Attendance (e2e)', () => {
   let app: INestApplication;
   let orm: MikroORM;
@@ -337,7 +344,7 @@ describe('Attendance (e2e)', () => {
    * above are undisturbed.
    */
   describe('a backdated clock-out', () => {
-    it('closes the entry at the instant the client names', async () => {
+    it('closes the entry at the instant the client names, not at the request', async () => {
       const started = await http()
         .post('/api/attendance/clock-in')
         .set(as(ownerToken))
@@ -345,9 +352,14 @@ describe('Attendance (e2e)', () => {
         .expect(201);
 
       const startedAt = new Date(started.body.since!);
-      // A minute after the clock-in and safely in the past: what a laptop that went to
-      // sleep a minute in and woke up much later would replay.
-      const at = new Date(startedAt.getTime() + 60_000);
+      // The entry has to be genuinely older than the instant being replayed, or `at`
+      // lands in the future and the skew tolerance clamps it — so wait, then close at
+      // a moment that has demonstrably passed. This second of real time is what makes
+      // "closed where the machine stopped, not where it woke" an assertion rather
+      // than a coincidence.
+      await pause(1_200);
+      const at = new Date(startedAt.getTime() + 200);
+      const sentAt = new Date();
 
       const response = await http()
         .post('/api/attendance/clock-out')
@@ -362,8 +374,28 @@ describe('Attendance (e2e)', () => {
       );
       expect(work.endedAt).toBe(at.toISOString());
       expect(work.source).toBe('desktop');
-      // One minute of work banked, not the hours the machine spent asleep.
-      expect(response.body.workedMinutes).toBe(1);
+      expect(new Date(work.endedAt).getTime()).toBeLessThan(sentAt.getTime());
+    });
+
+    it('clamps a client running slightly fast back to the server clock', async () => {
+      await http()
+        .post('/api/attendance/clock-in')
+        .set(as(ownerToken))
+        .send({ source: 'desktop' })
+        .expect(201);
+
+      // Inside the skew tolerance, so it is accepted rather than refused — but storing
+      // it would leave a segment that reads as still running for the next few seconds.
+      const ahead = new Date(Date.now() + 5_000);
+      const response = await http()
+        .post('/api/attendance/clock-out')
+        .set(as(ownerToken))
+        .send({ at: ahead.toISOString() })
+        .expect(201);
+
+      const work = response.body.segments.at(-1);
+      expect(work.endedAt).not.toBe(ahead.toISOString());
+      expect(new Date(work.endedAt).getTime()).toBeLessThanOrEqual(Date.now());
     });
 
     it('closes a running break at the same instant', async () => {
@@ -375,7 +407,8 @@ describe('Attendance (e2e)', () => {
 
       await http().post('/api/attendance/breaks/start').set(as(ownerToken)).expect(201);
 
-      const at = new Date(new Date(started.body.since!).getTime() + 60_000);
+      await pause(1_200);
+      const at = new Date(new Date(started.body.since!).getTime() + 200);
       const response = await http()
         .post('/api/attendance/clock-out')
         .set(as(ownerToken))
