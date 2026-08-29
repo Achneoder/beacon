@@ -227,6 +227,12 @@
 		"disableConfirm": "{name} deaktivieren? Die Historie bleibt erhalten und das Konto kann später wieder aktiviert werden.",
 		"roles": "Rollen",
 		"manager": "Vorgesetzte Person",
+		"editAssignment": "Zuordnung bearbeiten",
+		"editAssignmentHint": "Abteilung, Team und vorgesetzte Person für diese Person festlegen.",
+		"noDepartmentOption": "Keine Abteilung",
+		"noTeamOption": "Kein Team",
+		"noManagerOption": "Keine vorgesetzte Person",
+		"assignmentSaved": "Zuordnung aktualisiert.",
 		"status": {
 			"invited": "Eingeladen",
 			"active": "Aktiv",

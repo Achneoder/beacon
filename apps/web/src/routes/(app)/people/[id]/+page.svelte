@@ -1,12 +1,19 @@
 <script lang="ts">
 	import { _, locale } from 'svelte-i18n';
 	import { page } from '$app/state';
-	import type { UserDetail } from '@beacon/shared';
+	import type { DepartmentSummary, TeamSummary, UserDetail, UserSummary } from '@beacon/shared';
 	import { fullName } from '@beacon/shared';
 	import { Alert, Badge, Button, Card } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
 	import { Field, PersonCard } from '$lib/components/people';
-	import { disablePerson, getPerson } from '$lib/api/people';
+	import {
+		disablePerson,
+		getPerson,
+		listDepartments,
+		listPeople,
+		listTeams,
+		updatePerson
+	} from '$lib/api/people';
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
 	import {
@@ -39,6 +46,68 @@
 			person = await getPerson(userId);
 		} catch (error) {
 			loadErrorKey = errorKey(error);
+		}
+	}
+
+	// ── Assignment: department, team and manager — the fields only employee:manage may set ──
+	let departments = $state<DepartmentSummary[]>([]);
+	let teams = $state<TeamSummary[]>([]);
+	let managers = $state<UserSummary[]>([]);
+	let editingAssignment = $state(false);
+	let savingAssignment = $state(false);
+	let assignmentSaved = $state(false);
+	let assignmentErrorKey = $state<string | null>(null);
+
+	let departmentId = $state('');
+	let teamId = $state('');
+	let managerId = $state('');
+
+	$effect(() => {
+		if (canManage) void loadAssignmentOptions();
+	});
+
+	async function loadAssignmentOptions() {
+		try {
+			[departments, teams, managers] = await Promise.all([
+				listDepartments(),
+				listTeams(),
+				listPeople({ status: 'active' })
+			]);
+		} catch {
+			// The edit form falls back to the department/team already on the person; the
+			// selects just come up empty rather than blocking the read-only view.
+		}
+	}
+
+	function startEditingAssignment() {
+		if (!person) return;
+		departmentId = person.departmentId ?? '';
+		teamId = person.teamId ?? '';
+		managerId = person.managerId ?? '';
+		assignmentErrorKey = null;
+		assignmentSaved = false;
+		editingAssignment = true;
+	}
+
+	async function saveAssignment(event: SubmitEvent) {
+		event.preventDefault();
+		if (!person) return;
+
+		savingAssignment = true;
+		assignmentErrorKey = null;
+
+		try {
+			person = await updatePerson(person.id, {
+				departmentId: departmentId || null,
+				teamId: teamId || null,
+				managerId: managerId || null
+			});
+			editingAssignment = false;
+			assignmentSaved = true;
+		} catch (error) {
+			assignmentErrorKey = errorKey(error);
+		} finally {
+			savingAssignment = false;
 		}
 	}
 
@@ -93,12 +162,21 @@
 {:else if !person}
 	<p class="mt-6 text-sm text-ink-muted">{$_('people.loading')}</p>
 {:else}
+	{#if assignmentSaved}
+		<Alert tone="success" live="status" class="mt-6">{$_('people.assignmentSaved')}</Alert>
+	{/if}
+
 	<Card variant="panel" as="section" class="mt-6">
 		<div class="flex flex-wrap items-center justify-between gap-4">
 			<PersonCard name={fullName(person)} subtitle={person.jobTitle} size="lg" />
 			<div class="flex items-center gap-2">
 				<Badge tone={statusTone(person.status)}>{$_(statusKey(person.status))}</Badge>
 				<Badge tone="neutral" class="font-mono">{person.employeeNumber ?? notSet}</Badge>
+				{#if canManage && !editingAssignment}
+					<Button size="sm" variant="ghost" onclick={startEditingAssignment}>
+						{$_('people.editAssignment')}
+					</Button>
+				{/if}
 			</div>
 		</div>
 
@@ -117,6 +195,73 @@
 			<Field label={$_('profile.location')} value={location} placeholder={notSet} />
 			<Field label={$_('people.manager')} value={person.managerName} placeholder={notSet} />
 		</dl>
+
+		{#if editingAssignment}
+			<form class="mt-8 border-t border-border-subtle pt-6" onsubmit={saveAssignment} novalidate>
+				<p class="text-xs text-ink-muted">{$_('people.editAssignmentHint')}</p>
+
+				{#if assignmentErrorKey}
+					<Alert tone="warning" class="mt-4">{$_(assignmentErrorKey)}</Alert>
+				{/if}
+
+				<div class="mt-4 grid gap-4 sm:grid-cols-3">
+					<div class="flex flex-col gap-1.5">
+						<label for="person-department" class="text-sm font-semibold">
+							{$_('profile.department')}
+						</label>
+						<select
+							id="person-department"
+							bind:value={departmentId}
+							class="rounded-control border border-border-default bg-surface px-3.5 py-2.5 text-sm"
+						>
+							<option value="">{$_('people.noDepartmentOption')}</option>
+							{#each departments as department (department.id)}
+								<option value={department.id}>{department.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="flex flex-col gap-1.5">
+						<label for="person-team" class="text-sm font-semibold">{$_('profile.team')}</label>
+						<select
+							id="person-team"
+							bind:value={teamId}
+							class="rounded-control border border-border-default bg-surface px-3.5 py-2.5 text-sm"
+						>
+							<option value="">{$_('people.noTeamOption')}</option>
+							{#each teams as team (team.id)}
+								<option value={team.id}>{team.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="flex flex-col gap-1.5">
+						<label for="person-manager" class="text-sm font-semibold">
+							{$_('people.manager')}
+						</label>
+						<select
+							id="person-manager"
+							bind:value={managerId}
+							class="rounded-control border border-border-default bg-surface px-3.5 py-2.5 text-sm"
+						>
+							<option value="">{$_('people.noManagerOption')}</option>
+							{#each managers as candidate (candidate.id)}
+								{#if candidate.id !== person.id}
+									<option value={candidate.id}>{fullName(candidate)}</option>
+								{/if}
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				<div class="mt-5 flex gap-3">
+					<Button type="submit" variant="primary" size="sm" disabled={savingAssignment}>
+						{savingAssignment ? $_('profile.saving') : $_('profile.save')}
+					</Button>
+					<Button size="sm" variant="quiet" onclick={() => (editingAssignment = false)}>
+						{$_('profile.cancel')}
+					</Button>
+				</div>
+			</form>
+		{/if}
 	</Card>
 
 	<div class="mt-6 grid gap-6 lg:grid-cols-2">

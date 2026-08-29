@@ -227,6 +227,12 @@
 		"disableConfirm": "Disable {name}? Their history is kept and they can be re-enabled later.",
 		"roles": "Roles",
 		"manager": "Manager",
+		"editAssignment": "Edit assignment",
+		"editAssignmentHint": "Set this person's department, team and manager.",
+		"noDepartmentOption": "No department",
+		"noTeamOption": "No team",
+		"noManagerOption": "No manager",
+		"assignmentSaved": "Assignment updated.",
 		"status": {
 			"invited": "Invited",
 			"active": "Active",

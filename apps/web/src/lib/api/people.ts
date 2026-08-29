@@ -10,6 +10,7 @@ import type {
 	UpdateOwnProfileRequest,
 	UpdateUserRequest,
 	UserDetail,
+	UserStatusValue,
 	UserSummary
 } from '@beacon/shared';
 import { api, apiSend } from './client';
@@ -23,6 +24,7 @@ export interface PeopleFilter {
 	departmentId?: string;
 	teamId?: string;
 	search?: string;
+	status?: UserStatusValue;
 }
 
 function query(filter: PeopleFilter): string {
