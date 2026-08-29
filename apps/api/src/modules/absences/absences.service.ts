@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { ref, type Ref } from '@mikro-orm/core';
+import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_ABSENCE_TYPES,
   absenceCostByYear,
@@ -569,25 +570,36 @@ export class AbsencesService {
     userId: string,
     year: number,
   ): Promise<LeaveBalance> {
-    const existing = await this.em.findOne(LeaveBalance, {
-      organization: organizationId,
-      user: userId,
-      year,
-    });
+    const where = { organization: organizationId, user: userId, year };
+    const existing = await this.em.findOne(LeaveBalance, where);
     if (existing) return existing;
 
-    const created = this.em.create(LeaveBalance, {
-      organization: this.em.getReference(Organization, organizationId, { wrapped: true }),
-      user: this.em.getReference(User, userId, { wrapped: true }),
-      year,
-      entitlementDays: DEFAULT_ENTITLEMENT_DAYS,
-      carryOverDays: 0,
-      carryOverExpiresOn: null,
-      takenDays: 0,
-    });
-    await this.em.flush();
-
-    return created;
+    // Two concurrent first reads — the pricing screen and an approval, say — would
+    // both pass the findOne above and collide on the (user, year) unique constraint.
+    // The upsert turns the loser's insert into a no-op, and the refresh re-reads the
+    // row the winner committed instead of returning the discarded stub.
+    await this.em.upsert(
+      LeaveBalance,
+      {
+        // upsert hydrates without running the constructor, so the field
+        // initializers never run — every constructor-assigned column (the id and
+        // both timestamps) has to be provided, or the not-null constraints bite.
+        id: randomUUID(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organization: organizationId,
+        user: userId,
+        year,
+        entitlementDays: DEFAULT_ENTITLEMENT_DAYS,
+        carryOverDays: 0,
+        carryOverExpiresOn: null,
+        takenDays: 0,
+      },
+      // Without this the driver would conflict on the primary key we just
+      // generated; the guard that matters is the (user, year) unique constraint.
+      { onConflictAction: 'ignore', onConflictFields: ['user', 'year'] },
+    );
+    return this.em.findOneOrFail(LeaveBalance, where, { refresh: true });
   }
 
   private async pendingDaysOf(
