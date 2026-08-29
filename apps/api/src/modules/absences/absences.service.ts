@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { ref, type Ref } from '@mikro-orm/core';
+import { ref } from '@mikro-orm/core';
 import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_ABSENCE_TYPES,
@@ -26,11 +26,12 @@ import {
   type LeaveBalanceSummary,
 } from '@beacon/shared';
 import { localDate, resolveTimezone } from '../../common/time/zone.js';
+import { lockAdvisory } from '../../common/db/advisory-lock.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
 import { DocumentsService } from '../documents/documents.service.js';
-import type { Document } from '../documents/document.entity.js';
+import { Document } from '../documents/document.entity.js';
 import { AbsenceRequest } from './absence-request.entity.js';
 import { AbsenceType } from './absence-type.entity.js';
 import { Holiday } from './holiday.entity.js';
@@ -41,6 +42,14 @@ import type { UpsertLeaveBalanceDto } from './dto/upsert-leave-balance.dto.js';
 
 /** The quota a person gets until someone sets one for them. */
 const DEFAULT_ENTITLEMENT_DAYS = 30;
+
+/**
+ * Namespaces for the advisory locks — see {@link lockAdvisory}. The decide lock is
+ * shared by {@link decide} and {@link withdraw}, so a withdrawal cannot delete a
+ * request an approval is mid-way through paying for.
+ */
+const ABSENCE_CREATE_LOCK = 20_260_004;
+const ABSENCE_DECIDE_LOCK = 20_260_005;
 
 /** Who is asking, and how far the guard already let them see. */
 export interface Caller {
@@ -146,11 +155,17 @@ export class AbsencesService {
 
   // ---------------------------------------------------------------- holidays
 
-  async listHolidays(organizationId: string, from?: string, to?: string): Promise<HolidaySummary[]> {
+  async listHolidays(
+    organizationId: string,
+    from?: string,
+    to?: string,
+    /** Explicit when called inside `em.transactional` — the fork owns the reads. */
+    em: EntityManager = this.em,
+  ): Promise<HolidaySummary[]> {
     const where: Record<string, unknown> = { organization: organizationId };
     if (from && to) where.date = { $gte: from, $lte: to };
 
-    const holidays = await this.em.find(Holiday, where, { orderBy: { date: 'asc' } });
+    const holidays = await em.find(Holiday, where, { orderBy: { date: 'asc' } });
 
     return holidays.map(toHolidaySummary);
   }
@@ -196,24 +211,10 @@ export class AbsencesService {
     });
     if (!type) throw new NotFoundException('absence type not found');
 
-    await this.assertFree(caller.organizationId, subjectId, dto.startsOn, dto.endsOn);
-
-    const holidays = await this.holidayDates(caller.organizationId, dto.startsOn, dto.endsOn);
-    const request = {
-      startsOn: dto.startsOn,
-      endsOn: dto.endsOn,
-      halfDayStart: dto.halfDayStart ?? false,
-      halfDayEnd: dto.halfDayEnd ?? false,
-    };
-    const workingDays = absenceCostDays({ ...request, halfDayStart: false, halfDayEnd: false }, holidays);
-    if (workingDays === 0) {
-      throw new BadRequestException('that range contains no working days');
-    }
-
     // An invisible document is a 404 — that 404 *is* the enforcement. A manager
     // cannot staple their own file to an employee's request: the document must
     // belong to whoever the absence is for, not to whoever is raising it.
-    let document: Ref<Document> | null = null;
+    let documentId: string | null = null;
     if (dto.documentId) {
       const found = await this.documents.findVisible(
         { id: caller.id, organizationId: caller.organizationId, canManage: caller.canManageDocuments },
@@ -222,26 +223,55 @@ export class AbsencesService {
       if (found.owner?.id !== subjectId) {
         throw new BadRequestException('the document belongs to someone else');
       }
-      document = ref(found);
+      documentId = found.id;
     }
 
-    const user = await this.users.findEntity(caller.organizationId, subjectId);
-    const absence = this.em.create(AbsenceRequest, {
-      organization: this.em.getReference(Organization, caller.organizationId, { wrapped: true }),
-      user: ref(user),
-      type: ref(type),
-      ...request,
-      status: 'pending',
-      costDays: type.deductsFromQuota ? absenceCostDays(request, holidays) : 0,
-      approver: user.manager,
-      note: dto.note ?? null,
-      document,
+    // The overlap check and the insert only hold together while nobody else can
+    // insert for the same subject in between: two requests raised in the same
+    // second over the same days would otherwise both pass `assertFree`. The
+    // advisory lock serializes on the subject, so different people still request
+    // concurrently.
+    return this.em.transactional(async (em) => {
+      await lockAdvisory(em, ABSENCE_CREATE_LOCK, `${caller.organizationId}:${subjectId}`);
+
+      const user = await em.findOne(
+        User,
+        { id: subjectId, organization: caller.organizationId },
+        { populate: ['manager'] },
+      );
+      if (!user) throw new NotFoundException('user not found');
+
+      await this.assertFree(em, caller.organizationId, subjectId, dto.startsOn, dto.endsOn);
+
+      const holidays = await this.holidayDates(em, caller.organizationId, dto.startsOn, dto.endsOn);
+      const request = {
+        startsOn: dto.startsOn,
+        endsOn: dto.endsOn,
+        halfDayStart: dto.halfDayStart ?? false,
+        halfDayEnd: dto.halfDayEnd ?? false,
+      };
+      const workingDays = absenceCostDays({ ...request, halfDayStart: false, halfDayEnd: false }, holidays);
+      if (workingDays === 0) {
+        throw new BadRequestException('that range contains no working days');
+      }
+
+      const absence = em.create(AbsenceRequest, {
+        organization: em.getReference(Organization, caller.organizationId, { wrapped: true }),
+        user: ref(user),
+        type: em.getReference(AbsenceType, type.id),
+        ...request,
+        status: 'pending',
+        costDays: type.deductsFromQuota ? absenceCostDays(request, holidays) : 0,
+        approver: user.manager,
+        note: dto.note ?? null,
+        document: documentId ? em.getReference(Document, documentId) : null,
+      });
+
+      await em.flush();
+      await em.populate(absence, ['user', 'type', 'approver', 'document']);
+
+      return toAbsenceSummary(absence, holidays);
     });
-
-    await this.em.flush();
-    await this.em.populate(absence, ['user', 'type', 'approver', 'document']);
-
-    return toAbsenceSummary(absence, holidays);
   }
 
   /**
@@ -269,31 +299,44 @@ export class AbsencesService {
       orderBy: { startsOn: 'desc' },
     });
 
-    await this.settleTaken(caller.organizationId, requests);
+    await this.settleTaken(this.em, caller.organizationId, requests);
 
-    return this.summarize(caller.organizationId, requests);
+    return this.summarize(this.em, caller.organizationId, requests);
   }
 
-  /** Withdrawing your own request. Only while it is still a question. */
+  /**
+   * Withdrawing your own request. Only while it is still a question.
+   *
+   * Shares the decide lock — a withdrawal racing an approval must lose to it, not
+   * delete a request whose days were just committed to the balance.
+   */
   async withdraw(caller: Caller, requestId: string): Promise<void> {
-    const request = await this.em.findOne(AbsenceRequest, {
-      id: requestId,
-      organization: caller.organizationId,
-    });
-    if (!request) throw new NotFoundException('request not found');
-    if (request.user.id !== caller.id) {
-      throw new ForbiddenException('you may only withdraw your own requests');
-    }
-    if (request.status !== 'pending') {
-      throw new BadRequestException('only a pending request can be withdrawn');
-    }
+    await this.em.transactional(async (em) => {
+      await lockAdvisory(em, ABSENCE_DECIDE_LOCK, requestId);
 
-    await this.em.removeAndFlush(request);
+      const request = await em.findOne(AbsenceRequest, {
+        id: requestId,
+        organization: caller.organizationId,
+      });
+      if (!request) throw new NotFoundException('request not found');
+      if (request.user.id !== caller.id) {
+        throw new ForbiddenException('you may only withdraw your own requests');
+      }
+      if (request.status !== 'pending') {
+        throw new BadRequestException('only a pending request can be withdrawn');
+      }
+
+      await em.removeAndFlush(request);
+    });
   }
 
   /**
    * Deciding. Approving commits the days to the balance of each year the request
    * touches — a holiday over New Year spends two quotas, not one.
+   *
+   * The advisory lock makes this atomic against a concurrent decide or withdraw:
+   * two approvals would otherwise both pass the pending check and commit the days
+   * twice.
    */
   async decide(
     caller: Caller,
@@ -301,32 +344,36 @@ export class AbsencesService {
     approved: boolean,
     note?: string | null,
   ): Promise<AbsenceRequestSummary> {
-    const request = await this.em.findOne(
-      AbsenceRequest,
-      { id: requestId, organization: caller.organizationId },
-      { populate: ['user', 'type', 'approver', 'document'] },
-    );
-    if (!request) throw new NotFoundException('request not found');
-    if (request.status !== 'pending') {
-      throw new BadRequestException('that request has already been decided');
-    }
-    if (request.user.id === caller.id) {
-      throw new ForbiddenException('you cannot decide your own request');
-    }
+    return this.em.transactional(async (em) => {
+      await lockAdvisory(em, ABSENCE_DECIDE_LOCK, requestId);
 
-    request.status = approved ? 'approved' : 'rejected';
-    request.decidedAt = new Date();
-    request.decidedBy = this.em.getReference(User, caller.id, { wrapped: true });
-    request.decisionNote = note ?? null;
+      const request = await em.findOne(
+        AbsenceRequest,
+        { id: requestId, organization: caller.organizationId },
+        { populate: ['user', 'type', 'approver', 'document'] },
+      );
+      if (!request) throw new NotFoundException('request not found');
+      if (request.status !== 'pending') {
+        throw new BadRequestException('that request has already been decided');
+      }
+      if (request.user.id === caller.id) {
+        throw new ForbiddenException('you cannot decide your own request');
+      }
 
-    if (approved && request.type.getEntity().deductsFromQuota) {
-      await this.commitToBalances(caller.organizationId, request, 1);
-    }
+      request.status = approved ? 'approved' : 'rejected';
+      request.decidedAt = new Date();
+      request.decidedBy = em.getReference(User, caller.id, { wrapped: true });
+      request.decisionNote = note ?? null;
 
-    await this.em.flush();
-    await this.settleTaken(caller.organizationId, [request]);
+      if (approved && request.type.getEntity().deductsFromQuota) {
+        await this.commitToBalances(em, caller.organizationId, request, 1);
+      }
 
-    return (await this.summarize(caller.organizationId, [request]))[0];
+      await em.flush();
+      await this.settleTaken(em, caller.organizationId, [request]);
+
+      return (await this.summarize(em, caller.organizationId, [request]))[0];
+    });
   }
 
   // ---------------------------------------------------------------- calendar
@@ -353,11 +400,11 @@ export class AbsencesService {
       },
       { populate: ['user', 'type', 'approver', 'document'], orderBy: { startsOn: 'asc' } },
     );
-    await this.settleTaken(caller.organizationId, requests);
+    await this.settleTaken(this.em, caller.organizationId, requests);
 
-    const holidays = await this.listHolidays(caller.organizationId, from, to);
+    const holidays = await this.listHolidays(caller.organizationId, from, to, this.em);
     const byDate = new Map(holidays.map((holiday) => [holiday.date, holiday.name]));
-    const summaries = await this.summarize(caller.organizationId, requests);
+    const summaries = await this.summarize(this.em, caller.organizationId, requests);
 
     const days: CalendarDay[] = datesBetween(from, to).map((date) => ({
       date,
@@ -379,7 +426,7 @@ export class AbsencesService {
     const today = localDate(timezone);
     const forYear = year ?? Number(today.slice(0, 4));
 
-    const balance = await this.ensureBalance(caller.organizationId, subjectId, forYear);
+    const balance = await this.ensureBalance(this.em, caller.organizationId, subjectId, forYear);
     const pendingDays = await this.pendingDaysOf(caller.organizationId, subjectId, forYear);
 
     return toBalanceSummary(balance, pendingDays, today);
@@ -392,7 +439,7 @@ export class AbsencesService {
     dto: UpsertLeaveBalanceDto,
   ): Promise<LeaveBalanceSummary> {
     const user = await this.users.findEntity(caller.organizationId, userId);
-    const balance = await this.ensureBalance(caller.organizationId, user.id, dto.year);
+    const balance = await this.ensureBalance(this.em, caller.organizationId, user.id, dto.year);
 
     if (dto.entitlementDays !== undefined) balance.entitlementDays = dto.entitlementDays;
     if (dto.carryOverDays !== undefined) balance.carryOverDays = dto.carryOverDays;
@@ -441,7 +488,7 @@ export class AbsencesService {
         startsOn: { $lte: to },
         endsOn: { $gte: from },
       }),
-      this.holidayDates(organizationId, from, to),
+      this.holidayDates(this.em, organizationId, from, to),
     ]);
 
     const byUser = new Map(rows.map((row) => [row.user.id, row]));
@@ -534,6 +581,7 @@ export class AbsencesService {
    * trip per row.
    */
   private async summarize(
+    em: EntityManager,
     organizationId: string,
     requests: AbsenceRequest[],
   ): Promise<AbsenceRequestSummary[]> {
@@ -541,7 +589,7 @@ export class AbsencesService {
 
     const from = requests.reduce((first, r) => (r.startsOn < first ? r.startsOn : first), requests[0].startsOn);
     const to = requests.reduce((last, r) => (r.endsOn > last ? r.endsOn : last), requests[0].endsOn);
-    const holidays = await this.holidayDates(organizationId, from, to);
+    const holidays = await this.holidayDates(em, organizationId, from, to);
 
     return requests.map((request) => toAbsenceSummary(request, holidays));
   }
@@ -552,33 +600,35 @@ export class AbsencesService {
    * never drift apart.
    */
   private async commitToBalances(
+    em: EntityManager,
     organizationId: string,
     request: AbsenceRequest,
     direction: 1 | -1,
   ): Promise<void> {
-    const holidays = await this.holidayDates(organizationId, request.startsOn, request.endsOn);
+    const holidays = await this.holidayDates(em, organizationId, request.startsOn, request.endsOn);
     const byYear = absenceCostByYear(request, holidays);
 
     for (const [year, days] of byYear) {
-      const balance = await this.ensureBalance(organizationId, request.user.id, year);
+      const balance = await this.ensureBalance(em, organizationId, request.user.id, year);
       balance.takenDays = round(balance.takenDays + direction * days);
     }
   }
 
   private async ensureBalance(
+    em: EntityManager,
     organizationId: string,
     userId: string,
     year: number,
   ): Promise<LeaveBalance> {
     const where = { organization: organizationId, user: userId, year };
-    const existing = await this.em.findOne(LeaveBalance, where);
+    const existing = await em.findOne(LeaveBalance, where);
     if (existing) return existing;
 
     // Two concurrent first reads — the pricing screen and an approval, say — would
     // both pass the findOne above and collide on the (user, year) unique constraint.
     // The upsert turns the loser's insert into a no-op, and the refresh re-reads the
     // row the winner committed instead of returning the discarded stub.
-    await this.em.upsert(
+    await em.upsert(
       LeaveBalance,
       {
         // upsert hydrates without running the constructor, so the field
@@ -599,7 +649,7 @@ export class AbsencesService {
       // generated; the guard that matters is the (user, year) unique constraint.
       { onConflictAction: 'ignore', onConflictFields: ['user', 'year'] },
     );
-    return this.em.findOneOrFail(LeaveBalance, where, { refresh: true });
+    return em.findOneOrFail(LeaveBalance, where, { refresh: true });
   }
 
   private async pendingDaysOf(
@@ -615,7 +665,7 @@ export class AbsencesService {
       endsOn: { $gte: `${year}-01-01` },
     });
 
-    const holidays = await this.holidayDates(organizationId, `${year}-01-01`, `${year}-12-31`);
+    const holidays = await this.holidayDates(this.em, organizationId, `${year}-01-01`, `${year}-12-31`);
 
     return round(
       requests.reduce(
@@ -626,11 +676,11 @@ export class AbsencesService {
   }
 
   /** Approved becomes taken once the last day has passed, in the subject's own zone. */
-  private async settleTaken(organizationId: string, requests: AbsenceRequest[]): Promise<void> {
+  private async settleTaken(em: EntityManager, organizationId: string, requests: AbsenceRequest[]): Promise<void> {
     const stale = requests.filter((request) => request.status === 'approved');
     if (stale.length === 0) return;
 
-    const timezone = await this.organizationTimezone(organizationId);
+    const timezone = await this.organizationTimezone(em, organizationId);
     const today = localDate(timezone);
     let changed = false;
 
@@ -641,17 +691,18 @@ export class AbsencesService {
       }
     }
 
-    if (changed) await this.em.flush();
+    if (changed) await em.flush();
   }
 
   /** Refuses a second absence over days already spoken for. */
   private async assertFree(
+    em: EntityManager,
     organizationId: string,
     userId: string,
     startsOn: string,
     endsOn: string,
   ): Promise<void> {
-    const clashing = await this.em.find(AbsenceRequest, {
+    const clashing = await em.find(AbsenceRequest, {
       organization: organizationId,
       user: userId,
       status: { $ne: 'rejected' },
@@ -665,11 +716,12 @@ export class AbsencesService {
   }
 
   private async holidayDates(
+    em: EntityManager,
     organizationId: string,
     from: string,
     to: string,
   ): Promise<string[]> {
-    const holidays = await this.listHolidays(organizationId, from, to);
+    const holidays = await this.listHolidays(organizationId, from, to, em);
 
     return holidays.map((holiday) => holiday.date);
   }
@@ -721,11 +773,11 @@ export class AbsencesService {
       { fields: ['timezone'] },
     );
 
-    return resolveTimezone(user?.timezone ?? null, await this.organizationTimezone(caller.organizationId));
+    return resolveTimezone(user?.timezone ?? null, await this.organizationTimezone(this.em, caller.organizationId));
   }
 
-  private async organizationTimezone(organizationId: string): Promise<string> {
-    const organization = await this.em.findOne(Organization, { id: organizationId });
+  private async organizationTimezone(em: EntityManager, organizationId: string): Promise<string> {
+    const organization = await em.findOne(Organization, { id: organizationId });
 
     return organization?.timezone ?? 'UTC';
   }

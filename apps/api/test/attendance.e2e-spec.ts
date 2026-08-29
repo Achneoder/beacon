@@ -274,6 +274,43 @@ describe('Attendance (e2e)', () => {
         .send({})
         .expect(400);
     });
+
+    it('writes the change through once when two approvals arrive together', async () => {
+      const created = await http()
+        .post('/api/attendance/corrections')
+        .set(as(outsiderToken))
+        .send({
+          kind: 'add',
+          startedAt: '2026-08-12T07:00:00.000Z',
+          endedAt: '2026-08-12T15:00:00.000Z',
+          breakMinutes: 0,
+          reason: 'Forgot the Wednesday too.',
+        })
+        .expect(201);
+
+      const [left, right] = await Promise.all([
+        http()
+          .post(`/api/attendance/corrections/${created.body.id}/approve`)
+          .set(as(ownerToken))
+          .send({}),
+        http()
+          .post(`/api/attendance/corrections/${created.body.id}/approve`)
+          .set(as(ownerToken))
+          .send({}),
+      ]);
+
+      // Exactly one approval lands; the other loses on the pending check — and the
+      // timesheet holds exactly one entry, not two.
+      expect([left.status, right.status].sort()).toEqual([201, 400]);
+
+      const segments = await http()
+        .get('/api/attendance?from=2026-08-12&to=2026-08-12')
+        .set(as(outsiderToken))
+        .expect(200);
+
+      const work = segments.body.filter((segment: { kind: string }) => segment.kind === 'work');
+      expect(work).toHaveLength(1);
+    });
   });
 
   describe('who may read whom', () => {

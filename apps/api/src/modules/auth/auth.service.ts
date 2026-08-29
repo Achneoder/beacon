@@ -5,6 +5,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import { createHash, randomBytes } from 'node:crypto';
 import type { AuthResponse, SessionUser, SetupState, SsoErrorCode } from '@beacon/shared';
 import { OrganizationService } from '../organizations/organization.service.js';
+import { lockAdvisory } from '../../common/db/advisory-lock.js';
 import { SsoProvider } from '../sso/sso-provider.entity.js';
 import { User, UserStatus } from '../users/user.entity.js';
 import { RefreshToken } from './refresh-token.entity.js';
@@ -16,6 +17,17 @@ import type { LoginDto } from './dto/login.dto.js';
 
 const DEFAULT_ACCESS_SECONDS = 15 * 60;
 const DEFAULT_REFRESH_SECONDS = 30 * 24 * 60 * 60;
+
+/** Namespace for the rotation lock — see {@link lockAdvisory}. */
+const REFRESH_ROTATION_LOCK = 20_260_003;
+
+/**
+ * How long after a rotation a spent token is read as "a second tab of the same
+ * browser" rather than "stolen" — see {@link AuthService.refresh}. Configurable so a
+ * test can set it to zero and assert the family-revocation guarantee without sleeping
+ * through the window.
+ */
+const REFRESH_REPLAY_GRACE_MS = 30_000;
 
 export interface IssuedSession {
   auth: AuthResponse;
@@ -105,32 +117,71 @@ export class AuthService {
    * Rotates: the presented token is spent, a fresh one takes its place. Presenting an
    * already-spent token means it leaked, so the whole family is revoked and the holder
    * — legitimate or not — has to sign in again.
+   *
+   * Rotation serializes on an advisory lock keyed by the token hash: two tabs of the
+   * same browser share the cookie jar and can present the same token at once, and
+   * without the lock both would pass the `revokedAt` check and mint two live
+   * successors — replay detection defeated by a double refresh. The lock makes the
+   * loser observe the winner's revocation, and the grace window tells a just-rotated
+   * loser (a second tab) apart from a replayed, stolen token.
+   *
+   * The verdict is decided under the lock, but the refusal itself — the family
+   * revocation, above all — happens outside the transaction: a 401 thrown inside it
+   * would roll the revocation back with it.
    */
   async refresh(token: string | undefined, userAgent?: string): Promise<IssuedSession> {
     if (!token) throw new UnauthorizedException('missing refresh token');
+    const tokenHash = digest(token);
 
-    const existing = await this.em.findOne(RefreshToken, { tokenHash: digest(token) });
-    if (!existing) throw new UnauthorizedException('invalid refresh token');
+    const verdict = await this.em.transactional(async (em) => {
+      await lockAdvisory(em, REFRESH_ROTATION_LOCK, tokenHash);
 
-    if (existing.revokedAt || existing.expiresAt.getTime() <= Date.now()) {
-      await this.revokeAllForUser(existing.user.id);
-      throw new UnauthorizedException('refresh token is no longer valid');
-    }
+      const existing = await em.findOne(RefreshToken, { tokenHash });
+      if (!existing) return { decision: 'unknown' as const };
 
-    const user = await this.em.findOne(
-      User,
-      { id: existing.user.id },
-      { populate: ['roles', 'organization'] },
-    );
-    if (!user || user.status !== UserStatus.Active) {
-      await this.revokeAllForUser(existing.user.id);
-      throw new UnauthorizedException('account is not active');
-    }
+      if (existing.revokedAt) {
+        return this.withinReplayGrace(existing.revokedAt)
+          ? { decision: 'spent' as const }
+          : { decision: 'revoke-family' as const, userId: existing.user.id };
+      }
+      if (existing.expiresAt.getTime() <= Date.now()) {
+        return { decision: 'revoke-family' as const, userId: existing.user.id };
+      }
 
-    return this.issueSession(user, userAgent, (successorHash) => {
-      existing.revokedAt = new Date();
-      existing.replacedByHash = successorHash;
+      const user = await em.findOne(
+        User,
+        { id: existing.user.id },
+        { populate: ['roles', 'organization'] },
+      );
+      if (!user || user.status !== UserStatus.Active) {
+        return { decision: 'revoke-family' as const, userId: existing.user.id };
+      }
+
+      return {
+        decision: 'rotate' as const,
+        session: await this.issueSession(
+          user,
+          userAgent,
+          (successorHash) => {
+            existing.revokedAt = new Date();
+            existing.replacedByHash = successorHash;
+          },
+          em,
+        ),
+      };
     });
+
+    switch (verdict.decision) {
+      case 'rotate':
+        return verdict.session;
+      case 'unknown':
+        throw new UnauthorizedException('invalid refresh token');
+      case 'spent':
+        throw new UnauthorizedException('refresh token is no longer valid');
+      case 'revoke-family':
+        await this.revokeAllForUser(this.em, verdict.userId);
+        throw new UnauthorizedException('refresh token is no longer valid');
+    }
   }
 
   async logout(token: string | undefined): Promise<void> {
@@ -166,14 +217,24 @@ export class AuthService {
     return toSessionUser(user);
   }
 
-  private async revokeAllForUser(userId: string): Promise<void> {
-    await this.em.nativeUpdate(RefreshToken, { user: userId, revokedAt: null }, { revokedAt: new Date() });
+  private async revokeAllForUser(em: EntityManager, userId: string): Promise<void> {
+    await em.nativeUpdate(RefreshToken, { user: userId, revokedAt: null }, { revokedAt: new Date() });
+  }
+
+  /** Whether `revokedAt` is recent enough to be a second tab, not a replay. */
+  private withinReplayGrace(revokedAt: Date): boolean {
+    const configured = this.config.get<string>('REFRESH_REPLAY_GRACE_MS');
+    const graceMs = configured ? Number(configured) : REFRESH_REPLAY_GRACE_MS;
+
+    return Date.now() - revokedAt.getTime() < graceMs;
   }
 
   private async issueSession(
     user: User,
     userAgent?: string,
     onIssued?: (successorHash: string) => void,
+    /** Explicit when called inside `em.transactional` — the fork owns the writes. */
+    em: EntityManager = this.em,
   ): Promise<IssuedSession> {
     const accessSeconds = durationToSeconds(
       this.config.get<string>('JWT_EXPIRES_IN') ?? '15m',
@@ -196,7 +257,7 @@ export class AuthService {
     const refreshToken = randomBytes(32).toString('base64url');
     const tokenHash = digest(refreshToken);
 
-    this.em.create(RefreshToken, {
+    em.create(RefreshToken, {
       organization: user.organization,
       user,
       tokenHash,
@@ -205,7 +266,7 @@ export class AuthService {
     });
 
     onIssued?.(tokenHash);
-    await this.em.flush();
+    await em.flush();
 
     return {
       auth: { accessToken, expiresIn: accessSeconds, user: toSessionUser(user) },

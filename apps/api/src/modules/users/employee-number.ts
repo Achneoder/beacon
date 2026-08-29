@@ -1,11 +1,10 @@
 import type { EntityManager } from '@mikro-orm/postgresql';
 import { formatEmployeeNumber, parseEmployeeNumber } from '@beacon/shared';
+import { lockAdvisory } from '../../common/db/advisory-lock.js';
 import { User } from './user.entity.js';
 
 /**
- * Namespace for the lock below, so it cannot collide with another advisory lock. The
- * two-argument form takes two `int4`s, which is why this is small and why the cast
- * below is explicit — `hashtext` already returns one.
+ * Namespace for the lock below, so it cannot collide with another advisory lock.
  */
 const EMPLOYEE_NUMBER_LOCK = 20_260_002;
 
@@ -29,14 +28,7 @@ export async function nextEmployeeNumber(
     throw new Error('nextEmployeeNumber must run inside a transaction — its lock ends with one');
   }
 
-  await em
-    .getConnection()
-    .execute(
-      'select pg_advisory_xact_lock(?::int4, hashtext(?))',
-      [EMPLOYEE_NUMBER_LOCK, organizationId],
-      'run',
-      transaction,
-    );
+  await lockAdvisory(em, EMPLOYEE_NUMBER_LOCK, organizationId);
 
   const existing = await em.find(
     User,

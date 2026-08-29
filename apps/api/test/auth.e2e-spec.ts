@@ -181,11 +181,24 @@ describe('Auth (e2e)', () => {
       expect(rotated.body.accessToken).toEqual(expect.any(String));
       expect(refreshCookie(rotated)).not.toBe(firstCookie);
 
-      // Replaying the spent token is treated as a leak.
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set('Cookie', firstCookie)
-        .expect(401);
+      // Replaying the spent token is treated as a leak — and outside the grace
+      // window that forgives a second tab of the same browser rotating first, the
+      // whole family dies with it: the successor the replay was minted from no
+      // longer works either.
+      process.env.REFRESH_REPLAY_GRACE_MS = '0';
+      try {
+        await request(app.getHttpServer())
+          .post('/api/auth/refresh')
+          .set('Cookie', firstCookie)
+          .expect(401);
+
+        await request(app.getHttpServer())
+          .post('/api/auth/refresh')
+          .set('Cookie', refreshCookie(rotated))
+          .expect(401);
+      } finally {
+        delete process.env.REFRESH_REPLAY_GRACE_MS;
+      }
     });
 
     it('refuses to refresh without a cookie', async () => {

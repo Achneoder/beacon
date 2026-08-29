@@ -25,6 +25,7 @@ import {
   type WorkScheduleSummary,
 } from '@beacon/shared';
 import { localDate, offsetMinutes, resolveTimezone } from '../../common/time/zone.js';
+import { lockAdvisory } from '../../common/db/advisory-lock.js';
 import { AbsencesService } from '../absences/absences.service.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { User } from '../users/user.entity.js';
@@ -50,6 +51,9 @@ export interface Caller {
   /** True when the caller holds `attendance:approve` — they may read everyone. */
   canApprove: boolean;
 }
+
+/** Namespace for the correction decide lock — see {@link lockAdvisory}. */
+const CORRECTION_DECIDE_LOCK = 20_260_006;
 
 @Injectable()
 export class AttendanceService {
@@ -318,6 +322,10 @@ export class AttendanceService {
   /**
    * Approving writes the change through — the request is the audit trail, and an
    * approval that left the timesheet untouched would be a lie on the screen.
+   *
+   * The status transition and the timesheet write serialize on an advisory lock:
+   * two concurrent approvals would otherwise both pass the pending check and write
+   * the change through twice — two entries for one approved correction.
    */
   async decideCorrection(
     caller: Caller,
@@ -325,35 +333,43 @@ export class AttendanceService {
     approved: boolean,
     note?: string | null,
   ): Promise<CorrectionSummary> {
-    const correction = await this.em.findOne(
-      AttendanceCorrection,
-      { id: correctionId, organization: caller.organizationId },
-      { populate: ['user', 'approver', 'entry'] },
-    );
-    if (!correction) throw new NotFoundException('correction not found');
-    if (correction.status !== 'pending') {
-      throw new BadRequestException('that request has already been decided');
-    }
-    if (correction.user.id === caller.id) {
-      throw new ForbiddenException('you cannot decide your own correction');
-    }
+    const decided = await this.em.transactional(async (em) => {
+      await lockAdvisory(em, CORRECTION_DECIDE_LOCK, correctionId);
 
-    correction.status = approved ? 'approved' : 'rejected';
-    correction.decidedAt = new Date();
-    correction.decidedBy = this.em.getReference(User, caller.id, { wrapped: true });
-    correction.decisionNote = note ?? null;
-
-    if (approved) await this.applyCorrection(correction);
-
-    await this.em.flush();
-    if (approved) {
-      await this.recomputeBalance(
-        { ...caller, id: correction.user.id },
-        correction.localDate,
+      const correction = await em.findOne(
+        AttendanceCorrection,
+        { id: correctionId, organization: caller.organizationId },
+        { populate: ['user', 'approver', 'entry'] },
       );
+      if (!correction) throw new NotFoundException('correction not found');
+      if (correction.status !== 'pending') {
+        throw new BadRequestException('that request has already been decided');
+      }
+      if (correction.user.id === caller.id) {
+        throw new ForbiddenException('you cannot decide your own correction');
+      }
+
+      correction.status = approved ? 'approved' : 'rejected';
+      correction.decidedAt = new Date();
+      correction.decidedBy = em.getReference(User, caller.id, { wrapped: true });
+      correction.decisionNote = note ?? null;
+
+      if (approved) await this.applyCorrection(em, correction);
+
+      await em.flush();
+
+      return {
+        summary: toCorrectionSummary(correction),
+        localDate: correction.localDate,
+        userId: correction.user.id,
+      };
+    });
+
+    if (approved) {
+      await this.recomputeBalance({ ...caller, id: decided.userId }, decided.localDate);
     }
 
-    return toCorrectionSummary(correction);
+    return decided.summary;
   }
 
   /** The schedule, as the Profile screen's *Work model* card reads it. */
@@ -366,11 +382,11 @@ export class AttendanceService {
 
   // ---------------------------------------------------------------- internals
 
-  private async applyCorrection(correction: AttendanceCorrection): Promise<void> {
+  private async applyCorrection(em: EntityManager, correction: AttendanceCorrection): Promise<void> {
     const entry = correction.entry?.getEntity() ?? null;
 
     if (correction.kind === 'remove') {
-      if (entry) this.em.remove(entry);
+      if (entry) em.remove(entry);
       return;
     }
 
@@ -382,11 +398,11 @@ export class AttendanceService {
       // The requested break total replaces whatever was recorded: an amendment
       // restates the day rather than patching individual pauses.
       entry.breaks.removeAll();
-      this.addBreakOfMinutes(correction, entry);
+      this.addBreakOfMinutes(em, correction, entry);
       return;
     }
 
-    const added = this.em.create(AttendanceEntry, {
+    const added = em.create(AttendanceEntry, {
       organization: correction.organization,
       user: correction.user,
       startedAt: correction.startedAt!,
@@ -396,7 +412,7 @@ export class AttendanceService {
       note: correction.reason,
       approvalStatus: 'approved',
     });
-    this.addBreakOfMinutes(correction, added);
+    this.addBreakOfMinutes(em, correction, added);
   }
 
   /**
@@ -404,11 +420,15 @@ export class AttendanceService {
    * when last Tuesday's lunch started. It is materialised at the front of the entry
    * so the minutes are subtracted exactly once.
    */
-  private addBreakOfMinutes(correction: AttendanceCorrection, entry: AttendanceEntry): void {
+  private addBreakOfMinutes(
+    em: EntityManager,
+    correction: AttendanceCorrection,
+    entry: AttendanceEntry,
+  ): void {
     if (correction.breakMinutes <= 0) return;
 
     const startedAt = correction.startedAt!;
-    this.em.create(BreakEntry, {
+    em.create(BreakEntry, {
       organization: correction.organization,
       entry: ref(entry),
       startedAt,

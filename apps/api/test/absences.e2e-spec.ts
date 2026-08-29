@@ -561,4 +561,53 @@ describe('Absence (e2e)', () => {
         .expect(403);
     });
   });
+
+  /**
+   * The races the read-then-write flows above must not lose. Two requests fired in
+   * the same instant are the honest simulation of a double-click, and each pair has
+   * exactly one winner by construction — the advisory locks the service takes make
+   * the second one observe the first.
+   */
+  describe('concurrent writes', () => {
+    it('lets one of two requests over the same days through', async () => {
+      const day = shift(THIS_MONDAY, 98);
+
+      const [left, right] = await Promise.all([
+        http()
+          .post('/api/absences')
+          .set(as(otherToken))
+          .send({ typeId: vacationTypeId, startsOn: day, endsOn: shift(day, 2) }),
+        http()
+          .post('/api/absences')
+          .set(as(otherToken))
+          .send({ typeId: vacationTypeId, startsOn: day, endsOn: shift(day, 2) }),
+      ]);
+
+      // The overlap check and the insert are atomic: one wins, the other is refused.
+      expect([left.status, right.status].sort()).toEqual([201, 400]);
+    });
+
+    it('commits the days once when two approvals arrive together', async () => {
+      const day = shift(THIS_MONDAY, 105);
+      const created = await http()
+        .post('/api/absences')
+        .set(as(otherToken))
+        .send({ typeId: vacationTypeId, startsOn: day, endsOn: day })
+        .expect(201);
+
+      const before = await balanceFor(otherToken, yearOf(day));
+
+      const [left, right] = await Promise.all([
+        http().post(`/api/absences/${created.body.id}/approve`).set(as(ownerToken)).send({}),
+        http().post(`/api/absences/${created.body.id}/approve`).set(as(ownerToken)).send({}),
+      ]);
+
+      // Exactly one approval lands; the other loses on the pending check — and the
+      // quota moved by exactly the one day, not twice.
+      expect([left.status, right.status].sort()).toEqual([201, 400]);
+
+      const after = await balanceFor(otherToken, yearOf(day));
+      expect(after.takenDays).toBe(before.takenDays + 1);
+    });
+  });
 });
