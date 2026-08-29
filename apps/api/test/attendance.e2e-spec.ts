@@ -330,4 +330,97 @@ describe('Attendance (e2e)', () => {
       await http().get('/api/attendance/me/today').expect(401);
     });
   });
+  /**
+   * The desktop client's case: a machine that suspends may sleep before its clock-out
+   * lands, so the entry has to be closable at an instant that has already passed —
+   * replayed on resume. Runs last, and on the owner, so the timesheet expectations
+   * above are undisturbed.
+   */
+  describe('a backdated clock-out', () => {
+    it('closes the entry at the instant the client names', async () => {
+      const started = await http()
+        .post('/api/attendance/clock-in')
+        .set(as(ownerToken))
+        .send({ source: 'desktop' })
+        .expect(201);
+
+      const startedAt = new Date(started.body.since!);
+      // A minute after the clock-in and safely in the past: what a laptop that went to
+      // sleep a minute in and woke up much later would replay.
+      const at = new Date(startedAt.getTime() + 60_000);
+
+      const response = await http()
+        .post('/api/attendance/clock-out')
+        .set(as(ownerToken))
+        .send({ at: at.toISOString() })
+        .expect(201);
+
+      expect(response.body.state).toBe('out');
+
+      const work = response.body.segments.find(
+        (segment: { kind: string }) => segment.kind === 'work',
+      );
+      expect(work.endedAt).toBe(at.toISOString());
+      expect(work.source).toBe('desktop');
+      // One minute of work banked, not the hours the machine spent asleep.
+      expect(response.body.workedMinutes).toBe(1);
+    });
+
+    it('closes a running break at the same instant', async () => {
+      const started = await http()
+        .post('/api/attendance/clock-in')
+        .set(as(ownerToken))
+        .send({ source: 'desktop' })
+        .expect(201);
+
+      await http().post('/api/attendance/breaks/start').set(as(ownerToken)).expect(201);
+
+      const at = new Date(new Date(started.body.since!).getTime() + 60_000);
+      const response = await http()
+        .post('/api/attendance/clock-out')
+        .set(as(ownerToken))
+        .send({ at: at.toISOString() })
+        .expect(201);
+
+      expect(response.body.state).toBe('out');
+      expect(
+        response.body.segments.every((segment: { endedAt: string | null }) => segment.endedAt),
+      ).toBe(true);
+    });
+
+    it('refuses an instant in the future, or one before the clock-in', async () => {
+      const started = await http()
+        .post('/api/attendance/clock-in')
+        .set(as(ownerToken))
+        .send({ source: 'desktop' })
+        .expect(201);
+
+      const startedAt = new Date(started.body.since!);
+
+      await http()
+        .post('/api/attendance/clock-out')
+        .set(as(ownerToken))
+        .send({ at: new Date(Date.now() + 3_600_000).toISOString() })
+        .expect(400);
+
+      await http()
+        .post('/api/attendance/clock-out')
+        .set(as(ownerToken))
+        .send({ at: new Date(startedAt.getTime() - 1_000).toISOString() })
+        .expect(400);
+
+      // A date is not an instant — read as midnight UTC it would discard the day.
+      await http()
+        .post('/api/attendance/clock-out')
+        .set(as(ownerToken))
+        .send({ at: '2026-08-29' })
+        .expect(400);
+
+      // The entry is still open: a refused clock-out changes nothing.
+      const today = await http().get('/api/attendance/me/today').set(as(ownerToken)).expect(200);
+      expect(today.body.state).toBe('in');
+
+      await http().post('/api/attendance/clock-out').set(as(ownerToken)).expect(201);
+    });
+  });
 });
