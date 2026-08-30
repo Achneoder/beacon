@@ -8,8 +8,9 @@ Follows `docs/review-2026-08-29.md`, whose highs and mediums are fixed; its open
 not repeated here except where this pass sharpens the severity. **2 high · 4 medium ·
 6 low.**
 
-**All highs and mediums fixed 2026-08-30**; the lows remain open. Each fix is recorded
-under its finding.
+**All findings fixed 2026-08-30.** Each fix is recorded under its finding. One half of
+finding 6 is deliberately left open and says so — it needs a product decision rather than
+a patch.
 
 ## High
 
@@ -251,31 +252,57 @@ caller neither approves for nor manages.
 
 ## Low
 
-- [ ] **Query-string ids are not validated.** `userId`/`categoryId` reach MikroORM as raw
+- [x] **Query-string ids are not validated.** `userId`/`categoryId` reach MikroORM as raw
   strings — `documents.controller.ts:52-60`, `attendance.controller.ts:57-85`,
   `absences.controller.ts:43-56, 98-108, 135-141` — while every path param uses
   `ParseUUIDPipe`. A malformed value surfaces as a Postgres `invalid input syntax for
   type uuid` 500 rather than a 400.
-- [ ] **No `Cache-Control: no-store` on PII responses.** Nothing in `configureApp`
+  *Fix:* `OptionalUuidPipe` (`common/http/`) on every id query param. Absent, empty and
+  blank all still read as "not filtering", which is what they already meant — every
+  service tests `if (filter.userId)`, so `?userId=` was ignored rather than refused, and
+  a 400 there would break a caller that works today. That tolerance is why it is its own
+  pipe rather than `ParseUUIDPipe({ optional: true })`, which exempts only null and
+  undefined.
+- [x] **No `Cache-Control: no-store` on PII responses.** Nothing in `configureApp`
   (`main.ts:14-21`) sets it, so payslip lists, people records and absence reasons are
   heuristically cacheable by intermediaries and by the browser's disk cache — an
   on-premise app on shared workstations is exactly where that matters.
-- [ ] **`webBaseUrl()` falls back to `CORS_ORIGIN`, which is a list.**
+  *Fix:* folded into the `securityHeaders` middleware below. Every response is either
+  personal data or a redirect, so there is no case that wants an exception.
+- [x] **`webBaseUrl()` falls back to `CORS_ORIGIN`, which is a list.**
   `invitations.service.ts:231-234` and `sso-auth.controller.ts:72-78` both do
   `WEB_BASE_URL ?? CORS_ORIGIN`, but `main.ts:32-36` splits `CORS_ORIGIN` on commas. A
   deployment with two allowed origins and no `WEB_BASE_URL` emails a malformed accept
   link and 302s SSO to a malformed target.
-- [ ] **JWT algorithms not pinned** (`jwt.strategy.ts:22-27`) — still open from
+  *Fix:* `common/config/web-origins.ts` owns both the split and the fallback, and all
+  three callers use it, so they cannot drift again. The fallback takes the first origin —
+  a convenience for the single-origin case, not a second way to configure two: an
+  installation serving the SPA from several origins has to name the one an emailed link
+  should use, and `WEB_BASE_URL` is how.
+- [x] **JWT algorithms not pinned** (`jwt.strategy.ts:22-27`) — still open from
   `docs/review-2026-08-29.md:189`. Not exploitable today (`jsonwebtoken` restricts a
   string secret to HMAC, so `alg: none` is rejected), but `algorithms: ['HS256']` is one
   line of drift defence.
-- [ ] **Refresh cookie `Secure` off by default, `SameSite=none` accepted without it**
-  (`refresh-cookie.ts:20-30`) — still open from `docs/review-2026-08-29.md:187`. Fold into
-  finding 3's production guard: `none` without `secure` is a configuration a browser will
-  refuse anyway, so it should fail at boot rather than at runtime.
-- [ ] **No security headers on API responses** (`main.ts:14-21`) — still open from
+  *Fix:* pinned on both sides — `algorithms: ['HS256']` on the verifier and
+  `algorithm: 'HS256'` in `auth.module.ts`'s sign options, so signer and verifier are
+  never free to disagree.
+- [x] **Refresh cookie `Secure` off by default, `SameSite=none` accepted without it**
+  (`refresh-cookie.ts:20-30`) — still open from `docs/review-2026-08-29.md:187`.
+  *Fix:* two locks. `assertProductionConfig` (finding 3) refuses the boot when
+  `AUTH_COOKIE_SECURE` is not `"true"` or `SameSite=none` is set without it, so an
+  operator who meant it insecurely is told rather than quietly overridden; and
+  `baseOptions` now defaults `secure` on under `NODE_ENV=production` and cannot be turned
+  off there by configuration, for any path that reaches the cookie without passing the
+  boot check.
+- [x] **No security headers on API responses** (`main.ts:14-21`) — still open from
   `docs/review-2026-08-29.md:190`. Low for a JSON-only API, but `X-Content-Type-Options`
   and `Referrer-Policy` are free.
+  *Fix:* `securityHeaders` (`common/http/`) sets `no-store`, `nosniff`, `DENY`,
+  `no-referrer`, a `default-src 'none'` CSP, and HSTS only over TLS. Written out rather
+  than pulling in Helmet: Helmet's defaults are tuned for an app that serves HTML, and
+  several of them either do nothing here or get in the way of a browser SPA on another
+  origin calling this API. `Referrer-Policy` earns its place — the SSO callback carries
+  `state` and `code` in its URL, which a `Referer` would otherwise pass onward.
 
 ## Verified clean
 
