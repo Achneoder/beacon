@@ -14,15 +14,23 @@ export function cookieName(config: ConfigService): string {
  * Dev runs web on :5173 and the API on :3000 — cross-origin but same-site, so a Lax
  * cookie is sent. A deployment that splits the two across registrable domains must set
  * AUTH_COOKIE_SAME_SITE=none and AUTH_COOKIE_SECURE=true.
+ *
+ * `secure` is on by default in production and can only be turned *on* by configuration,
+ * never off: this is the 30-day credential the whole session hangs from, and shipping it
+ * in the clear is not a deployment choice worth honouring. `assertProductionConfig`
+ * (`main.ts`) refuses the boot outright when AUTH_COOKIE_SECURE is not "true", so an
+ * operator who meant it insecurely is told rather than quietly overridden — this is the
+ * second lock, for any path that reaches the cookie without going through that check.
  */
 function baseOptions(config: ConfigService): CookieOptions {
   const sameSite = (config.get<string>('AUTH_COOKIE_SAME_SITE') ?? 'lax').toLowerCase();
+  const production = config.get<string>('NODE_ENV') === 'production';
 
   return {
     httpOnly: true,
     path: COOKIE_PATH,
     sameSite: (SAME_SITE.has(sameSite) ? sameSite : 'lax') as CookieOptions['sameSite'],
-    secure: config.get<string>('AUTH_COOKIE_SECURE') === 'true',
+    secure: production || config.get<string>('AUTH_COOKIE_SECURE') === 'true',
     domain: config.get<string>('AUTH_COOKIE_DOMAIN') || undefined,
   };
 }

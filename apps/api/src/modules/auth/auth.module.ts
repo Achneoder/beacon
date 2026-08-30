@@ -28,6 +28,9 @@ import { JwtStrategy } from './jwt.strategy.js';
         // env string, so it can only be validated at runtime.
         signOptions: {
           expiresIn: (config.get<string>('JWT_EXPIRES_IN') ?? '15m') as `${number}m`,
+          // Matches the pin in `jwt.strategy.ts` — signer and verifier must never be
+          // free to disagree about which algorithms are acceptable.
+          algorithm: 'HS256',
         },
       }),
     }),

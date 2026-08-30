@@ -24,6 +24,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: config.getOrThrow<string>('JWT_SECRET'),
+      // Pinned rather than inferred. `jsonwebtoken` already restricts a string secret
+      // to the HMAC family, so `alg: none` was never accepted — this is drift defence:
+      // the day `JWT_SECRET` becomes a key object or a JWKS, an unpinned verifier would
+      // silently widen to whatever that key type allows.
+      algorithms: ['HS256'],
     });
   }
 
