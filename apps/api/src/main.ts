@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
+import { parseOriginList } from './common/config/web-origins.js';
+import { securityHeaders } from './common/http/security-headers.js';
 
 /**
  * Shared by bootstrap() and the e2e suites, so tests exercise the same prefix, CORS,
@@ -19,6 +21,7 @@ export function configureApp(app: INestApplication): INestApplication {
     origin: corsOrigins(),
     credentials: true,
   });
+  app.use(securityHeaders);
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
@@ -37,10 +40,7 @@ export function configureApp(app: INestApplication): INestApplication {
  * than start as the open-by-default server this used to be.
  */
 function corsOrigins(): string[] | false {
-  const origins = (process.env.CORS_ORIGIN ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const origins = parseOriginList(process.env.CORS_ORIGIN);
 
   if (origins.length === 0) {
     if (process.env.NODE_ENV === 'production') {
