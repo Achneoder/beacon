@@ -12,6 +12,7 @@ import { CryptoModule } from './common/crypto/crypto.module.js';
 import { PermissionsGuard } from './common/auth/permissions.guard.js';
 import { DEFAULT_THROTTLE_LIMIT } from './common/auth/throttle.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { InstanceModule } from './modules/instance/instance.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard.js';
 import { OrganizationModule } from './modules/organizations/organization.module.js';
@@ -46,6 +47,7 @@ import { SsoModule } from './modules/sso/sso.module.js';
     // without importing this module itself.
     CryptoModule,
     HealthModule,
+    InstanceModule,
     AuthModule,
     OrganizationModule,
     UsersModule,
