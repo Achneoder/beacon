@@ -42,6 +42,22 @@ function yearOf(date: string): number {
 const TODAY = iso(new Date());
 const THIS_MONDAY = shift(TODAY, -((new Date(`${TODAY}T00:00:00Z`).getUTCDay() + 6) % 7));
 
+/** One person's absences across a calendar payload, in no particular order. */
+interface CalendarAbsence {
+  userId: string;
+  typeKey: string;
+  note: string | null;
+  decisionNote: string | null;
+  documentId: string | null;
+  documentTitle: string | null;
+}
+
+function absencesOf(calendar: { days: { absences: CalendarAbsence[] }[] }, userId: string) {
+  return calendar.days
+    .flatMap((day) => day.absences)
+    .filter((absence) => absence.userId === userId);
+}
+
 describe('Absence (e2e)', () => {
   let app: INestApplication;
   let orm: MikroORM;
@@ -428,16 +444,19 @@ describe('Absence (e2e)', () => {
     });
 
     it("keeps the requester's own reason on their own calendar", async () => {
+      // The week the "Sailing" request covers — approved above, with "Enjoy" as its
+      // decision note. THIS_MONDAY itself holds nothing of staff's, so anchoring here
+      // is what makes this assert something.
       const response = await http()
-        .get(`/api/absences/calendar?from=${THIS_MONDAY}&to=${shift(THIS_MONDAY, 6)}`)
+        .get(`/api/absences/calendar?from=${shift(THIS_MONDAY, 14)}&to=${shift(THIS_MONDAY, 18)}`)
         .set(as(staffToken))
         .expect(200);
 
-      const mine = response.body.days
-        .flatMap((day: { absences: { note: string | null }[] }) => day.absences)
-        .filter((absence: { note: string | null }) => absence.note !== null);
+      const mine = absencesOf(response.body, staffId);
 
       expect(mine.length).toBeGreaterThan(0);
+      expect(mine.some((absence) => absence.note === 'Sailing')).toBe(true);
+      expect(mine.some((absence) => absence.decisionNote === 'Enjoy')).toBe(true);
     });
 
     it('will not widen to the whole organization without holiday:approve', async () => {
@@ -543,18 +562,20 @@ describe('Absence (e2e)', () => {
      * the surface that does, and keeps it.
      */
     it("reads no one else's reason off the calendar, at any scope", async () => {
+      // Staff report to this manager, and the "Sailing" request that week carries both
+      // a note and a decision note — so there is something real to be redacted.
       for (const scope of ['team', 'organization']) {
         const response = await http()
-          .get(`/api/absences/calendar?from=${THIS_MONDAY}&to=${shift(THIS_MONDAY, 6)}&scope=${scope}`)
+          .get(
+            `/api/absences/calendar?from=${shift(THIS_MONDAY, 14)}&to=${shift(THIS_MONDAY, 18)}&scope=${scope}`,
+          )
           .set(as(managerToken))
           .expect(200);
 
-        const others = response.body.days
-          .flatMap((day: { absences: { userId: string }[] }) => day.absences)
-          .filter((absence: { userId: string }) => absence.userId !== undefined);
+        const theirs = absencesOf(response.body, staffId);
 
-        expect(others.length).toBeGreaterThan(0);
-        for (const absence of others) {
+        expect(theirs.length).toBeGreaterThan(0);
+        for (const absence of theirs) {
           // The type still colours the cell; only the reason is gone.
           expect(absence.typeKey).toEqual(expect.any(String));
           expect(absence.note).toBeNull();
