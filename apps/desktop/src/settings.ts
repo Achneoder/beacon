@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { isServerUrl } from '@beacon/shared';
 import { LANGUAGES, toLanguage, type Language } from './locales.js';
 
 /**
@@ -49,24 +50,6 @@ export function apiUrlFor(settings: Settings): string | null {
   if (!settings.serverUrl) return null;
 
   return `${trimSlash(settings.serverUrl)}/api`;
-}
-
-/**
- * Whether a string is a server address we are willing to load.
- *
- * `http` is allowed because an on-premise install on a private network is a supported
- * deployment and this is the address of the user's own employer, typed by the user —
- * but only those two schemes, so a stored `file:` or `javascript:` can never become
- * something the window navigates to.
- */
-export function isServerUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.length > 0;
-  } catch {
-    return false;
-  }
 }
 
 function trimSlash(value: string): string {

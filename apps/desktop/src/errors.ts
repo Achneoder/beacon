@@ -24,6 +24,19 @@ export class NetworkError extends Error {
   }
 }
 
+/**
+ * Something answered, but not with JSON a Beacon client can read — an HTML captive
+ * portal, a reverse proxy's own error page, a server that is not Beacon at all. Kept
+ * distinct from `NetworkError` because it is not temporary: the client heard back, it
+ * just was not from Beacon.
+ */
+export class ProtocolError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ProtocolError';
+  }
+}
+
 /** A refusal that will refuse again: retrying changes nothing. */
 export function isRefusal(error: unknown): boolean {
   return error instanceof ApiError && error.status >= 400 && error.status < 500;

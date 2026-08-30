@@ -18,12 +18,15 @@
   label { display: block; margin-bottom: .35rem; font-weight: 600; }
   input { width: 100%; padding: .55rem .7rem; border: 1px solid var(--line); border-radius: .5rem;
           background: var(--field); color: inherit; font: inherit; }
+  input:disabled, input:read-only { opacity: .65; }
   input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .actions { display: flex; gap: .5rem; margin-top: 1rem; }
   button { flex: 1; padding: .55rem .9rem; border: 1px solid transparent; border-radius: .5rem;
            background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: default; }
   button.secondary { background: transparent; border-color: var(--line); color: inherit; }
-  [role="alert"] { margin-top: .6rem; color: #c0392b; min-height: 1.4em; }
+  [role="status"] { margin: .5rem 0 0; color: var(--muted); min-height: 1.2em; font-size: .9em; }
+  [role="alert"] { margin-top: .3rem; color: #c0392b; min-height: 1.4em; }
   @media (prefers-color-scheme: dark) { [role="alert"] { color: #ff8f83; } }
 </style>
 
@@ -32,8 +35,10 @@
   <p id="intro"></p>
   <form id="form">
     <label for="url" id="label"></label>
-    <input id="url" name="url" type="url" inputmode="url" autocomplete="url"
-           placeholder="https://beacon.example.com" aria-describedby="message" required />
+    <input id="url" name="url" type="text" inputmode="url" autocomplete="url"
+           autocapitalize="none" spellcheck="false"
+           placeholder="beacon.example.com" aria-describedby="status message" required />
+    <p id="status" role="status" aria-live="polite"></p>
     <p id="message" role="alert"></p>
     <div class="actions">
       <button type="submit" id="submit"></button>
@@ -45,19 +50,33 @@
 <script>
   const form = document.getElementById('form');
   const field = document.getElementById('url');
+  const status = document.getElementById('status');
   const message = document.getElementById('message');
   const secondary = document.getElementById('secondary');
+  const submitButton = document.getElementById('submit');
+
+  let copy = null;
+  // Set once a probe reports the instance still needs installing: the next submit of
+  // the same address is a deliberate "continue anyway" rather than a retry.
+  let pendingConfirm = false;
 
   async function render() {
-    const copy = await window.beaconSetup.copy();
+    copy = await window.beaconSetup.copy();
 
     document.documentElement.lang = copy.language;
     document.title = copy.title;
     document.getElementById('title').textContent = copy.title;
     document.getElementById('intro').textContent = copy.intro;
     document.getElementById('label').textContent = copy.label;
-    document.getElementById('submit').textContent = copy.submit;
+    submitButton.textContent = copy.submit;
     field.value = copy.url ?? '';
+
+    if (copy.locked) {
+      // Nothing to type: the address is enforced by the organization. Only a retry —
+      // for a provisioned address that is temporarily unreachable — stays available.
+      field.readOnly = true;
+      submitButton.hidden = true;
+    }
 
     if (copy.retry) {
       secondary.hidden = false;
@@ -65,19 +84,46 @@
       secondary.onclick = () => window.beaconSetup.retry();
     }
 
-    field.focus();
-    field.select();
+    if (!copy.locked) {
+      field.focus();
+      field.select();
+    }
   }
+
+  field.addEventListener('input', () => {
+    // A changed address is a new attempt, not a continuation of the last one.
+    if (!pendingConfirm) return;
+    pendingConfirm = false;
+    if (copy) submitButton.textContent = copy.submit;
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    message.textContent = '';
+    if (copy && copy.locked) return;
 
-    const result = await window.beaconSetup.submit(field.value.trim());
-    if (!result.ok) {
-      message.textContent = result.message;
-      field.focus();
+    message.textContent = '';
+    status.textContent = copy ? copy.checking : '';
+    field.disabled = true;
+    submitButton.disabled = true;
+    form.setAttribute('aria-busy', 'true');
+
+    let result;
+    try {
+      result = await window.beaconSetup.submit(field.value.trim(), pendingConfirm);
+    } finally {
+      field.disabled = false;
+      submitButton.disabled = false;
+      form.removeAttribute('aria-busy');
+      status.textContent = '';
     }
+
+    if (result.ok) return; // the main process adopts the address and relaunches
+
+    message.textContent = result.message;
+    pendingConfirm = Boolean(result.confirm);
+    if (copy) submitButton.textContent = pendingConfirm ? copy.confirm : copy.submit;
+
+    field.focus();
   });
 
   render();

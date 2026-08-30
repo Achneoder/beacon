@@ -1,0 +1,6 @@
+{
+  "$comment": "Copy to desktop.json in the machine-level path your OS uses — /etc/beacon/desktop.json on Linux, /Library/Application Support/Beacon/desktop.json on macOS, %ProgramData%\\Beacon\\desktop.json on Windows (see CLAUDE.md, ## Desktop) — to give every install on this machine a server address without anyone typing it in. BEACON_SERVER_URL in the environment does the same without a file. The address is still verified before it is ever used: a wrong or unreachable value falls back to the connect screen, pre-filled, rather than failing silently. Set locked to true to enforce it on every launch — the connect screen and the tray's 'Change server…' item disappear entirely; leave it false to offer this only as a default a person can still change.",
+
+  "serverUrl": "https://beacon.example.com",
+  "locked": false
+}
