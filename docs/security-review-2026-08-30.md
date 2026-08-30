@@ -8,6 +8,9 @@ Follows `docs/review-2026-08-29.md`, whose highs and mediums are fixed; its open
 not repeated here except where this pass sharpens the severity. **2 high · 4 medium ·
 6 low.**
 
+**All highs and mediums fixed 2026-08-30**; the lows remain open. Each fix is recorded
+under its finding.
+
 ## High
 
 ### 1. `employee:manage` can grant any role, including `owner` — vertical privilege escalation
@@ -52,8 +55,30 @@ caller to change their own roles is worth having too, but it is the weaker half:
 subset rule is what actually closes the escalation, since granting `owner` to a colleague
 is the same breach one step removed.
 
-*Test gap:* no suite asserts this. `documents.e2e-spec.ts:321,334-336` exercises
+*Test gap:* no suite asserted this. `documents.e2e-spec.ts:321,334-336` exercises
 `POST /users/:id/roles`, but only as the owner, only to set up a fixture.
+
+*Fix (done 2026-08-30):* `assertGrantable` (`common/auth/role-grant.ts`) refuses a grant
+carrying a permission the granter does not hold, and all three paths run through it —
+`UsersService.resolveRoles` (used by `create` and `setRoles`) and
+`InvitationsService.resolveRoles`, each now taking the caller's own permission union from
+`@CurrentUser()`. The default `employee` role is checked on the same path as a named one.
+
+A plain subset rule would have been wrong: `admin` deliberately holds neither
+`attendance:write` nor `holiday:request`, both of which `employee` carries, so a strict
+subset would have stopped an admin inviting an employee — the commonest administrative
+act there is. `SELF_SERVICE_PERMISSIONS` (`packages/shared/src/permissions.ts`) exempts
+the three permissions whose every code path is scoped to the holder's own record. Widening
+that list widens what a non-owner may grant, which is why each entry carries the code
+reference that makes it self-scoped.
+
+Self-assignment needs no separate rule: under this one a caller can only hand out
+authority they already hold, so granting to themselves gains them nothing.
+
+Tests: `common/auth/role-grant.spec.ts` covers the rule, and a `role escalation` block in
+`test/people.e2e-spec.ts` drives the full chain — admin refused the owner role for
+themselves, for a colleague, by invitation and at user creation, while the default
+employee grant and a manager grant still succeed and the owner may still grant owner.
 
 ### 2. Invitation tokens are written to the application log in plaintext
 
@@ -86,11 +111,11 @@ Two things make it worse than a developer-convenience log line:
 Chained with finding 1, an admin can mint an `owner` invitation and anyone with log
 access can consume it.
 
-*Fix:* log the subject and recipient, never `text`/`html`. If seeing the body in
-development is worth keeping, gate it on an explicit opt-in
-(`MAIL_LOG_BODY=true`) that is off by default — and it is worth checking the same rule
-holds for `SmtpMailService`, which already logs only subject and recipient
-(`smtp-mail.service.ts:39`) and is the shape to copy.
+*Fix (done 2026-08-30):* `LogMailService` logs the subject and recipient only, matching
+what `SmtpMailService` already did (`smtp-mail.service.ts:39`). `MAIL_LOG_BODY=true` opts
+back in for local debugging and is off by default. Tests in
+`common/mail/log-mail.service.spec.ts` assert the token never reaches the log unless the
+flag is set, and that any value but `"true"` reads as off.
 
 ## Medium
 
@@ -109,11 +134,15 @@ outcomes on that line: blanking the value is right, but the real gap is that the
 production guard idiom and does not apply it here. `corsOrigins()` (`main.ts:31-45`)
 already throws at boot in `NODE_ENV=production` for exactly this class of mistake.
 
-*Fix:* blank `JWT_SECRET` in `.env.example` (as `SSO_ENCRYPTION_KEY` already is) **and**
-refuse to boot in production when it is absent, short, or equal to a known placeholder —
-the same shape as `corsOrigins()` and `SecretCipher`'s key-length check
-(`secret-cipher.ts:36-46`). Worth the same treatment: `AUTH_COOKIE_SECURE=false` in
-production, and `STORAGE_SECRET_KEY`/`SEARCH_API_KEY` still on their example values.
+*Fix (done 2026-08-30):* `JWT_SECRET` is blank in `.env.example`, so `getOrThrow` refuses
+a boot without one in every environment. `assertProductionConfig()` in `main.ts` adds the
+production-only half, in the same shape as `corsOrigins()`: it refuses to start when
+`JWT_SECRET` is shorter than 32 characters or is one of the published example values, when
+`AUTH_COOKIE_SECURE` is not `"true"`, when `SameSite=none` is set without it, or when
+`STORAGE_ACCESS_KEY`/`STORAGE_SECRET_KEY`/`SEARCH_API_KEY` are still on their example
+values. Placeholders are matched exactly rather than by substring, so a real secret that
+happens to contain "beacon" is not refused. Inert outside `NODE_ENV=production`, so both
+e2e suites (which run as `test` with fixed throwaway values) are untouched.
 
 ### 4. The SSO callback URL is built from the `Host` header
 
@@ -139,10 +168,13 @@ the one the IdP was configured with, and the authorization request was built wit
 input load-bearing in the one flow `CLAUDE.md` singles out as *"the one place in this
 feature a subtle mistake would be silent."*
 
-*Fix:* build the callback URL from `API_PUBLIC_URL` plus the request's query string; keep
-the header out of it entirely. While in there: `SsoService.finish` (`sso.service.ts:216-230`)
-never reads the `error`/`error_description` params an IdP returns on a denied consent, so
-a user who declines gets `invalid_token` rather than a cancellation.
+*Fix (done 2026-08-30):* `SsoService.finish` now takes the callback's `URLSearchParams`
+rather than a URL, and rebuilds the URL itself from `redirectUri()` — the same
+`API_PUBLIC_URL`-derived value the authorization request was built with and the IdP was
+registered with. No request header reaches the token exchange. `finish` also reads the
+`error` param an IdP returns on a refusal and reports `exchange_failed`, which has copy
+already, rather than letting a declined consent fall through as `invalid_token`. Covered
+in `sso.service.spec.ts`.
 
 ### 5. Rate limits key on `req.ip`, which is the reverse proxy in every real deployment
 
@@ -163,9 +195,17 @@ proxy's address for every client:
 `test/throttle.e2e-spec.ts` cannot see this — it calls the API directly, so `req.ip` is a
 real per-connection address.
 
-*Fix:* set `trust proxy` to a specific hop count or CIDR from configuration (default 0),
-document it beside `CORS_ORIGIN`, and consider keying the auth throttle on submitted email
-as well as IP so one account's failures cannot exhaust everyone's budget.
+*Fix (done 2026-08-30):* `trustProxy()` in `main.ts` reads `TRUST_PROXY` — a hop count, or
+a comma-separated list of addresses/CIDRs — and applies it to the Express instance. It
+defaults to unset (no proxy trusted), because the safe failure is a shared bucket, not a
+forgeable one: `trust proxy: true` would make `X-Forwarded-For` client-controlled and
+remove the limit outright. Documented in `.env.example` beside `CORS_ORIGIN`, with the
+warning not to set it above the number of proxies actually controlled.
+
+Still open, deliberately: keying the auth throttle on the submitted email as well as the
+IP. With `TRUST_PROXY` set correctly each client has its own bucket, which closes the
+finding; email keying is defence in depth against a distributed attempt and wants a custom
+`ThrottlerGuard`.
 
 ### 6. Absence reasons — potentially health data — go to every approver organization-wide
 
@@ -193,10 +233,21 @@ widened paths look unintended rather than considered. This is a data-minimisatio
 under GDPR Art. 5(1)(c) and Art. 9 (special-category data), not a broken access check, so
 it needs a product decision rather than a patch.
 
-*Options:* drop `note`, `decisionNote` and `documentTitle` from summaries the caller is not
-the subject of and does not directly approve; or scope the unfiltered `list` to the
-caller's reports the way the calendar's default scope already does, keeping the
-organization-wide view for `employee:manage`.
+*Fix (done 2026-08-30):* `withoutReason()` in `absences.service.ts` strips `note`,
+`decisionNote`, `documentId` and `documentTitle`, and `calendar()` applies it to every
+subject but the caller themselves — at any scope, including the organization-wide one. A
+month grid is rendered from dates, a name and a type; it never needed the free text, so
+this costs nothing and closes the widest and most casually browsed surface, the one
+`calendarSubjects` already calls "the easiest place to leak who is off sick".
+
+**`GET /absences` deliberately keeps the detail, and that half is a product decision left
+open.** It is the approvals queue: an approver cannot decide a request whose reason has
+been taken away from them, and because Beacon does not route a request to a *particular*
+approver, narrowing it to direct reports would strand every request in an organization
+that does not set managers. Narrowing it is worth doing if that is how the installation
+actually works — the options are to scope the unfiltered list to the caller's reports
+(keeping the organization-wide view for `employee:manage`), or to redact for subjects the
+caller neither approves for nor manages.
 
 ## Low
 
