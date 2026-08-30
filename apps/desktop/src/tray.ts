@@ -27,14 +27,17 @@ export class StatusTray {
     private readonly actions: TrayActions,
     private status: TrackerStatus,
     private settings: Settings,
+    /** True when an administrator has enforced the server address. */
+    private locked = false,
   ) {
     this.#tray = new Tray(icon(status));
     this.render();
   }
 
-  update(status: TrackerStatus, settings: Settings): void {
+  update(status: TrackerStatus, settings: Settings, locked = this.locked): void {
     this.status = status;
     this.settings = settings;
+    this.locked = locked;
     this.#tray.setImage(icon(status));
     this.render();
   }
@@ -80,7 +83,11 @@ export class StatusTray {
           click: (item) => this.actions.toggle('stopOnLock', item.checked),
         },
         { type: 'separator' },
-        { label: label('tray.changeServer'), click: this.actions.changeServer },
+        // An enforced server address is not something the tray offers to change —
+        // there is nothing here for the user to do about it.
+        ...(this.locked
+          ? []
+          : [{ label: label('tray.changeServer'), click: this.actions.changeServer }]),
         { label: label('tray.quit'), click: this.actions.quit },
       ]),
     );

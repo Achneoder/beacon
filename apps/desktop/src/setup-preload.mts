@@ -14,17 +14,29 @@ export interface SetupCopy {
   intro: string;
   label: string;
   submit: string;
+  checking: string;
+  confirm: string;
   retry: string | null;
   url: string | null;
+  /** True when the address is enforced and the field must not be editable. */
+  locked: boolean;
 }
 
 export interface SetupResult {
   ok: boolean;
   message: string;
+  /**
+   * The address answered, but the instance still needs to be installed. Not an error:
+   * the screen relabels its button and asks for one more click before adopting it, so
+   * a person does not silently register themselves as the owner of the wrong company's
+   * fresh install.
+   */
+  confirm?: boolean;
 }
 
 contextBridge.exposeInMainWorld('beaconSetup', {
   copy: (): Promise<SetupCopy> => ipcRenderer.invoke('setup:copy'),
-  submit: (url: string): Promise<SetupResult> => ipcRenderer.invoke('setup:submit', url),
+  submit: (url: string, confirmed?: boolean): Promise<SetupResult> =>
+    ipcRenderer.invoke('setup:submit', url, confirmed),
   retry: (): Promise<void> => ipcRenderer.invoke('setup:retry'),
 });

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /**
@@ -78,6 +78,19 @@ export class FileOutbox implements OutboxPort {
 
 export function outboxPath(userData: string): string {
   return join(userData, 'outbox.json');
+}
+
+/**
+ * Drops everything owed to a server the user is leaving.
+ *
+ * `settings.json` holds one server at a time, and `outbox.json` is not namespaced by
+ * server — so a clock-out recorded against one installation, replayed against another
+ * after a `changeServer`, would close an entry that is not the one it was recorded
+ * for, at an instant from a different machine's timeline. That is worse than the data
+ * loss of simply discarding it.
+ */
+export function clearOutbox(path: string): void {
+  rmSync(path, { force: true });
 }
 
 function read(path: string): Persisted {

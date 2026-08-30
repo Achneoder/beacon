@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FileOutbox, outboxPath } from './outbox.js';
+import { existsSync } from 'node:fs';
+import { FileOutbox, clearOutbox, outboxPath } from './outbox.js';
 
 describe('FileOutbox', () => {
   let dir: string;
@@ -73,5 +74,35 @@ describe('FileOutbox', () => {
     writeFileSync(path, JSON.stringify({ pendingAt: 'soon', lastSeenAt: null }), 'utf8');
 
     expect(new FileOutbox(path).pending()).toBeNull();
+  });
+});
+
+describe('clearOutbox', () => {
+  let dir: string;
+  let path: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'beacon-outbox-'));
+    path = outboxPath(dir);
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('drops an owed clock-out and the heartbeat, so neither survives a server change', () => {
+    const outbox = new FileOutbox(path);
+    outbox.record(new Date('2026-08-29T17:00:00.000Z'));
+    outbox.seen(new Date('2026-08-29T17:01:00.000Z'));
+
+    clearOutbox(path);
+
+    expect(existsSync(path)).toBe(false);
+    expect(new FileOutbox(path).pending()).toBeNull();
+    expect(new FileOutbox(path).lastSeen()).toBeNull();
+  });
+
+  it('is a no-op when there is nothing to clear', () => {
+    expect(() => clearOutbox(path)).not.toThrow();
   });
 });

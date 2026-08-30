@@ -1,7 +1,11 @@
 import { net, type Session } from 'electron';
-import type { ClockOutRequest, ClockRequest, TodayStatus } from '@beacon/shared';
-import { ApiError, NetworkError } from './errors.js';
+import { isInstanceInfo, type ClockOutRequest, type ClockRequest, type InstanceInfo, type TodayStatus } from '@beacon/shared';
+import { ApiError, NetworkError, ProtocolError } from './errors.js';
 import type { ClockPort } from './tracker.js';
+import type { FetchInstanceInfo } from './discovery.js';
+
+/** A response body larger than this is not a Beacon JSON reply — stop reading it. */
+const MAX_PROBE_BODY_BYTES = 65_536;
 
 /**
  * The attendance API, called from the main process.
@@ -134,7 +138,15 @@ export class ApiClient implements ClockPort {
 
             if (status >= 400) return reject(new ApiError(status, messageOf(text, method, path)));
 
-            resolve((text ? JSON.parse(text) : undefined) as T);
+            if (!text) return resolve(undefined as T);
+
+            try {
+              resolve(JSON.parse(text) as T);
+            } catch {
+              // A 2xx that is not JSON — a captive portal, a proxy's own page, a server
+              // that answered but is not Beacon. Not a network failure: it heard back.
+              reject(new ProtocolError(`${method} ${path} did not return JSON`));
+            }
           }),
         );
       });
@@ -160,4 +172,95 @@ function messageOf(text: string, method: string, path: string): string {
   }
 
   return `${method} ${path} failed`;
+}
+
+/**
+ * One unauthenticated probe of `<apiUrl>/instance`, used only by the connect screen
+ * before a server address is ever saved. Deliberately separate from `ApiClient`:
+ *
+ * - `useSessionCookies: false` — the address is only a candidate, and it must never see
+ *   the refresh cookie of whatever server is currently configured.
+ * - No retry, no refresh, no `Authorization` header — there is no session yet.
+ * - A shorter timeout, because a person is watching the connect screen rather than a
+ *   background tracker; several candidates are tried per typed address (see
+ *   `serverCandidates` in `@beacon/shared`), so a slow default would make the worst
+ *   case a long wait for an obviously wrong address.
+ *
+ * Throws `NetworkError` when nothing answered (DNS, refused, TLS, timeout) and
+ * `ProtocolError` when something did but not with a Beacon `InstanceInfo` body — the
+ * distinction `discovery.ts` uses to tell "unreachable" from "not a Beacon server".
+ */
+export function fetchInstanceInfo(
+  apiUrl: string,
+  session: Session,
+  timeoutMs = 5_000,
+): Promise<InstanceInfo> {
+  return new Promise<InstanceInfo>((resolve, reject) => {
+    const request = net.request({
+      method: 'GET',
+      url: `${apiUrl}/instance`,
+      session,
+      useSessionCookies: false,
+      redirect: 'manual',
+    });
+
+    request.setHeader('Accept', 'application/json');
+
+    const timer = setTimeout(() => {
+      request.abort();
+      reject(new NetworkError(`GET ${apiUrl}/instance timed out`));
+    }, timeoutMs);
+    const settle = (finish: () => void) => {
+      clearTimeout(timer);
+      finish();
+    };
+
+    request.on('response', (response) => {
+      const chunks: Buffer[] = [];
+      let bytes = 0;
+      let overflowed = false;
+
+      response.on('data', (chunk: Buffer) => {
+        bytes += chunk.length;
+        if (bytes > MAX_PROBE_BODY_BYTES) {
+          overflowed = true;
+          request.abort();
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on('error', (error: Error) => settle(() => reject(new NetworkError(error.message))));
+      response.on('end', () =>
+        settle(() => {
+          if (overflowed) return reject(new ProtocolError(`GET ${apiUrl}/instance sent too much`));
+
+          const text = Buffer.concat(chunks).toString('utf8');
+
+          try {
+            const body: unknown = text ? JSON.parse(text) : null;
+
+            if (!isInstanceInfo(body)) {
+              return reject(new ProtocolError(`${apiUrl} did not answer as a Beacon API`));
+            }
+
+            resolve(body);
+          } catch {
+            reject(new ProtocolError(`${apiUrl} did not return JSON`));
+          }
+        }),
+      );
+    });
+
+    request.on('error', (error) => settle(() => reject(new NetworkError(error.message))));
+    request.on('abort', () =>
+      settle(() => reject(new NetworkError(`GET ${apiUrl}/instance aborted`))),
+    );
+
+    request.end();
+  });
+}
+
+/** `fetchInstanceInfo` bound to a session, matching the `FetchInstanceInfo` port `discovery.ts` expects. */
+export function instanceProbe(session: Session, timeoutMs?: number): FetchInstanceInfo {
+  return (apiUrl: string) => fetchInstanceInfo(apiUrl, session, timeoutMs);
 }

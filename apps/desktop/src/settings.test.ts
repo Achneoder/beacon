@@ -5,26 +5,13 @@ import { join } from 'node:path';
 import {
   DEFAULT_SETTINGS,
   apiUrlFor,
-  isServerUrl,
   readSettings,
   settingsPath,
   writeSettings,
 } from './settings.js';
 
-describe('isServerUrl', () => {
-  it('accepts https, and http for an install on a private network', () => {
-    expect(isServerUrl('https://beacon.example.com')).toBe(true);
-    expect(isServerUrl('http://beacon.internal:8080')).toBe(true);
-  });
-
-  it('refuses anything that is not the web', () => {
-    // A stored `file:` or `javascript:` must never become something the window loads.
-    expect(isServerUrl('file:///etc/passwd')).toBe(false);
-    expect(isServerUrl('javascript:alert(1)')).toBe(false);
-    expect(isServerUrl('beacon.example.com')).toBe(false);
-    expect(isServerUrl('')).toBe(false);
-  });
-});
+// isServerUrl now lives in @beacon/shared (packages/shared/src/instance.test.ts) —
+// desktop is not the only client that needs to validate a typed address.
 
 describe('apiUrlFor', () => {
   it('derives the API from the server, so setup is one field', () => {
@@ -73,6 +60,17 @@ describe('readSettings', () => {
 
   it('round-trips what was written', () => {
     const settings = { ...DEFAULT_SETTINGS, serverUrl: 'https://beacon.example.com', autoTrack: false };
+    writeSettings(path, settings);
+
+    expect(readSettings(path)).toEqual(settings);
+  });
+
+  it('round-trips an explicit apiUrl for a deployment that splits it from serverUrl', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      serverUrl: 'https://beacon.example.com',
+      apiUrl: 'https://api.example.com',
+    };
     writeSettings(path, settings);
 
     expect(readSettings(path)).toEqual(settings);

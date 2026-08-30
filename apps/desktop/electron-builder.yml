@@ -17,6 +17,14 @@ files:
 # pnpm's store is symlinked, which electron-builder cannot follow into a package.
 nodeGypRebuild: false
 
+# Lets an administrator hand out a beacon://connect?url=… link instead of the address
+# itself. On Linux this needs the desktop entry's MimeType spelled out explicitly —
+# electron-builder's own coverage of this key is strongest on mac and NSIS — so check
+# the packaged .desktop file carries `MimeType=x-scheme-handler/beacon;` when releasing.
+protocols:
+  - name: Beacon
+    schemes: [beacon]
+
 mac:
   category: public.app-category.productivity
   icon: assets/icon.png
