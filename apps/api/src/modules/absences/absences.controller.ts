@@ -20,6 +20,7 @@ import type {
 } from '@beacon/shared';
 import { ABSENCE_STATUSES } from '@beacon/shared';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
+import { optionalUuid } from '../../common/http/optional-uuid.pipe.js';
 import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { AbsencesService, type Caller, type CalendarFilter } from './absences.service.js';
 import { CreateAbsenceDto } from './dto/create-absence.dto.js';
@@ -44,7 +45,7 @@ export class AbsencesController {
   @RequirePermissions('attendance:read')
   list(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('userId') userId?: string,
+    @Query('userId', optionalUuid) userId?: string,
     @Query('status') status?: string,
     @Query('mine') mine?: string,
   ): Promise<AbsenceRequestSummary[]> {
@@ -101,7 +102,7 @@ export class AbsencesController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('userId') userId?: string,
+    @Query('userId', optionalUuid) userId?: string,
     @Query('scope') scope?: string,
   ): Promise<AbsenceCalendar> {
     return this.absences.calendar(callerOf(user), { from, to, userId, scope: toScope(scope) });
@@ -136,7 +137,7 @@ export class AbsencesController {
   @RequirePermissions('employee:read')
   balance(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('userId') userId?: string,
+    @Query('userId', optionalUuid) userId?: string,
     @Query('year') year?: string,
   ): Promise<LeaveBalanceSummary> {
     return this.absences.balanceOf(callerOf(user), userId, toYear(year));
