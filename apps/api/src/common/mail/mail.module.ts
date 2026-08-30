@@ -16,7 +16,7 @@ import { SmtpMailService } from './smtp-mail.service.js';
       provide: MailService,
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>
-        config.get<string>('MAIL_HOST') ? new SmtpMailService(config) : new LogMailService(),
+        config.get<string>('MAIL_HOST') ? new SmtpMailService(config) : new LogMailService(config),
     },
   ],
   exports: [MailService],
