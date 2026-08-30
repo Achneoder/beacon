@@ -448,6 +448,25 @@ describe('Absence (e2e)', () => {
     });
   });
 
+  describe('a malformed id', () => {
+    /**
+     * Path params have always gone through ParseUUIDPipe; query params went straight to
+     * MikroORM, where a bad uuid reaches Postgres and comes back as a 500. A bad id is
+     * a client bug and deserves a 400 — see `OptionalUuidPipe`.
+     */
+    it('is a 400, not a 500 from Postgres', async () => {
+      await http().get('/api/absences?userId=not-a-uuid').set(as(staffToken)).expect(400);
+      await http()
+        .get(`/api/absences/calendar?userId=%27%20or%201%3D1--`)
+        .set(as(staffToken))
+        .expect(400);
+    });
+
+    it('still reads an empty value as no filter at all, the way it always did', async () => {
+      await http().get('/api/absences?userId=').set(as(staffToken)).expect(200);
+    });
+  });
+
   describe('reading someone else', () => {
     it('is refused to a peer', async () => {
       await http().get(`/api/absences?userId=${otherId}`).set(as(staffToken)).expect(403);

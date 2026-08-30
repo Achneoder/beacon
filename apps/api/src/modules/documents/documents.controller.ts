@@ -26,6 +26,7 @@ import {
   type DocumentVersionSummary,
 } from '@beacon/shared';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
+import { optionalUuid } from '../../common/http/optional-uuid.pipe.js';
 import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { DocumentsService, type DocumentCaller } from './documents.service.js';
 import { DocumentFilePipe, type UploadedDocumentFile } from './document-file.pipe.js';
@@ -53,8 +54,8 @@ export class DocumentsController {
   @RequirePermissions('document:read')
   list(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('categoryId') categoryId?: string,
-    @Query('userId') userId?: string,
+    @Query('categoryId', optionalUuid) categoryId?: string,
+    @Query('userId', optionalUuid) userId?: string,
   ): Promise<DocumentSummary[]> {
     return this.documents.list(callerOf(user), { categoryId, userId });
   }
@@ -90,7 +91,7 @@ export class DocumentsController {
   download(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('versionId') versionId?: string,
+    @Query('versionId', optionalUuid) versionId?: string,
   ): Promise<DocumentDownload> {
     return this.documents.download(callerOf(user), id, versionId);
   }

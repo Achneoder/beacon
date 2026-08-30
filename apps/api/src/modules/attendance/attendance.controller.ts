@@ -8,6 +8,7 @@ import type {
   WorkScheduleSummary,
 } from '@beacon/shared';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
+import { optionalUuid } from '../../common/http/optional-uuid.pipe.js';
 import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { AttendanceService, type Caller } from './attendance.service.js';
 import { ClockDto, ClockOutDto } from './dto/clock.dto.js';
@@ -59,7 +60,7 @@ export class AttendanceController {
   week(
     @CurrentUser() user: AuthenticatedUser,
     @Query('offset') offset?: string,
-    @Query('userId') userId?: string,
+    @Query('userId', optionalUuid) userId?: string,
   ): Promise<TimesheetWeek> {
     return this.attendance.week(callerOf(user), toOffset(offset), userId);
   }
@@ -68,7 +69,7 @@ export class AttendanceController {
   @RequirePermissions('attendance:read')
   schedule(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('userId') userId?: string,
+    @Query('userId', optionalUuid) userId?: string,
   ): Promise<WorkScheduleSummary> {
     return this.attendance.scheduleOf(callerOf(user), userId);
   }
@@ -77,7 +78,7 @@ export class AttendanceController {
   @RequirePermissions('attendance:read')
   range(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('userId') userId?: string,
+    @Query('userId', optionalUuid) userId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ): Promise<AttendanceSegment[]> {
