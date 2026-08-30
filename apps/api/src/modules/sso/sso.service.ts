@@ -213,9 +213,20 @@ export class SsoService {
    * redirects the browser to `/login?error=` with. Never throws for an expected
    * failure — a wrong nonce or an unknown address is routine here, not exceptional.
    */
-  async finish(callbackUrl: URL, userAgent: string | undefined): Promise<SsoLoginOutcome> {
-    const state = callbackUrl.searchParams.get('state');
+  async finish(query: URLSearchParams, userAgent: string | undefined): Promise<SsoLoginOutcome> {
+    // An IdP that refused — a denied consent, an unknown client — redirects back with
+    // `error` and no code. Reading it here is what tells that apart from a response
+    // that failed verification, which used to come back as `invalid_token`.
+    if (query.get('error')) return { errorCode: 'exchange_failed' };
+
+    const state = query.get('state');
     if (!state) return { errorCode: 'invalid_state' };
+
+    // Rebuilt from configuration, never from request headers — see the callback
+    // handler in `sso-auth.controller.ts`. This is the URL `openid-client` reads the
+    // code and state out of, and the one it derives `redirect_uri` from.
+    const callbackUrl = new URL(this.redirectUri());
+    for (const [key, value] of query) callbackUrl.searchParams.append(key, value);
 
     const attempt = await this.em.findOne(
       SsoLoginAttempt,
