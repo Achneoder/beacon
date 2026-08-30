@@ -51,7 +51,7 @@ export class UsersController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateUserDto,
   ): Promise<UserDetail> {
-    return this.users.create(user.organizationId, dto);
+    return this.users.create(user.organizationId, dto, user.permissions);
   }
 
   @Get(':id')
@@ -80,7 +80,7 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetRolesDto,
   ): Promise<UserDetail> {
-    return this.users.setRoles(user.organizationId, id, dto.roleIds);
+    return this.users.setRoles(user.organizationId, id, dto.roleIds, user.permissions);
   }
 
   /**

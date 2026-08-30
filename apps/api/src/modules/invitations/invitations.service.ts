@@ -6,7 +6,9 @@ import {
   fullName,
   type CreatedInvitation,
   type InvitationSummary,
+  type Permission,
 } from '@beacon/shared';
+import { assertGrantable } from '../../common/auth/role-grant.js';
 import { Department } from '../departments/department.entity.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { Role } from '../roles/role.entity.js';
@@ -58,6 +60,7 @@ export class InvitationsService {
     organizationId: string,
     invitedById: string,
     dto: CreateInvitationDto,
+    granter: readonly Permission[],
   ): Promise<CreatedInvitation> {
     const email = dto.email.toLowerCase();
 
@@ -95,7 +98,7 @@ export class InvitationsService {
       startsOn: dto.startsOn ?? null,
     });
 
-    invitation.roles.set(await this.resolveRoles(organizationId, dto.roleIds));
+    invitation.roles.set(await this.resolveRoles(organizationId, dto.roleIds, granter));
     await this.em.flush();
     await this.em.populate(invitation, ['roles', 'invitedBy', 'organization']);
 
@@ -231,20 +234,34 @@ export class InvitationsService {
     return ref(found) as Ref<T>;
   }
 
-  private async resolveRoles(organizationId: string, roleIds?: string[]): Promise<Role[]> {
+  /**
+   * `granter` is the inviter's own permission union — an invitation carries roles onto
+   * the account it creates, so inviting is a grant like any other and gets the same
+   * `assertGrantable` check `UsersService.resolveRoles` applies. Without it, an admin
+   * who could not promote themselves directly could simply invite an owner-role account
+   * at an address they control.
+   */
+  private async resolveRoles(
+    organizationId: string,
+    roleIds: string[] | undefined,
+    granter: readonly Permission[],
+  ): Promise<Role[]> {
     if (!roleIds) {
       const fallback = await this.em.findOne(Role, {
         organization: organizationId,
         key: DEFAULT_ROLE_KEY,
       });
+      const roles = fallback ? [fallback] : [];
+      assertGrantable(granter, roles);
 
-      return fallback ? [fallback] : [];
+      return roles;
     }
 
     const roles = await this.em.find(Role, { organization: organizationId, id: { $in: roleIds } });
     if (roles.length !== new Set(roleIds).size) {
       throw new BadRequestException('one or more roles do not exist');
     }
+    assertGrantable(granter, roles);
 
     return roles;
   }

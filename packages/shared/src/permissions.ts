@@ -46,3 +46,32 @@ export const DEFAULT_ROLES = {
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type DefaultRole = keyof typeof DEFAULT_ROLES;
+
+/**
+ * Permissions whose every code path acts on the holder's own record, and which are
+ * therefore not an escalation to hand out.
+ *
+ * This exists for `assertGrantable` (`apps/api/src/common/auth/role-grant.ts`), which
+ * otherwise refuses to let a caller grant a permission they do not hold themselves. A
+ * plain subset rule would be wrong here: `admin` deliberately holds none of these —
+ * an administrator manages people, they do not clock in on someone else's behalf — so
+ * a strict subset would stop an admin handing out the default `employee` role, which
+ * is the single most common thing an administrator does.
+ *
+ * Each entry is self-scoped in code, not merely by convention:
+ * `attendance:write` clocks only `caller.id` (`attendance.controller.ts`);
+ * `holiday:request` is refused for another subject by `resolveSubject(…, writing)`
+ * (`absences.service.ts`); `document:write` needs `document:manage` before
+ * `resolveOwner` will accept an `ownerId` that is not the caller's
+ * (`documents.service.ts`). Adding to this list widens what a non-owner may grant, so
+ * a permission belongs here only once every path that reads it is self-scoped.
+ */
+export const SELF_SERVICE_PERMISSIONS = [
+  'attendance:write',
+  'holiday:request',
+  'document:write',
+] as const satisfies readonly Permission[];
+
+export function isSelfServicePermission(permission: Permission): boolean {
+  return (SELF_SERVICE_PERMISSIONS as readonly Permission[]).includes(permission);
+}

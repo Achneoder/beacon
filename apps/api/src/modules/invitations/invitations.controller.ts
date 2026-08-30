@@ -50,7 +50,7 @@ export class InvitationsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateInvitationDto,
   ): Promise<CreatedInvitation> {
-    return this.invitations.create(user.organizationId, user.id, dto);
+    return this.invitations.create(user.organizationId, user.id, dto, user.permissions);
   }
 
   @Delete(':id')

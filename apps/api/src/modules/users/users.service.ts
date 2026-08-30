@@ -4,9 +4,11 @@ import { type Ref, ref } from '@mikro-orm/core';
 import {
   fullName,
   type EmploymentFields,
+  type Permission,
   type UserDetail,
   type UserSummary,
 } from '@beacon/shared';
+import { assertGrantable } from '../../common/auth/role-grant.js';
 import { Department } from '../departments/department.entity.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { Role } from '../roles/role.entity.js';
@@ -94,7 +96,11 @@ export class UsersService {
    * dies with the transaction — see `nextEmployeeNumber`. `begin` on this `em` rather
    * than `em.transactional`, so the helpers below keep working against the same one.
    */
-  async create(organizationId: string, dto: CreateUserDto): Promise<UserDetail> {
+  async create(
+    organizationId: string,
+    dto: CreateUserDto,
+    granter: readonly Permission[],
+  ): Promise<UserDetail> {
     const email = dto.email.toLowerCase();
 
     await this.em.begin();
@@ -117,7 +123,7 @@ export class UsersService {
       });
 
       await this.applyEmployment(organizationId, user, dto);
-      user.roles.set(await this.resolveRoles(organizationId, dto.roleIds));
+      user.roles.set(await this.resolveRoles(organizationId, dto.roleIds, { granter }));
 
       await this.em.flush();
       await this.em.commit();
@@ -160,9 +166,16 @@ export class UsersService {
     return toUserDetail(user);
   }
 
-  async setRoles(organizationId: string, userId: string, roleIds: string[]): Promise<UserDetail> {
+  async setRoles(
+    organizationId: string,
+    userId: string,
+    roleIds: string[],
+    granter: readonly Permission[],
+  ): Promise<UserDetail> {
     const user = await this.findEntity(organizationId, userId);
-    user.roles.set(await this.resolveRoles(organizationId, roleIds, { allowEmpty: false }));
+    user.roles.set(
+      await this.resolveRoles(organizationId, roleIds, { allowEmpty: false, granter }),
+    );
 
     await this.em.flush();
 
@@ -268,19 +281,29 @@ export class UsersService {
     }
   }
 
-  /** Roles are per organization, so an id from elsewhere is simply not found. */
+  /**
+   * Roles are per organization, so an id from elsewhere is simply not found.
+   *
+   * `granter` is the caller's own permission union, checked by `assertGrantable` — a
+   * caller may not hand out authority they do not hold. The default `employee` role
+   * gets the same check as an explicitly named one: it is resolved by key rather than
+   * chosen by the client, but it is still a grant, and the day somebody edits what
+   * `employee` means is the day the two paths must not disagree.
+   */
   private async resolveRoles(
     organizationId: string,
     roleIds: string[] | undefined,
-    options: { allowEmpty?: boolean } = {},
+    options: { allowEmpty?: boolean; granter: readonly Permission[] },
   ): Promise<Role[]> {
     if (roleIds === undefined) {
       const fallback = await this.em.findOne(Role, {
         organization: organizationId,
         key: DEFAULT_ROLE_KEY,
       });
+      const roles = fallback ? [fallback] : [];
+      assertGrantable(options.granter, roles);
 
-      return fallback ? [fallback] : [];
+      return roles;
     }
 
     if (roleIds.length === 0 && options.allowEmpty === false) {
@@ -291,6 +314,7 @@ export class UsersService {
     if (roles.length !== new Set(roleIds).size) {
       throw new BadRequestException('one or more roles do not exist');
     }
+    assertGrantable(options.granter, roles);
 
     return roles;
   }
