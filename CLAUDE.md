@@ -68,7 +68,10 @@ a reason.
   that talks to the NestJS API over REST.
 - **The API is the only contract.** Shared types live in `packages/shared` and are imported by
   both sides as `@beacon/shared`. Never redeclare a DTO in the frontend. All HTTP goes through
-  `apps/web/src/lib/api/client.ts`.
+  `apps/web/src/lib/api/client.ts`. One type in that package is pre-auth by design —
+  `InstanceInfo` (`GET /api/instance`) is what a client checks before it even has a session, and
+  must never grow a field that identifies the tenant; see `SsoPublicState` for the one deliberate
+  exception, an IdP's own display name, not the organization's.
 - **One organization per installation.** Beacon is deployed on-premise for a single company.
   `POST /auth/register` installs the instance — organization, built-in roles, owner — and 409s
   ever after; `OrganizationService.createWithOwner` enforces that under an advisory lock, and
@@ -164,11 +167,41 @@ that a database fact rather than a convention. `apps/api/src/modules/sso/`.
 `apps/desktop` — Electron, one window and a tray, doing one thing the web app cannot: clocking
 people in and out from the machine's own lifecycle.
 
-- **The window loads the served web app.** The user types their server's address once; from then
-  on the window is `apps/web`, unmodified. There is no desktop build of the frontend and no
-  `if (desktop)` branch in it — the SPA already re-reads the clock on window focus
-  (`routes/(app)/+layout.svelte`), which is how it notices a clock-out the shell made behind it.
-  A change here should almost never need a change there.
+- **The window loads the served web app.** From the moment a server is adopted, the window is
+  `apps/web`, unmodified. There is no desktop build of the frontend and no `if (desktop)` branch
+  in it — the SPA already re-reads the clock on window focus (`routes/(app)/+layout.svelte`),
+  which is how it notices a clock-out the shell made behind it. A change here should almost never
+  need a change there.
+- **One generic build, so the address is verified, not just parsed.** Beacon is on-premise —
+  nobody rebuilds or hosts their own copy of the client — so the server is entirely a runtime
+  fact, and `isServerUrl` alone (a scheme and a hostname) was never enough to trust it. Before
+  `settings.json` gets a `serverUrl`, `discovery.ts`'s `discoverInstance` walks the candidates
+  `serverCandidates` (`@beacon/shared`) derives from whatever was typed — a bare host tries
+  `https://` first, `http://` only for something private-looking — and keeps the first that
+  answers `GET /api/instance` as `{ product: 'beacon', ... }`. Nothing is written on anything
+  less. `setupRequired: true` is accepted, not refused, and a server whose `apiVersion` is newer
+  than this build's is still adopted — refusing it would brick every client the moment an
+  administrator upgrades the server, which one generic build can never recover from on its own.
+- **An administrator can pre-seed the address.** `provisioning.ts` reads a machine-level
+  `desktop.json` (`apps/desktop/desktop.example.json` is the template) or `BEACON_SERVER_URL`,
+  used only as a *default* for an unconfigured install — a user's own already-verified choice in
+  `settings.json` wins over it — unless `"locked": true`, which enforces it every launch and
+  hides the tray's "Change server…" entirely. A provisioned address is still probed exactly like
+  a typed one before anything is built around it.
+- **A `beacon://` link is a suggestion, never a command.** `parseConnectLink` (`@beacon/shared`)
+  reads `beacon://connect?url=…`, but it only pre-fills the connect screen — the same probe still
+  runs, and only an explicit click adopts it. Any web page can navigate to a custom scheme, so an
+  emailed link must never be able to silently repoint an already-working install at an attacker's
+  server; `locked` refuses a link outright instead of prompting, since an enforced install has
+  nothing for a link to change. Never add a path that adopts a link's address without that click.
+- **Never bypass a certificate error.** There is no `certificate-error` handler, and there must
+  never be one added to get a self-signed on-prem install probing — a TLS failure should surface
+  as `unreachable`, the same as any other candidate that never answered, with the fix being to
+  install the organization's CA in the OS trust store, which Electron's `net` already reads from.
+- **A server change drops the outbox.** `outbox.json` is not namespaced per server, so a clock-out
+  or heartbeat recorded against one installation must never be replayed against another —
+  `clearOutbox` runs alongside the existing cookie clear in `setup:submit` whenever the address
+  actually changes.
 - **The main process owns the clock.** Everything worth tracking — the app closing, the machine
   sleeping, the screen locking — happens when there may be no window left to ask, and a renderer
   being torn down cannot be trusted to finish an HTTP request. `tracker.ts` is that logic, and it
@@ -179,10 +212,13 @@ people in and out from the machine's own lifecycle.
   nothing in `userData` worth stealing. Because `net` from the main process sends no `Origin`,
   **CORS is not involved and an installation needs no configuration change** to support this
   client. Never add a credential of its own; if a request needs auth, it goes through `ApiClient`.
-- **Electron stays behind ports.** `tracker.ts`, `outbox.ts`, `settings.ts` and `locales.ts` import
-  nothing from `electron`, which is what `vitest.config.ts` relies on. `api.ts`, `main.ts`,
-  `window.ts` and `tray.ts` are the only modules that may — the same containment `StorageService`,
-  `MailService` and `OidcClient` give their vendor SDKs.
+- **Electron stays behind ports.** `tracker.ts`, `outbox.ts`, `settings.ts`, `locales.ts`,
+  `discovery.ts` and `provisioning.ts` import nothing from `electron`, which is what
+  `vitest.config.ts` relies on. `api.ts`, `main.ts`, `window.ts` and `tray.ts` are the only modules
+  that may — the same containment `StorageService`, `MailService` and `OidcClient` give their
+  vendor SDKs. `discovery.ts`'s `discoverInstance` takes a `FetchInstanceInfo` function exactly as
+  `tracker.ts` takes a `ClockPort`, so the decision logic is unit-tested against a fake and only
+  `api.ts`'s `fetchInstanceInfo` touches Electron's `net`.
 - **Correctness under standby is the outbox, not luck.** The OS may sleep before a clock-out is
   sent, so `FileOutbox` writes it **synchronously, before** the request, and the tracker replays
   it on the next resume or launch *still carrying its original instant* — which is why

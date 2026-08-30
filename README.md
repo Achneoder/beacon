@@ -135,6 +135,17 @@ time. The desktop client is built; the mobile one is planned:
   awake. Automatic tracking can be switched off at any time, and clocking in and out by hand
   still works from the app or from the tray.
 
+  Beacon ships **one generic build** of the desktop client for every customer — nobody compiles
+  or hosts their own copy — so the server address is resolved entirely at runtime, and never
+  trusted until it proves itself. A person types it once, as little as `beacon.example.com`; the
+  app tries the likely candidates and only saves one that answers `GET /api/instance` as Beacon
+  (see [Backend](#backend) below). An administrator can skip that screen for their whole
+  organization by dropping `apps/desktop/desktop.example.json` (renamed `desktop.json`) into a
+  per-OS system path, or setting `BEACON_SERVER_URL`; adding `"locked": true` enforces it, hiding
+  the tray's "Change server…" entirely. A `beacon://connect?url=…` link pre-fills the same screen
+  for a one-off invite — never adopted without an explicit click, since a link is not something
+  the app can trust on its own.
+
 ### Across the application
 
 Multiple languages, with users switching based on their preference, and a notification system for
@@ -182,7 +193,10 @@ multi-tenant service. `POST /api/auth/register` is therefore a first-run install
 organization, seeds its four built-in roles and makes the caller its owner, in one transaction, and
 then refuses every later attempt with `409`. Everyone after the owner arrives by invitation.
 `GET /api/auth/setup` reports whether the instance still needs installing, so the login and register
-screens can stop offering a form that can only fail.
+screens can stop offering a form that can only fail. `GET /api/instance` answers the same question
+for the desktop (and future mobile) client, alongside a product marker and a contract version — the
+identity check a client runs against a candidate address before ever saving it, and deliberately the
+only thing an unauthenticated caller learns: never the organization's name.
 
 ### Additional services
 
