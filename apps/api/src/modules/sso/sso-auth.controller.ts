@@ -45,14 +45,21 @@ export class SsoAuthController {
    * it carries only the `HttpOnly` refresh cookie (`SameSite=Lax`, path `/api/auth`,
    * so it survives the hop), and `session.bootstrap()` trades it for an access token
    * the same way it already does on every page load.
+   *
+   * Only the *query* is taken from the request. The callback URL itself is rebuilt
+   * from `API_PUBLIC_URL` inside `SsoService`, because `openid-client` derives the
+   * `redirect_uri` it presents at the token endpoint from the URL it is handed — and
+   * this used to be reconstructed from the `Host` header, which any client sets. That
+   * made a request-controlled value load-bearing in the one flow where a subtle
+   * mistake is silent. The configured origin is the one the IdP was registered with
+   * and the one the authorization request was built with, so it is the only URL that
+   * can be right.
    */
   @Public()
   @Get('callback')
   async callback(@Req() request: Request, @Res() response: Response): Promise<void> {
-    const callbackUrl = new URL(
-      `${request.protocol}://${request.get('host')}${request.originalUrl}`,
-    );
-    const outcome = await this.sso.finish(callbackUrl, request.get('user-agent'));
+    const query = new URLSearchParams(request.originalUrl.split('?')[1] ?? '');
+    const outcome = await this.sso.finish(query, request.get('user-agent'));
     const target = this.webBaseUrl();
 
     if ('errorCode' in outcome) {

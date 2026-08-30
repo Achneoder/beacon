@@ -40,20 +40,34 @@ function buildService(findOne: FindOneImpl = () => null) {
   return { service, em, oidc, invitations, auth, organizations, cipher };
 }
 
-const CALLBACK_URL = new URL('https://api.beacon.test/api/auth/sso/callback?state=abc&code=xyz');
+/**
+ * `finish` takes the callback's *query*, not a URL: it rebuilds the URL itself from
+ * `API_PUBLIC_URL` rather than from request headers, so there is no host here to get
+ * wrong. See `SsoAuthController.callback`.
+ */
+const CALLBACK_QUERY = new URLSearchParams('state=abc&code=xyz');
 
 describe('SsoService.finish — single-use and expiry', () => {
   it('refuses when the state carries no matching attempt', async () => {
     const { service } = buildService(() => null);
 
-    expect(await service.finish(CALLBACK_URL, undefined)).toEqual({ errorCode: 'invalid_state' });
+    expect(await service.finish(CALLBACK_QUERY, undefined)).toEqual({ errorCode: 'invalid_state' });
   });
 
   it('refuses a callback with no state parameter at all', async () => {
     const { service } = buildService();
-    const url = new URL('https://api.beacon.test/api/auth/sso/callback?code=xyz');
+    const query = new URLSearchParams('code=xyz');
 
-    expect(await service.finish(url, undefined)).toEqual({ errorCode: 'invalid_state' });
+    expect(await service.finish(query, undefined)).toEqual({ errorCode: 'invalid_state' });
+  });
+
+  it('reports an IdP that refused, rather than reading it as an unverifiable token', async () => {
+    const { service, em } = buildService();
+    const query = new URLSearchParams('error=access_denied&state=abc');
+
+    expect(await service.finish(query, undefined)).toEqual({ errorCode: 'exchange_failed' });
+    // Refused before the attempt is even looked up — there is no code to exchange.
+    expect(em.findOne).not.toHaveBeenCalled();
   });
 
   it('refuses an already-consumed attempt — a replayed callback', async () => {
@@ -64,7 +78,7 @@ describe('SsoService.finish — single-use and expiry', () => {
     };
     const { service, em } = buildService((entity) => (entity === SsoLoginAttempt ? attempt : null));
 
-    expect(await service.finish(CALLBACK_URL, undefined)).toEqual({ errorCode: 'invalid_state' });
+    expect(await service.finish(CALLBACK_QUERY, undefined)).toEqual({ errorCode: 'invalid_state' });
     // Never reaches the provider lookup — a spent attempt is refused before anything else runs.
     expect(em.findOne).not.toHaveBeenCalledWith(SsoProvider, expect.anything());
   });
@@ -77,7 +91,7 @@ describe('SsoService.finish — single-use and expiry', () => {
     };
     const { service } = buildService((entity) => (entity === SsoLoginAttempt ? attempt : null));
 
-    expect(await service.finish(CALLBACK_URL, undefined)).toEqual({ errorCode: 'invalid_state' });
+    expect(await service.finish(CALLBACK_QUERY, undefined)).toEqual({ errorCode: 'invalid_state' });
   });
 
   it('consumes the attempt exactly once it is accepted for exchange', async () => {
@@ -94,7 +108,7 @@ describe('SsoService.finish — single-use and expiry', () => {
       return null;
     });
 
-    await service.finish(CALLBACK_URL, undefined);
+    await service.finish(CALLBACK_QUERY, undefined);
 
     expect(attempt.consumedAt).not.toBeNull();
   });
