@@ -85,6 +85,14 @@ a reason.
 - **Check permissions, never role names.** Roles are customizable per organization.
   Handlers declare `@RequirePermissions(...)` from `apps/api/src/common/auth/`; the permission
   union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`.
+- **You may not grant authority you do not hold.** `employee:manage` assigns roles — at user
+  creation, on an invitation, and through `POST /users/:id/roles` — so without a check it is
+  also a way to *acquire* any permission: `admin` holds it but not `organization:manage`, and
+  could have assigned itself `owner`. Every grant path runs through `assertGrantable`
+  (`common/auth/role-grant.ts`) with the caller's own permission union.
+  `SELF_SERVICE_PERMISSIONS` (`@beacon/shared`) is the exemption that keeps an admin able to
+  hand out the default `employee` role; add to it only for a permission whose every code path
+  is scoped to the holder's own record.
 - **Requests are authenticated by default.** `JwtAuthGuard` and `PermissionsGuard` are registered
   as `APP_GUARD`s in `app.module.ts`, in that order — 401 then 403. A new controller is protected
   unless it opts out with `@Public()` (`apps/api/src/modules/auth/public.decorator.ts`). Read the
@@ -127,6 +135,13 @@ Email/password and SSO over OIDC today; passkeys, social login and 2FA are plann
   `AuthService.login` is a single lookup.
 - **Web guards are UX only.** The redirects in `src/routes/(app)/+layout.svelte` are convenience;
   the API re-checks every request. `session.can()` decides what to *offer*, never what to allow.
+- **Production configuration fails closed at boot.** `assertProductionConfig` in `main.ts`
+  refuses to start under `NODE_ENV=production` on a short or example `JWT_SECRET`, a refresh
+  cookie that is not `Secure`, or example storage/search credentials — the same shape as
+  `corsOrigins()`. `.env.example` is a file people copy, so every value in it is public.
+  Rate limits key on `req.ip`, so a deployment behind a proxy must set `TRUST_PROXY` to the
+  number of hops it controls; never `true`, which makes `X-Forwarded-For` client-controlled
+  and removes the limit outright.
 
 ## SSO
 
@@ -247,6 +262,10 @@ Invitations are emailed; every other notification will follow the same path.
 - **`MailService` is the seam** (`apps/api/src/common/mail/`). `SmtpMailService` is chosen at boot
   when `MAIL_HOST` is set, `LogMailService` otherwise — so a deployment without a relay still
   works, and a bad host fails at startup rather than silently per message.
+- **A message body is never logged.** An invitation body carries the accept link, and that
+  link carries the raw token — a live credential, stored only as a digest precisely so it
+  cannot be re-read. `LogMailService` logs subject and recipient only; `MAIL_LOG_BODY=true`
+  opts back in for local debugging and belongs nowhere near real invitations.
 - **`send` never throws.** It returns whether the message reached a transport. An invitation is
   committed before the email goes out and stays valid regardless; `CreatedInvitation.emailSent`
   is how the web app decides between "sent" and "pass the link on yourself". The accept link is
