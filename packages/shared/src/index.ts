@@ -9,3 +9,4 @@ export * from './document.js';
 export * from './search.js';
 export * from './report.js';
 export * from './sso.js';
+export * from './instance.js';
