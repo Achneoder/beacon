@@ -184,8 +184,19 @@ async function resolveServer(): Promise<{ serverUrl: string; apiUrl: string } | 
     return null;
   }
 
+  // A freshly enforced `locked` address can differ from whatever this machine was
+  // already pointed at — the same "different installation" case `setup:submit`
+  // guards against, so it gets the same cleanup: the old server's session cookie and
+  // any clock-out or heartbeat owed to it must not survive the switch.
+  const changed = outcome.serverUrl !== settings.serverUrl || outcome.apiUrl !== settings.apiUrl;
+
   settings = { ...settings, serverUrl: outcome.serverUrl, apiUrl: outcome.apiUrl };
   writeSettings(store.settings(), settings);
+
+  if (changed) {
+    await session.defaultSession.clearStorageData({ storages: ['cookies'] });
+    clearOutbox(store.outbox());
+  }
 
   return { serverUrl: outcome.serverUrl, apiUrl: outcome.apiUrl };
 }
@@ -281,7 +292,10 @@ function registerSetupHandlers(): void {
         checking: t(language, 'setup.checking'),
         confirm: t(language, 'setup.confirm'),
         retry: provisionFailure ? t(language, 'error.retry') : null,
-        url: settings.serverUrl,
+        // A first launch under a locked provisioning that failed its probe has no
+        // `settings.serverUrl` yet — the address the screen shows is the one that was
+        // actually tried, not whatever (possibly null) settings happens to hold.
+        url: provisionFailure ? provisionFailure.url : settings.serverUrl,
         locked: true,
       };
     }
