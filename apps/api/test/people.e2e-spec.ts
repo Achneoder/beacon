@@ -16,6 +16,7 @@ const RUN = Date.now().toString(36);
 const ORG_NAME = `People ${RUN}`;
 const OWNER_EMAIL = `owner.${RUN}@people.test`;
 const INVITEE_EMAIL = `newcomer.${RUN}@people.test`;
+const ADMIN_EMAIL = `admin.${RUN}@people.test`;
 const PASSWORD = 'correct-horse-battery';
 
 describe('People (e2e)', () => {
@@ -317,6 +318,141 @@ describe('People (e2e)', () => {
         .get('/api/users/me')
         .set({ Authorization: `Bearer ${invitee.body.accessToken}` })
         .expect(200);
+    });
+  });
+  /**
+   * `employee:manage` is what lets a caller assign roles. Before `assertGrantable` it
+   * was also, transitively, a way to *acquire* any permission in the system: the
+   * built-in `admin` role holds `employee:manage` but deliberately not
+   * `organization:manage`, and nothing stopped an admin reading the owner role's id
+   * off `GET /organizations/current/roles` and assigning it to themselves.
+   *
+   * Asserted end to end rather than only in `role-grant.spec.ts`, because the guard
+   * being *reached* by all three grant paths is the half a unit test cannot show.
+   */
+  describe('role escalation', () => {
+    let adminToken: string;
+    let ownerRoleId: string;
+    let adminRoleId: string;
+    let managerRoleId: string;
+    let victimId: string;
+
+    const asAdmin = () => ({ Authorization: `Bearer ${adminToken}` });
+
+    beforeAll(async () => {
+      const roles = await request(app.getHttpServer())
+        .get('/api/organizations/current/roles')
+        .set(auth())
+        .expect(200);
+
+      const idOf = (key: string) =>
+        roles.body.find((role: { key: string }) => role.key === key).id as string;
+      ownerRoleId = idOf('owner');
+      adminRoleId = idOf('admin');
+      managerRoleId = idOf('manager');
+
+      // An admin account with a real password, so the escalation is attempted with a
+      // token carrying exactly the admin permission union.
+      const invitation = await request(app.getHttpServer())
+        .post('/api/invitations')
+        .set(auth())
+        .send({
+          email: ADMIN_EMAIL,
+          firstName: 'Admin',
+          lastName: 'User',
+          roleIds: [adminRoleId],
+        })
+        .expect(201);
+
+      const accepted = await request(app.getHttpServer())
+        .post('/api/invitations/accept')
+        .send({ token: invitation.body.token, password: PASSWORD })
+        .expect(201);
+
+      adminToken = accepted.body.accessToken;
+      expect(accepted.body.user.permissions).not.toContain('organization:manage');
+
+      const victim = await request(app.getHttpServer())
+        .post('/api/users')
+        .set(auth())
+        .send({ email: `victim.${RUN}@people.test`, firstName: 'Vic', lastName: 'Timm' })
+        .expect(201);
+      victimId = victim.body.id;
+    });
+
+    it('refuses an admin the owner role for themselves', async () => {
+      const me = await request(app.getHttpServer()).get('/api/users/me').set(asAdmin()).expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/users/${me.body.id}/roles`)
+        .set(asAdmin())
+        .send({ roleIds: [ownerRoleId] })
+        .expect(403);
+    });
+
+    it('refuses an admin the owner role for somebody else', async () => {
+      // The same breach one step removed — granting it to a colleague they control.
+      await request(app.getHttpServer())
+        .post(`/api/users/${victimId}/roles`)
+        .set(asAdmin())
+        .send({ roleIds: [ownerRoleId] })
+        .expect(403);
+    });
+
+    it('refuses an owner-role invitation from an admin', async () => {
+      await request(app.getHttpServer())
+        .post('/api/invitations')
+        .set(asAdmin())
+        .send({
+          email: `backdoor.${RUN}@people.test`,
+          firstName: 'Back',
+          lastName: 'Door',
+          roleIds: [ownerRoleId],
+        })
+        .expect(403);
+    });
+
+    it('refuses an owner-role user created by an admin', async () => {
+      await request(app.getHttpServer())
+        .post('/api/users')
+        .set(asAdmin())
+        .send({
+          email: `sideways.${RUN}@people.test`,
+          firstName: 'Side',
+          lastName: 'Ways',
+          roleIds: [ownerRoleId],
+        })
+        .expect(403);
+    });
+
+    it('still lets an admin create a user with the default employee role', async () => {
+      // The case a plain subset rule would have broken: `admin` holds neither
+      // attendance:write nor holiday:request, both of which `employee` carries.
+      const response = await request(app.getHttpServer())
+        .post('/api/users')
+        .set(asAdmin())
+        .send({ email: `ordinary.${RUN}@people.test`, firstName: 'Or', lastName: 'Dinary' })
+        .expect(201);
+
+      expect(response.body.roles.map((role: { key: string }) => role.key)).toEqual(['employee']);
+    });
+
+    it('still lets an admin grant manager — authority they already hold', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/users/${victimId}/roles`)
+        .set(asAdmin())
+        .send({ roleIds: [managerRoleId] })
+        .expect(201);
+    });
+
+    it('lets the owner grant the owner role', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/users/${victimId}/roles`)
+        .set(auth())
+        .send({ roleIds: [ownerRoleId] })
+        .expect(201);
+
+      expect(response.body.roles.map((role: { key: string }) => role.key)).toEqual(['owner']);
     });
   });
 });
