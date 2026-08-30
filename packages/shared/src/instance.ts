@@ -98,13 +98,26 @@ export function serverCandidates(raw: string): ServerCandidate[] {
 
   if (trimmed.length === 0) return [];
   if (SCHEME_WITH_AUTHORITY.test(trimmed) && !/^https?:\/\//i.test(trimmed)) return [];
-  if (!SCHEME_WITH_AUTHORITY.test(trimmed) && OPAQUE_SCHEME.test(trimmed)) return [];
+
+  // A bare IPv6 literal (`::1`, `fe80::1`) needs square brackets to be a valid URL
+  // authority — `https://${trimmed}` would otherwise build something `new URL()`
+  // rejects outright, silently dropping every candidate for an address the private-
+  // host rules below explicitly mean to allow. Checked before the opaque-scheme
+  // rejection: a hextet that happens to start with a letter (`fe80::1`) has exactly
+  // the shape `OPAQUE_SCHEME` looks for — `word:` followed by something that is not a
+  // digit — so without this, an address is treated as a `fe80:`-schemed URI instead of
+  // the private IPv6 host it actually is.
+  const bareIpv6 = !SCHEME_WITH_AUTHORITY.test(trimmed) && isIpv6Literal(trimmed);
+
+  if (!bareIpv6 && !SCHEME_WITH_AUTHORITY.test(trimmed) && OPAQUE_SCHEME.test(trimmed)) return [];
+
+  const host = bareIpv6 ? `[${trimmed}]` : trimmed;
 
   const origins = SCHEME_WITH_AUTHORITY.test(trimmed)
     ? [trimmed]
     : isPrivateHost(trimmed)
-      ? [`https://${trimmed}`, `http://${trimmed}`]
-      : [`https://${trimmed}`];
+      ? [`https://${host}`, `http://${host}`]
+      : [`https://${host}`];
 
   const candidates: ServerCandidate[] = [];
 
@@ -123,11 +136,40 @@ export function serverCandidates(raw: string): ServerCandidate[] {
   return dedupe(candidates);
 }
 
+/**
+ * A bare (unbracketed, unscheduled) IPv6 literal — `::1`, `fe80::1`, `2001:db8::1`. Two
+ * or more colons is what tells it apart from a `host:port` pair, which only ever has
+ * one; `OPAQUE_SCHEME`/`SCHEME_WITH_AUTHORITY` have already ruled out an actual scheme
+ * by this point.
+ */
+function isIpv6Literal(value: string): boolean {
+  return /^[0-9a-f:]+$/i.test(value) && value.split(':').length > 2;
+}
+
+function isPrivateIpv6(address: string): boolean {
+  return (
+    address === '::1' ||
+    address === '::' ||
+    /^fe[89ab]/.test(address) || // link-local, fe80::/10
+    /^f[cd]/.test(address) // unique local, fc00::/7
+  );
+}
+
 function isPrivateHost(originOrHost: string): boolean {
-  const host = originOrHost.replace(SCHEME_WITH_AUTHORITY, '').split(/[/:]/)[0]?.toLowerCase() ?? '';
+  const stripped = originOrHost.replace(SCHEME_WITH_AUTHORITY, '');
+
+  // A bracketed IPv6 host inside a full origin (`https://[::1]:8080`), or a bare
+  // literal with no scheme or brackets at all (`::1`) — the `:`/`/` split below would
+  // otherwise tear an IPv6 address itself apart, since it uses `:` as its own
+  // separator.
+  const bracketed = /^\[([0-9a-f:]+)\]/i.exec(stripped);
+  const ipv6 = bracketed ? bracketed[1] : isIpv6Literal(stripped) ? stripped : null;
+  if (ipv6) return isPrivateIpv6(ipv6.toLowerCase());
+
+  const host = stripped.split(/[/:]/)[0]?.toLowerCase() ?? '';
 
   if (host.length === 0) return false;
-  if (host === 'localhost' || host === '::1') return true;
+  if (host === 'localhost') return true;
   if (/\.(local|internal|home\.arpa)$/.test(host)) return true;
   if (!host.includes('.') && !/^\d+$/.test(host)) return true; // a bare intranet name
 

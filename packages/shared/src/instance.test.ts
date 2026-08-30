@@ -88,6 +88,28 @@ describe('serverCandidates', () => {
     ]);
   });
 
+  it('brackets a bare IPv6 loopback literal and tries http, since it is private', () => {
+    expect(serverCandidates('::1').map((c) => c.apiUrl)).toEqual([
+      'https://[::1]/api',
+      'https://[::1]',
+      'http://[::1]/api',
+      'http://[::1]',
+    ]);
+  });
+
+  it('recognises IPv6 link-local and unique-local ranges as private too', () => {
+    expect(serverCandidates('fe80::1').map((c) => c.apiUrl)[0]).toBe('https://[fe80::1]/api');
+    expect(serverCandidates('fe80::1').length).toBe(4);
+    expect(serverCandidates('fd12:3456::1').length).toBe(4);
+  });
+
+  it('tries only https for a public-looking IPv6 literal', () => {
+    expect(serverCandidates('2001:db8::1').map((c) => c.apiUrl)).toEqual([
+      'https://[2001:db8::1]/api',
+      'https://[2001:db8::1]',
+    ]);
+  });
+
   it('respects an explicit scheme and stays https-only when https is typed', () => {
     expect(serverCandidates('https://beacon.example.com').map((c) => c.apiUrl)).toEqual([
       'https://beacon.example.com/api',

@@ -206,11 +206,18 @@ export function fetchInstanceInfo(
 
     request.setHeader('Accept', 'application/json');
 
+    let settled = false;
     const timer = setTimeout(() => {
       request.abort();
       reject(new NetworkError(`GET ${apiUrl}/instance timed out`));
     }, timeoutMs);
+    // Guards against the `abort()` calls below (overflow, timeout) also firing the
+    // `abort` event — without it, that second settle would silently overwrite an
+    // already-decided outcome with a misleading NetworkError, since a request that
+    // *answered* with too much data is not the same as one that never answered at all.
     const settle = (finish: () => void) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       finish();
     };
@@ -218,12 +225,14 @@ export function fetchInstanceInfo(
     request.on('response', (response) => {
       const chunks: Buffer[] = [];
       let bytes = 0;
-      let overflowed = false;
 
       response.on('data', (chunk: Buffer) => {
         bytes += chunk.length;
         if (bytes > MAX_PROBE_BODY_BYTES) {
-          overflowed = true;
+          // Something answered — with too much to be a Beacon `InstanceInfo` body —
+          // so this is decided the moment the limit is crossed, not deferred to
+          // whatever the subsequent `abort()` produces.
+          settle(() => reject(new ProtocolError(`GET ${apiUrl}/instance sent too much`)));
           request.abort();
           return;
         }
@@ -232,8 +241,6 @@ export function fetchInstanceInfo(
       response.on('error', (error: Error) => settle(() => reject(new NetworkError(error.message))));
       response.on('end', () =>
         settle(() => {
-          if (overflowed) return reject(new ProtocolError(`GET ${apiUrl}/instance sent too much`));
-
           const text = Buffer.concat(chunks).toString('utf8');
 
           try {
