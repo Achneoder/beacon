@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { SsoPublicState } from '@beacon/shared';
 import { PASSWORD_THROTTLE } from '../../common/auth/throttle.js';
+import { webBaseUrl } from '../../common/config/web-origins.js';
 import { Public } from '../auth/public.decorator.js';
 import { setRefreshCookie } from '../auth/refresh-cookie.js';
 import { SsoService } from './sso.service.js';
@@ -76,11 +77,9 @@ export class SsoAuthController {
     response.redirect(target);
   }
 
+  /** Where to send the browser once the callback resolves — see `webBaseUrl`, which
+   *  is careful that CORS_ORIGIN is a list rather than a single origin. */
   private webBaseUrl(): string {
-    return (
-      this.config.get<string>('WEB_BASE_URL') ??
-      this.config.get<string>('CORS_ORIGIN') ??
-      'http://localhost:5173'
-    ).replace(/\/+$/, '');
+    return webBaseUrl(this.config);
   }
 }
