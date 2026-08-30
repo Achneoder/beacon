@@ -93,6 +93,14 @@ a reason.
   `SELF_SERVICE_PERMISSIONS` (`@beacon/shared`) is the exemption that keeps an admin able to
   hand out the default `employee` role; add to it only for a permission whose every code path
   is scoped to the holder's own record.
+- **Every response carries the same headers**, set by `securityHeaders`
+  (`common/http/`) before routing: `Cache-Control: no-store` above all, because
+  everything this API returns is personal data and Beacon runs on shared workstations,
+  plus `nosniff`, `DENY`, `no-referrer`, a `default-src 'none'` CSP and HSTS over TLS.
+  Written out rather than Helmet, whose defaults are shaped for an app that serves HTML.
+  An id in a query string goes through `OptionalUuidPipe` (same directory) — path params
+  already had `ParseUUIDPipe`, and without it a malformed uuid reached Postgres and came
+  back as a 500.
 - **Requests are authenticated by default.** `JwtAuthGuard` and `PermissionsGuard` are registered
   as `APP_GUARD`s in `app.module.ts`, in that order — 401 then 403. A new controller is protected
   unless it opts out with `@Public()` (`apps/api/src/modules/auth/public.decorator.ts`). Read the
