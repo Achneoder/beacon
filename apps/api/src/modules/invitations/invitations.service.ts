@@ -17,6 +17,7 @@ import { User, UserStatus } from '../users/user.entity.js';
 import { nextEmployeeNumber } from '../users/employee-number.js';
 import { PasswordService } from '../auth/password.service.js';
 import { MailService } from '../../common/mail/mail.service.js';
+import { webBaseUrl } from '../../common/config/web-origins.js';
 import { invitationEmail } from './invitation-email.js';
 import { Invitation } from './invitation.entity.js';
 import {
@@ -215,10 +216,10 @@ export class InvitationsService {
     return user;
   }
 
+  /** The invite link is followed in a browser, so it points at the SPA — see
+   *  `webBaseUrl`, which is careful that CORS_ORIGIN is a list. */
   private webBaseUrl(): string {
-    // The invite link is followed in a browser, so it points at the SPA. CORS_ORIGIN
-    // already names it; there is no second URL to configure.
-    return this.config.get<string>('WEB_BASE_URL') ?? this.config.get<string>('CORS_ORIGIN') ?? 'http://localhost:5173';
+    return webBaseUrl(this.config);
   }
 
   private async scopedRef<T extends { id: string }>(
