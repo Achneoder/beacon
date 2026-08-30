@@ -381,6 +381,10 @@ export class AbsencesService {
   /**
    * The month grid. Every day in the range is returned, weekend and holiday flags
    * included, so the client renders six rows without repeating the arithmetic.
+   *
+   * Nobody else's *reason* appears here, whatever the caller's reach — a calendar
+   * answers who is away and when, and needs the absence type to colour a cell but
+   * never the free text behind it. See `withoutReason`.
    */
   async calendar(caller: Caller, filter: CalendarFilter = {}): Promise<AbsenceCalendar> {
     const timezone = await this.timezoneOf(caller);
@@ -404,7 +408,12 @@ export class AbsencesService {
 
     const holidays = await this.listHolidays(caller.organizationId, from, to, this.em);
     const byDate = new Map(holidays.map((holiday) => [holiday.date, holiday.name]));
-    const summaries = await this.summarize(this.em, caller.organizationId, requests);
+    // Everyone but the caller comes back without a reason — see `withoutReason`. The
+    // approvals queue (`list`) is unaffected; it is the surface where the reason is
+    // the point.
+    const summaries = await this.summarize(this.em, caller.organizationId, requests, {
+      redactFor: caller.id,
+    });
 
     const days: CalendarDay[] = datesBetween(from, to).map((date) => ({
       date,
@@ -586,6 +595,7 @@ export class AbsencesService {
     em: EntityManager,
     organizationId: string,
     requests: AbsenceRequest[],
+    options: { redactFor?: string } = {},
   ): Promise<AbsenceRequestSummary[]> {
     if (requests.length === 0) return [];
 
@@ -593,7 +603,13 @@ export class AbsencesService {
     const to = requests.reduce((last, r) => (r.endsOn > last ? r.endsOn : last), requests[0].endsOn);
     const holidays = await this.holidayDates(em, organizationId, from, to);
 
-    return requests.map((request) => toAbsenceSummary(request, holidays));
+    return requests.map((request) => {
+      const summary = toAbsenceSummary(request, holidays);
+
+      return options.redactFor !== undefined && request.user.id !== options.redactFor
+        ? withoutReason(summary)
+        : summary;
+    });
   }
 
   /**
@@ -783,6 +799,26 @@ export class AbsencesService {
 
     return organization?.timezone ?? 'UTC';
   }
+}
+
+/**
+ * The same absence, minus everything that says *why*.
+ *
+ * `note` is free text the requester wrote to explain an absence, `decisionNote` is the
+ * approver's reply to it, and `documentTitle` is the filename of an attached sick note
+ * — in an application that exists partly to store those. Under GDPR that is
+ * special-category data (Art. 9) and the minimisation rule (Art. 5(1)(c)) applies:
+ * a month grid is rendered from dates, a name and a type, and never needs the rest.
+ *
+ * Applied to the calendar for every subject but the caller themselves, including for
+ * an approver reading the organization-wide scope — the widest and most casually
+ * browsed view in the app, and the one `calendarSubjects` already calls "the easiest
+ * place to leak who is off sick". `GET /absences` deliberately keeps the detail: that
+ * is the approvals queue, and an approver cannot decide a request whose reason has
+ * been taken away from them.
+ */
+function withoutReason(summary: AbsenceRequestSummary): AbsenceRequestSummary {
+  return { ...summary, note: null, decisionNote: null, documentId: null, documentTitle: null };
 }
 
 /** Half days are the only fraction, so two decimals of slack is plenty. */

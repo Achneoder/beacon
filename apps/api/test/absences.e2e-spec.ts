@@ -427,6 +427,19 @@ describe('Absence (e2e)', () => {
       expect(names.every((id: string) => id === staffId)).toBe(true);
     });
 
+    it("keeps the requester's own reason on their own calendar", async () => {
+      const response = await http()
+        .get(`/api/absences/calendar?from=${THIS_MONDAY}&to=${shift(THIS_MONDAY, 6)}`)
+        .set(as(staffToken))
+        .expect(200);
+
+      const mine = response.body.days
+        .flatMap((day: { absences: { note: string | null }[] }) => day.absences)
+        .filter((absence: { note: string | null }) => absence.note !== null);
+
+      expect(mine.length).toBeGreaterThan(0);
+    });
+
     it('will not widen to the whole organization without holiday:approve', async () => {
       await http()
         .get(`/api/absences/calendar?scope=organization`)
@@ -502,6 +515,46 @@ describe('Absence (e2e)', () => {
         .get(`/api/absences/calendar?from=${THIS_MONDAY}&to=${shift(THIS_MONDAY, 6)}&scope=team`)
         .set(as(managerToken))
         .expect(200);
+    });
+
+    /**
+     * A calendar answers who is away and when. The free text behind an absence — and
+     * the title of any sick note attached to it — is special-category data under GDPR
+     * Art. 9, and rendering a month grid never needed it. The approvals queue below is
+     * the surface that does, and keeps it.
+     */
+    it("reads no one else's reason off the calendar, at any scope", async () => {
+      for (const scope of ['team', 'organization']) {
+        const response = await http()
+          .get(`/api/absences/calendar?from=${THIS_MONDAY}&to=${shift(THIS_MONDAY, 6)}&scope=${scope}`)
+          .set(as(managerToken))
+          .expect(200);
+
+        const others = response.body.days
+          .flatMap((day: { absences: { userId: string }[] }) => day.absences)
+          .filter((absence: { userId: string }) => absence.userId !== undefined);
+
+        expect(others.length).toBeGreaterThan(0);
+        for (const absence of others) {
+          // The type still colours the cell; only the reason is gone.
+          expect(absence.typeKey).toEqual(expect.any(String));
+          expect(absence.note).toBeNull();
+          expect(absence.decisionNote).toBeNull();
+          expect(absence.documentId).toBeNull();
+          expect(absence.documentTitle).toBeNull();
+        }
+      }
+    });
+
+    it('still reads the reason in the queue it decides', async () => {
+      const response = await http().get('/api/absences').set(as(managerToken)).expect(200);
+
+      const withReason = response.body.filter(
+        (absence: { userId: string; note: string | null }) =>
+          absence.userId === staffId && absence.note !== null,
+      );
+
+      expect(withReason.length).toBeGreaterThan(0);
     });
 
     it('reads the absence types, because every screen tags a day with one', async () => {
