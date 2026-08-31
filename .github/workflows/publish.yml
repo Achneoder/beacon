@@ -25,6 +25,11 @@ jobs:
     permissions:
       contents: read
       # The only write this workflow needs: pushing to ghcr.io. GITHUB_TOKEN carries it.
+      #
+      # Visibility is a property of the *package*, not of this workflow: GHCR publishes
+      # every new package private, whatever the repository's own visibility, and the
+      # flip to public is a one-time manual step per package (and is irreversible).
+      # There is no API or workflow input for it. See infra/DEPLOYMENT.md.
       packages: write
     strategy:
       fail-fast: false

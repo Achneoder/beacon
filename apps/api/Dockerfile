@@ -44,6 +44,16 @@ RUN pnpm --filter api build
 # runtime — production dependencies only, plus the two dist/ trees
 # ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION} AS runtime
+
+# Links the published package to this repository, which is what lets GitHub show the
+# source alongside the image and grants the workflow's GITHUB_TOKEN the right to push
+# to it. metadata-action sets the same label in CI; having it here keeps a locally
+# built image linked too.
+LABEL org.opencontainers.image.source="https://github.com/Achneoder/beacon" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.title="beacon-api" \
+      org.opencontainers.image.description="Beacon API — attendance, holidays, people and documents"
+
 ENV CI=true ELECTRON_SKIP_BINARY_DOWNLOAD=1 NODE_ENV=production
 WORKDIR /app
 RUN corepack enable

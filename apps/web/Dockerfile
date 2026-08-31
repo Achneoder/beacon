@@ -41,6 +41,12 @@ ENV PUBLIC_API_URL=${PUBLIC_API_URL}
 RUN pnpm --filter web build
 
 FROM nginxinc/nginx-unprivileged:${NGINX_VERSION} AS runtime
+
+LABEL org.opencontainers.image.source="https://github.com/Achneoder/beacon" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.title="beacon-web" \
+      org.opencontainers.image.description="Beacon web client — the SvelteKit SPA, served as static files"
+
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY apps/web/docker-entrypoint.sh /usr/local/bin/beacon-entrypoint.sh
 # uid 101 is the unprivileged image's nginx user, and it has to be able to rewrite
