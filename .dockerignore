@@ -1,0 +1,31 @@
+# Build context for both images is the repository root — the pnpm workspace is the
+# unit that installs, so apps/api cannot be its own context. Keep everything that is
+# rebuilt inside the image out of the context, or a stale local dist ships instead.
+**/node_modules
+**/dist
+**/build
+**/.svelte-kit
+**/coverage
+**/*.tsbuildinfo
+
+.git
+.github
+.claude
+docs
+infra
+
+# Never let a developer's real secrets into a layer.
+**/.env
+**/.env.*
+!**/.env.example
+
+# The desktop app is packaged by hand, per OS, and neither image copies its sources —
+# but its manifest stays in the context, because `--frozen-lockfile` checks the
+# lockfile against every workspace package's package.json, desktop included.
+apps/desktop/src
+apps/desktop/assets
+
+**/playwright-report
+**/test-results
+**/*.log
+.DS_Store
