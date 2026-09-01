@@ -281,7 +281,7 @@ describe('Auth (e2e)', () => {
 
     it('seeds the four built-in roles', async () => {
       const response = await request(app.getHttpServer())
-        .get('/api/organizations/current/roles')
+        .get('/api/roles')
         .set('authorization', `Bearer ${accessToken}`)
         .expect(200);
 

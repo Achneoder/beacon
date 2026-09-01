@@ -332,7 +332,7 @@ describe('Documents (e2e)', () => {
 
       // Roles are read fresh from the database, not from the token — moving Cleo back
       // to the default employee role takes effect on her very next request.
-      const roles = await http().get('/api/organizations/current/roles').set(as(ownerToken)).expect(200);
+      const roles = await http().get('/api/roles').set(as(ownerToken)).expect(200);
       const employeeRoleId = roles.body.find((r: { key: string }) => r.key === 'employee').id;
       await http().post(`/api/users/${c.id}/roles`).set(as(ownerToken)).send({ roleIds: [employeeRoleId] }).expect(201);
 

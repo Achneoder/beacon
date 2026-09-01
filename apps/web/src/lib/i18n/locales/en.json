@@ -171,6 +171,97 @@
 		"manager": "Manager",
 		"employee": "Employee"
 	},
+	"permission": {
+		"group": {
+			"organization": "Organization",
+			"employee": "People",
+			"attendance": "Attendance",
+			"holiday": "Time off",
+			"document": "Documents",
+			"report": "Reports"
+		},
+		"organization": {
+			"read": "See organization settings",
+			"manage": "Change organization settings"
+		},
+		"employee": {
+			"read": "See other people",
+			"manage": "Add and edit people"
+		},
+		"attendance": {
+			"read": "See attendance",
+			"write": "Clock in and out",
+			"approve": "Decide corrections"
+		},
+		"holiday": {
+			"request": "Request time off",
+			"approve": "Decide time-off requests"
+		},
+		"document": {
+			"read": "See documents",
+			"write": "Upload documents",
+			"manage": "Manage every document"
+		},
+		"report": {
+			"read": "See reports"
+		},
+		"hint": {
+			"organization": {
+				"read": "Read the organization, its departments, roles and absence types.",
+				"manage": "Edit those settings, roles and single sign-on included. It is the permission that reaches this screen."
+			},
+			"employee": {
+				"read": "Open the people directory and other people's profiles.",
+				"manage": "Invite, edit and deactivate people, and assign them roles."
+			},
+			"attendance": {
+				"read": "See other people's clock-ins and timesheets.",
+				"write": "Clock in, clock out and take breaks. Always only for oneself.",
+				"approve": "Decide the correction requests that come from the people they manage."
+			},
+			"holiday": {
+				"request": "Ask for time off. Always only for oneself.",
+				"approve": "Decide the time-off requests that come from the people they manage."
+			},
+			"document": {
+				"read": "Open the documents shared with them.",
+				"write": "Upload documents, and edit their own.",
+				"manage": "See, share and delete every document in the organization, whoever it belongs to."
+			},
+			"report": {
+				"read": "Open the attendance and absence reports, and export them."
+			}
+		}
+	},
+	"roleSettings": {
+		"kicker": "Organization",
+		"title": "Roles",
+		"intro": "A role is a named bundle of permissions. Nothing in Beacon checks a role by name, so add the roles your organization actually needs instead of stretching a built-in one.",
+		"tokenNote": "A permission change reaches someone when their session next refreshes, within fifteen minutes.",
+		"readOnly": "You can see the roles, but changing them needs permission to manage the organization.",
+		"back": "Back to settings",
+		"newRole": "New role",
+		"name": "Role name",
+		"permissions": "Permissions",
+		"noPermissions": "This role grants nothing on its own.",
+		"create": "Create role",
+		"save": "Save role",
+		"saving": "Saving…",
+		"cancel": "Cancel",
+		"edit": "Edit",
+		"delete": "Delete",
+		"created": "Role created.",
+		"saved": "Role saved.",
+		"deleted": "Role deleted.",
+		"customized": "Edited",
+		"builtInName": "A built-in role keeps its name, which Beacon translates. Its permissions are yours to change.",
+		"ownerLocked": "The owner role always holds every permission, so an administrator can never be locked out.",
+		"notEditable": "This role holds permissions you do not have, so it is not yours to change.",
+		"cannotGrant": "You do not hold this permission, so you cannot put it in a role.",
+		"inUse": "{count, plural, one {# person holds this role} other {# people hold this role}}",
+		"unused": "Nobody holds this role",
+		"deleteBlocked": "Give those people another role before deleting this one."
+	},
 	"profile": {
 		"kicker": "Your account",
 		"title": "Profile",
@@ -284,7 +375,9 @@
 		"members": "{count, plural, one {# member} other {# members}}",
 		"delete": "Delete",
 		"roles": "Roles",
-		"rolesHint": "Built-in roles cannot be edited yet. A role editor arrives with the manager screens.",
+		"rolesHint": "A role is a named bundle of permissions. Beacon checks permissions, never role names.",
+		"rolesManage": "Manage roles",
+		"rolesView": "See the roles",
 		"systemRole": "Built-in",
 		"permissionCount": "{count, plural, one {# permission} other {# permissions}}",
 		"absenceTypes": "Absence types",
@@ -303,7 +396,11 @@
 		"noHolidays": "No public holidays for this year yet.",
 		"ssoTitle": "Single sign-on",
 		"ssoHint": "Let people sign in through your identity provider instead of a Beacon password.",
-		"ssoManage": "Manage single sign-on"
+		"ssoManage": "Manage single sign-on",
+		"attendance": "Time tracking",
+		"attendanceHint": "How a change to a day that is already closed is handled.",
+		"selfApprove": "Let people correct their own timesheet without approval",
+		"selfApproveHint": "On, a correction someone raises for themselves applies straight away and is recorded against their own name. Off, it waits for their manager."
 	},
 	"timesheet": {
 		"kicker": "Time tracking",
@@ -334,7 +431,15 @@
 		"send": "Send request",
 		"sending": "Sending…",
 		"cancel": "Cancel",
-		"requestSent": "Your correction request has been sent."
+		"requestSent": "Your correction request has been sent.",
+		"lockedSelfApprove": "This week is closed, but your own corrections still apply straight away.",
+		"correctDay": "Correct a day",
+		"correctTitle": "Correct a day",
+		"correctHint": "Your change applies straight away. Say what the day should have been and why.",
+		"reasonHintSelf": "Kept on the record, and visible to your manager.",
+		"apply": "Apply correction",
+		"applying": "Applying…",
+		"correctionApplied": "Your correction has been applied."
 	},
 	"approvals": {
 		"kicker": "Time tracking",

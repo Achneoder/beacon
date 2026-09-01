@@ -20,6 +20,7 @@
 		listHolidays,
 		retireAbsenceType
 	} from '$lib/api/absences';
+	import { listRoles } from '$lib/api/roles';
 	import { reindexSearch } from '$lib/api/search';
 	import { timezoneGroups } from '$lib/time/zone';
 	import { formatDate, toneOf, typeName } from '$lib/absence/labels';
@@ -37,6 +38,17 @@
 	let saving = $state(false);
 	let saved = $state(false);
 	let saveErrorKey = $state<string | null>(null);
+
+	/**
+	 * The one attendance policy an administrator can move: whether a person's own
+	 * timesheet correction applies straight away or waits for their manager. It saves
+	 * on its own rather than riding the General form — it is a rule about what other
+	 * people may do, not a fallback like the language or the zone.
+	 */
+	let selfApproveCorrections = $state(false);
+	let savingPolicy = $state(false);
+	let policySaved = $state(false);
+	let policyErrorKey = $state<string | null>(null);
 
 	let newDepartment = $state('');
 	let departmentErrorKey = $state<string | null>(null);
@@ -74,7 +86,8 @@
 			name = organization.name;
 			timezone = organization.timezone;
 			defaultLocale = organization.defaultLocale;
-			roles = await api<RoleSummary[]>('/organizations/current/roles');
+			selfApproveCorrections = organization.selfApproveCorrections;
+			roles = await listRoles();
 			departments = await listDepartments();
 			absenceTypes = await listAllAbsenceTypes();
 			holidays = await listHolidays(`${year}-01-01`, `${year}-12-31`);
@@ -105,6 +118,24 @@
 			saveErrorKey = errorKey(error);
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function savePolicy(event: SubmitEvent) {
+		event.preventDefault();
+		savingPolicy = true;
+		policyErrorKey = null;
+		policySaved = false;
+
+		try {
+			organization = await apiSend<OrganizationSummary>('/organizations/current', 'PATCH', {
+				selfApproveCorrections
+			});
+			policySaved = true;
+		} catch (error) {
+			policyErrorKey = errorKey(error);
+		} finally {
+			savingPolicy = false;
 		}
 	}
 
@@ -246,6 +277,40 @@
 
 			<Button type="submit" variant="primary" size="sm" class="self-start" disabled={saving}>
 				{saving ? $_('settings.saving') : $_('settings.save')}
+			</Button>
+		</form>
+	</Card>
+
+	<Card variant="panel" as="section" class="mt-6">
+		<h2 class="text-sm font-bold">{$_('settings.attendance')}</h2>
+		<p class="mt-1 text-xs text-ink-muted">{$_('settings.attendanceHint')}</p>
+
+		<form class="mt-5 flex flex-col gap-4" onsubmit={savePolicy} novalidate>
+			{#if policySaved}
+				<Alert tone="success" live="status">{$_('settings.saved')}</Alert>
+			{/if}
+			{#if policyErrorKey}
+				<Alert tone="warning">{$_(policyErrorKey)}</Alert>
+			{/if}
+
+			<div class="flex items-start gap-2.5">
+				<input
+					id="settings-self-approve"
+					type="checkbox"
+					class="mt-1"
+					aria-describedby="settings-self-approve-hint"
+					bind:checked={selfApproveCorrections}
+				/>
+				<label for="settings-self-approve" class="text-sm font-semibold">
+					{$_('settings.selfApprove')}
+				</label>
+			</div>
+			<p id="settings-self-approve-hint" class="pl-[26px] text-xs text-ink-muted">
+				{$_('settings.selfApproveHint')}
+			</p>
+
+			<Button type="submit" variant="primary" size="sm" class="self-start" disabled={savingPolicy}>
+				{savingPolicy ? $_('settings.saving') : $_('settings.save')}
 			</Button>
 		</form>
 	</Card>
@@ -415,6 +480,10 @@
 				</li>
 			{/each}
 		</ul>
+
+		<Button size="sm" class="mt-5" href="/settings/roles">
+			{session.can('organization:manage') ? $_('settings.rolesManage') : $_('settings.rolesView')}
+		</Button>
 	</Card>
 
 	<Card variant="panel" as="section" class="mt-6">

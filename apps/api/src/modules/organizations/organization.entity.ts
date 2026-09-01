@@ -7,9 +7,13 @@ import { BaseEntity } from '../../common/entities/base.entity.js';
  *
  * Property types are always declared explicitly — the CLI runs through tsx/esbuild, which
  * does not emit decorator metadata, so reflection-based inference is unavailable.
+ *
+ * `selfApproveCorrections` is named optional so `em.create` does not demand it —
+ * registration has no opinion on the setting, and the column's `false` default is
+ * the answer until an administrator says otherwise.
  */
 @Entity({ tableName: 'organizations' })
-export class Organization extends BaseEntity {
+export class Organization extends BaseEntity<'selfApproveCorrections'> {
   @Property({ type: 'string', length: 200 })
   name!: string;
 
@@ -23,4 +27,15 @@ export class Organization extends BaseEntity {
 
   @Property({ type: 'string', length: 64, default: 'UTC' })
   timezone: string = 'UTC';
+
+  /**
+   * Whether an employee's own timesheet correction is applied on the spot instead of
+   * routing to their manager.
+   *
+   * Default false, and deliberately so: approval is the arrangement the correction
+   * flow was built around, and an installation that upgrades into this column must
+   * not silently lose it. Trust-based organizations turn it on in Settings.
+   */
+  @Property({ type: 'boolean', default: false })
+  selfApproveCorrections: boolean = false;
 }

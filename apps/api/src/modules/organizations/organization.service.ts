@@ -2,10 +2,10 @@ import { ConflictException, Injectable, Logger, NotFoundException, type OnModule
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   DEFAULT_ROLES,
+  OWNER_ROLE_KEY,
   resolveLocale,
   type DefaultRole,
   type OrganizationSummary,
-  type RoleSummary,
 } from '@beacon/shared';
 import { Organization } from './organization.entity.js';
 import { Role } from '../roles/role.entity.js';
@@ -24,9 +24,6 @@ export interface CreateOrganizationInput {
   timezone?: string;
 }
 
-/** The role every founder gets — it is the only one holding organization:manage. */
-const OWNER_ROLE_KEY = 'owner';
-
 /**
  * An arbitrary but fixed key for the Postgres advisory lock that serialises first-run
  * registration. Two requests arriving together on an empty database would otherwise
@@ -44,11 +41,14 @@ export class OrganizationService implements OnModuleInit {
    * A later phase can only add to `DEFAULT_ROLES` — it never has a route to reach
    * back and update a role an organization already has. Re-syncing every system
    * role's permissions from `DEFAULT_ROLES` on every boot means a new permission
-   * (`document:write`, this phase's addition) reaches existing installs the moment
-   * they restart, with no hand-written backfill per phase.
+   * (`document:write`, an earlier phase's addition) reaches existing installs the
+   * moment they restart, with no hand-written backfill per phase.
    *
-   * Safe because nothing lets an organization edit a system role today — the day a
-   * role editor changes that, this must stop overwriting what someone set by hand.
+   * A role the organization has edited is left alone. `RolesService.update` records
+   * that as `Role.customized` rather than leaving it to be inferred, because drift
+   * from `DEFAULT_ROLES` cannot tell an edit apart from a default this install has
+   * not caught up with yet — and guessing wrong here silently reverts somebody's
+   * change at the next restart.
    */
   async onModuleInit(): Promise<void> {
     await this.reconcileSystemRoles();
@@ -59,7 +59,7 @@ export class OrganizationService implements OnModuleInit {
     // instance, and MikroORM refuses instance methods on that one outside a request
     // context. A fork is a real, usable EntityManager regardless of context.
     const em = this.em.fork();
-    const roles = await em.find(Role, { isSystem: true });
+    const roles = await em.find(Role, { isSystem: true, customized: false });
     let changed = 0;
 
     for (const role of roles) {
@@ -180,27 +180,13 @@ export class OrganizationService implements OnModuleInit {
     if (changes.name !== undefined) organization.name = changes.name;
     if (changes.defaultLocale !== undefined) organization.defaultLocale = changes.defaultLocale;
     if (changes.timezone !== undefined) organization.timezone = changes.timezone;
+    if (changes.selfApproveCorrections !== undefined) {
+      organization.selfApproveCorrections = changes.selfApproveCorrections;
+    }
 
     await this.em.flush();
 
     return organization;
-  }
-
-  /** Always scoped by organization — there is no cross-tenant role listing. */
-  async listRoles(organizationId: string): Promise<RoleSummary[]> {
-    const roles = await this.em.find(
-      Role,
-      { organization: organizationId },
-      { orderBy: { key: 'asc' } },
-    );
-
-    return roles.map((role) => ({
-      id: role.id,
-      key: role.key,
-      name: role.name,
-      permissions: role.permissions,
-      isSystem: role.isSystem,
-    }));
   }
 }
 
@@ -211,5 +197,6 @@ export function toOrganizationSummary(organization: Organization): OrganizationS
     slug: organization.slug,
     defaultLocale: organization.defaultLocale,
     timezone: organization.timezone,
+    selfApproveCorrections: organization.selfApproveCorrections,
   };
 }

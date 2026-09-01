@@ -84,7 +84,16 @@ a reason.
   being trusted.
 - **Check permissions, never role names.** Roles are customizable per organization.
   Handlers declare `@RequirePermissions(...)` from `apps/api/src/common/auth/`; the permission
-  union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`.
+  union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`. `modules/roles/` is
+  where an organization edits them (Settings → Roles, `organization:manage`), which is what makes
+  that rule load-bearing rather than aspirational: `manager` is now whatever this installation
+  says it is. Two invariants keep the editor safe. `owner` is immutable — it always holds every
+  permission, so no sequence of edits can leave an install with nobody able to administer it, the
+  same lockout `enforced` SSO exempts `organization:manage` to avoid. And a built-in role the
+  organization has edited carries `Role.customized`, which is what stops
+  `OrganizationService.reconcileSystemRoles` re-syncing it from `DEFAULT_ROLES` at the next boot;
+  drift alone cannot tell an edit from a default an install has not caught up with, so the fact
+  is recorded rather than inferred.
 - **You may not grant authority you do not hold.** `employee:manage` assigns roles — at user
   creation, on an invitation, and through `POST /users/:id/roles` — so without a check it is
   also a way to *acquire* any permission: `admin` holds it but not `organization:manage`, and
@@ -93,6 +102,28 @@ a reason.
   `SELF_SERVICE_PERMISSIONS` (`@beacon/shared`) is the exemption that keeps an admin able to
   hand out the default `employee` role; add to it only for a permission whose every code path
   is scoped to the holder's own record.
+  **Defining a role is a grant too.** `POST /roles` and `PATCH /roles/:id` run the same
+  `assertGrantable`, because packaging a permission and then wearing the role reaches the same
+  place as assigning one — without it `organization:manage` alone would be a route to every
+  other permission. `assertRoleEditable` beside it is that rule read backwards: a role already
+  holding authority beyond the caller's is not theirs to rewrite or delete, which is what stops
+  an edit *stripping* a permission its author never had.
+- **A timesheet only ever changes through a correction row.** Once a week locks, an entry is
+  amended by `AttendanceCorrection`, never by an edit — the row is the audit trail, which is why
+  approving writes the change through. `Organization.selfApproveCorrections` decides only
+  *whether the row waits*: `requestCorrection` creates it `pending` for the requester's manager,
+  or `approved` and applied in the same transaction with the requester recorded as its own
+  decider. It is not a second write path, and the trail of a trust-based organization reads like
+  an approving one's. It defaults false and reads false whenever the organization cannot be
+  resolved — approval is the arrangement the flow was built around, and no upgrade may drop it
+  silently. `decideCorrection` is untouched: deciding *someone else's* correction still needs
+  `attendance:approve` and still refuses a caller their own row, because self-approval is a
+  standing organization decision and not a permission over the approval queue. Self-applied
+  corrections serialize on `CORRECTION_SELF_APPROVE_LOCK`, keyed on the person and the day —
+  there is no row to collide on, but two landing together would recompute one day's balance from
+  the same stale figure. The web reads the setting off `TimesheetWeek.selfApproveCorrections`,
+  because a plain employee holds `attendance:read` but not `organization:read`, and it changes
+  copy only.
 - **Every response carries the same headers**, set by `securityHeaders`
   (`common/http/`) before routing: `Cache-Control: no-store` above all, because
   everything this API returns is personal data and Beacon runs on shared workstations,

@@ -370,7 +370,7 @@ describe('People (e2e)', () => {
    * was also, transitively, a way to *acquire* any permission in the system: the
    * built-in `admin` role holds `employee:manage` but deliberately not
    * `organization:manage`, and nothing stopped an admin reading the owner role's id
-   * off `GET /organizations/current/roles` and assigning it to themselves.
+   * off `GET /roles` and assigning it to themselves.
    *
    * Asserted end to end rather than only in `role-grant.spec.ts`, because the guard
    * being *reached* by all three grant paths is the half a unit test cannot show.
@@ -386,7 +386,7 @@ describe('People (e2e)', () => {
 
     beforeAll(async () => {
       const roles = await request(app.getHttpServer())
-        .get('/api/organizations/current/roles')
+        .get('/api/roles')
         .set(auth())
         .expect(200);
 

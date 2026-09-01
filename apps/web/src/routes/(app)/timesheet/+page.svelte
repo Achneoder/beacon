@@ -27,6 +27,13 @@
 	const todayDate = $derived(new Date().toISOString().slice(0, 10));
 	// The day a fresh request defaults to — the Monday of whichever week is on screen.
 	const weekStart = $derived(week?.from ?? '');
+	/**
+	 * Whether the organization lets a person's own correction through without an
+	 * approval. It only changes what this screen *says*: the API decides what a
+	 * correction does, so the form is the same form either way and nothing here is
+	 * load-bearing for authorization.
+	 */
+	const selfApproves = $derived(week?.selfApproveCorrections ?? false);
 
 	$effect(() => {
 		void load(offset);
@@ -130,7 +137,9 @@
 {/if}
 
 {#if sent}
-	<Alert tone="success" class="mt-4">{$_('timesheet.requestSent')}</Alert>
+	<Alert tone="success" class="mt-4">
+		{selfApproves ? $_('timesheet.correctionApplied') : $_('timesheet.requestSent')}
+	</Alert>
 {/if}
 
 {#if week}
@@ -216,7 +225,9 @@
 	<Card variant="card" class="mt-4">
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<p class="text-2xs text-ink-muted">
-				{#if week.locked}
+				{#if week.locked && selfApproves}
+					{$_('timesheet.lockedSelfApprove')}
+				{:else if week.locked}
 					{$_('timesheet.locked')}
 				{:else}
 					{$_('timesheet.unlockedUntil', {
@@ -225,15 +236,19 @@
 				{/if}
 			</p>
 			<Button size="sm" onclick={() => openRequest(weekStart)}>
-				{$_('timesheet.requestCorrection')}
+				{selfApproves ? $_('timesheet.correctDay') : $_('timesheet.requestCorrection')}
 			</Button>
 		</div>
 	</Card>
 
 	{#if requesting}
 		<Card variant="panel" as="section" class="mt-4">
-			<h2 class="text-base font-bold tracking-tight">{$_('timesheet.requestTitle')}</h2>
-			<p class="mt-1 text-2xs text-ink-muted">{$_('timesheet.requestHint')}</p>
+			<h2 class="text-base font-bold tracking-tight">
+				{selfApproves ? $_('timesheet.correctTitle') : $_('timesheet.requestTitle')}
+			</h2>
+			<p class="mt-1 text-2xs text-ink-muted">
+				{selfApproves ? $_('timesheet.correctHint') : $_('timesheet.requestHint')}
+			</p>
 
 			<form class="mt-4 grid gap-4 sm:grid-cols-2" onsubmit={send}>
 				<label class="flex flex-col gap-1.5 text-sm font-semibold">
@@ -283,7 +298,7 @@
 					<TextField
 						id="correction-reason"
 						label={$_('timesheet.reason')}
-						hint={$_('timesheet.reasonHint')}
+						hint={selfApproves ? $_('timesheet.reasonHintSelf') : $_('timesheet.reasonHint')}
 						bind:value={requestReason}
 						required
 					/>
@@ -295,7 +310,11 @@
 
 				<div class="flex gap-2 sm:col-span-2">
 					<Button type="submit" variant="primary" disabled={sending}>
-						{sending ? $_('timesheet.sending') : $_('timesheet.send')}
+						{#if selfApproves}
+							{sending ? $_('timesheet.applying') : $_('timesheet.apply')}
+						{:else}
+							{sending ? $_('timesheet.sending') : $_('timesheet.send')}
+						{/if}
 					</Button>
 					<Button variant="ghost" onclick={() => (requesting = false)}>
 						{$_('timesheet.cancel')}

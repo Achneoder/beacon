@@ -57,6 +57,16 @@ export interface Caller {
 /** Namespace for the correction decide lock — see {@link lockAdvisory}. */
 const CORRECTION_DECIDE_LOCK = 20_260_006;
 
+/**
+ * Namespace for the self-approval lock. Keyed on the person and the day rather than
+ * on a correction id, because a self-approved correction is created and applied in
+ * one transaction and so has no row a second request could collide on. What has to
+ * serialize is the day's balance: two corrections landing together would otherwise
+ * both recompute it from the same stale figure and one of the two moves would be
+ * lost.
+ */
+const CORRECTION_SELF_APPROVE_LOCK = 20_260_007;
+
 @Injectable()
 export class AttendanceService {
   constructor(
@@ -280,6 +290,10 @@ export class AttendanceService {
       overtime: summarizeOvertime(balance.balanceMinutes, balance.capMinutes),
       locked: isWeekLocked(monday, new Date(), offsetForZone),
       locksAt: weekLocksAt(monday, offsetForZone).toISOString(),
+      // Copy, not authorization: what a correction actually does is decided in
+      // `requestCorrection`. The timesheet asks because a plain employee holds
+      // `attendance:read` but not `organization:read`.
+      selfApproveCorrections: await this.selfApprovesCorrections(caller.organizationId),
     };
   }
 
@@ -300,21 +314,31 @@ export class AttendanceService {
 
   // ---------------------------------------------------------------- corrections
 
+  /**
+   * Raising a correction — or, where the organization allows it, simply making the
+   * change.
+   *
+   * `Organization.selfApproveCorrections` does not open a second write path. The
+   * correction row is still the only thing that changes a timesheet, and it still
+   * records who asked, for what, and why; all the setting decides is whether the row
+   * is created `pending` for a manager or created `approved` and applied in the same
+   * transaction, with the requester recorded as its own decider. So the audit trail
+   * of a trust-based organization reads like an approving one's, `/approvals` never
+   * shows a queue nobody intends to work, and switching the setting back off leaves
+   * nothing half-applied behind.
+   *
+   * Deciding *someone else's* correction is unaffected and still needs
+   * `attendance:approve` — see {@link decideCorrection}, which continues to refuse a
+   * caller their own row. Self-approval is a standing organization-level decision,
+   * not a permission an employee can exercise over the approval queue.
+   */
   async requestCorrection(
     caller: Caller,
     dto: CreateCorrectionRequest,
   ): Promise<CorrectionSummary> {
     const timezone = await this.timezoneOf(caller);
-    const entry = dto.entryId
-      ? await this.em.findOne(AttendanceEntry, {
-          id: dto.entryId,
-          organization: caller.organizationId,
-          user: caller.id,
-        })
-      : null;
 
-    if (dto.entryId && !entry) throw new NotFoundException('entry not found');
-    if (dto.kind !== 'add' && !entry) {
+    if (dto.kind !== 'add' && !dto.entryId) {
       throw new BadRequestException('amending or removing needs an entry');
     }
 
@@ -325,25 +349,70 @@ export class AttendanceService {
       if (endedAt <= startedAt) throw new BadRequestException('the end must follow the start');
     }
 
-    const user = await this.users.findEntity(caller.organizationId, caller.id);
-    const correction = this.em.create(AttendanceCorrection, {
-      organization: this.em.getReference(Organization, caller.organizationId, { wrapped: true }),
-      user: ref(user),
-      entry: entry ? ref(entry) : null,
-      kind: dto.kind,
-      localDate: localDate(timezone, startedAt ?? entry?.startedAt ?? new Date()),
-      startedAt,
-      endedAt,
-      breakMinutes: dto.breakMinutes ?? 0,
-      reason: dto.reason,
-      status: 'pending',
-      approver: user.manager,
+    // Every read below goes through the fork: the entry and the user are the rows the
+    // correction is built from, and reading them through `this.em` would both leave
+    // them outside the transaction and hand `em.create` entities another
+    // EntityManager owns.
+    return this.em.transactional(async (em) => {
+      // Read inside the transaction, so the setting a correction is created under is
+      // the one that was in force when it was written.
+      const selfApproved = await this.selfApprovesCorrections(caller.organizationId, em);
+
+      const entry = dto.entryId
+        ? await em.findOne(
+            AttendanceEntry,
+            { id: dto.entryId, organization: caller.organizationId, user: caller.id },
+            // An amendment restates the day's breaks, and `removeAll` only deletes
+            // the pauses it can see.
+            { populate: ['breaks'] },
+          )
+        : null;
+      if (dto.entryId && !entry) throw new NotFoundException('entry not found');
+
+      const day = localDate(timezone, startedAt ?? entry?.startedAt ?? new Date());
+
+      if (selfApproved) {
+        await lockAdvisory(em, CORRECTION_SELF_APPROVE_LOCK, `${caller.id}:${day}`);
+      }
+
+      const user = await em.findOneOrFail(User, {
+        id: caller.id,
+        organization: caller.organizationId,
+      });
+
+      const correction = em.create(AttendanceCorrection, {
+        organization: em.getReference(Organization, caller.organizationId, { wrapped: true }),
+        user: ref(user),
+        entry: entry ? ref(entry) : null,
+        kind: dto.kind,
+        localDate: day,
+        startedAt,
+        endedAt,
+        breakMinutes: dto.breakMinutes ?? 0,
+        reason: dto.reason,
+        status: selfApproved ? 'approved' : 'pending',
+        // Under self-approval the requester *is* the approver — recording their
+        // manager there would read as a decision that manager never made.
+        approver: selfApproved ? ref(user) : user.manager,
+        decidedBy: selfApproved ? ref(user) : null,
+        decidedAt: selfApproved ? new Date() : null,
+      });
+
+      await em.flush();
+
+      if (selfApproved) {
+        // The same order `decideCorrection` uses: the timesheet write and the balance
+        // move commit with the decision, so a failure in either cannot leave the day
+        // changed and the bank stale.
+        await this.applyCorrection(em, correction);
+        await em.flush();
+        await this.recomputeBalance(caller, day, em);
+      }
+
+      await em.populate(correction, ['user', 'approver']);
+
+      return toCorrectionSummary(correction);
     });
-
-    await this.em.flush();
-    await this.em.populate(correction, ['user', 'approver']);
-
-    return toCorrectionSummary(correction);
   }
 
   /** Own requests always; a manager's queue when the caller can approve. */
@@ -633,6 +702,21 @@ export class AttendanceService {
     }
 
     return userId;
+  }
+
+  /**
+   * Whether this organization applies a person's own correction without a decision.
+   *
+   * Absent for any reason it reads false — the arrangement the correction flow was
+   * built around. A missing organization row is not a licence to skip approval.
+   */
+  private async selfApprovesCorrections(
+    organizationId: string,
+    em: EntityManager = this.em,
+  ): Promise<boolean> {
+    const organization = await em.findOne(Organization, { id: organizationId });
+
+    return organization?.selfApproveCorrections ?? false;
   }
 
   /** The subject's own zone, falling back through the organization to UTC. */

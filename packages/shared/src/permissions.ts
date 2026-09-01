@@ -75,3 +75,33 @@ export const SELF_SERVICE_PERMISSIONS = [
 export function isSelfServicePermission(permission: Permission): boolean {
   return (SELF_SERVICE_PERMISSIONS as readonly Permission[]).includes(permission);
 }
+
+/**
+ * The founding role, seeded by registration.
+ *
+ * It is the one role the editor refuses to change or delete, and that refusal is what
+ * keeps an installation reachable: `owner` always holds every permission, so there is
+ * always somewhere `organization:manage` lives. Without it an administrator could edit
+ * the last `organization:manage` out of the system and leave a database edit as the
+ * only remaining door — the same lockout `enforced` SSO exempts that permission to
+ * avoid.
+ *
+ * Nothing branches on this key to *authorize* anything; it names the one role whose
+ * definition is not the organization's to change.
+ */
+export const OWNER_ROLE_KEY = 'owner';
+
+/** Structural on purpose — the shape is `RoleSummary`'s and the ORM entity's alike. */
+export function isOwnerRole(role: { key: string; isSystem: boolean }): boolean {
+  return role.isSystem && role.key === OWNER_ROLE_KEY;
+}
+
+/** The half before the colon — `attendance` for `attendance:approve`. */
+export function permissionArea(permission: Permission): string {
+  return permission.slice(0, permission.indexOf(':'));
+}
+
+/** Every area, in the order `PERMISSIONS` first mentions it. The role editor groups by it. */
+export const PERMISSION_AREAS: readonly string[] = [
+  ...new Set(PERMISSIONS.map((permission) => permissionArea(permission))),
+];

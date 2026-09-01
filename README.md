@@ -107,8 +107,11 @@ different projects or tasks.
 
 A dashboard for users to view their attendance and time tracking data, plus a calendar view for
 planning holidays and breaks. Employers can manage their employees' attendance and time tracking
-data, and approve or reject holiday requests and breaks. Reporting and analytics let organizations
-track attendance trends and identify areas for improvement.
+data, and approve or reject holiday requests and breaks. Once a week is closed, changing a day is
+a correction request that the person's manager decides — or, where the organization prefers to
+trust its people, one that applies straight away and is simply recorded against the name of
+whoever made it (Settings → Organization → Time tracking). Reporting and analytics let
+organizations track attendance trends and identify areas for improvement.
 
 ### Documents
 
@@ -173,7 +176,11 @@ NestJS, TypeScript, PostgreSQL, MikroORM, Passport.js, JWT.
 
 Data is stored in PostgreSQL; schema changes ship as migrations. Records are scoped by organization,
 and authorization is checked against permissions rather than role names, so organizations can define
-their own roles.
+their own roles. Settings → Roles is where they do: an administrator adds a role, names it, and picks
+its permissions from the closed list Beacon actually checks. A caller can only ever put permissions
+they hold themselves into a role — otherwise `organization:manage` would be a route to every other
+permission in the system — and the `owner` role is left alone entirely, so an installation can never
+be edited into having nobody who can administer it.
 
 Authentication supports multiple methods — email/password, passkeys, social login, and single sign-on
 (SSO) via OAuth2 or SAML — with two-factor authentication (2FA) for added security. *(Email/password
