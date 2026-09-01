@@ -2,10 +2,15 @@
 	import { _, locale } from 'svelte-i18n';
 	import {
 		absenceCostDays,
+		absenceCostMinutes,
+		formatDuration,
+		targetMinutesFor,
+		weekdayOf,
 		type AbsenceCalendar,
 		type AbsenceRequestSummary,
 		type AbsenceTypeSummary,
-		type LeaveBalanceSummary
+		type LeaveBalanceSummary,
+		type WorkScheduleSummary
 	} from '@beacon/shared';
 	import { Alert, Badge, Button, Card, TextField } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
@@ -27,6 +32,7 @@
 		listAbsenceTypes,
 		withdrawAbsence
 	} from '$lib/api/absences';
+	import { getSchedule } from '$lib/api/attendance';
 	import { session } from '$lib/auth/session.svelte';
 	import { absenceErrorKey } from '$lib/absence/errors';
 	import { errorKey } from '$lib/auth/errors';
@@ -44,6 +50,9 @@
 	let types = $state<AbsenceTypeSummary[]>([]);
 	let balance = $state<LeaveBalanceSummary | null>(null);
 	let requests = $state<AbsenceRequestSummary[]>([]);
+	// Only so the cost of time off in lieu can be priced in hours before it is sent —
+	// the bank is kept in minutes, and a part-time Friday is not a part-time Monday.
+	let schedule = $state<WorkScheduleSummary | null>(null);
 	let loading = $state(true);
 	let loadErrorKey = $state<string | null>(null);
 	let notice = $state<string | null>(null);
@@ -72,11 +81,12 @@
 		const { from, to } = gridRange(forMonth);
 
 		try {
-			[calendar, types, balance, requests] = await Promise.all([
+			[calendar, types, balance, requests, schedule] = await Promise.all([
 				getCalendar(from, to, forScope),
 				listAbsenceTypes(),
 				getLeaveBalance(),
-				listAbsences({ mine: true })
+				listAbsences({ mine: true }),
+				getSchedule()
 			]);
 		} catch (error) {
 			loadErrorKey = errorKey(error);
@@ -119,6 +129,28 @@
 	const cost = $derived(
 		range ? absenceCostDays({ ...range, halfDayStart, halfDayEnd }, holidayDates) : 0
 	);
+
+	/**
+	 * What the selection would cost the overtime bank, spelled out before it is sent —
+	 * `null` for every type that is not paid for out of it, which is most of them.
+	 *
+	 * The same shared arithmetic the API freezes onto the row, against the schedule in
+	 * force today. A contract change between now and the approval would move the
+	 * figure, and the row's own frozen cost is what governs the bank either way.
+	 */
+	const overtimeCost = $derived.by(() => {
+		const type = types.find((one) => one.id === typeId);
+		const hours = schedule;
+		if (!range || !hours || !type?.deductsFromOvertime) return null;
+
+		const minutes = absenceCostMinutes(
+			{ ...range, halfDayStart, halfDayEnd },
+			(date) => targetMinutesFor(hours, weekdayOf(date)),
+			holidayDates
+		);
+
+		return minutes > 0 ? formatDuration(minutes) : null;
+	});
 
 	// The first type is the sensible default — `vacation` is seeded at position 0.
 	$effect(() => {
@@ -264,7 +296,9 @@
 				<p class="mt-1 font-mono text-2xs text-ink-muted">
 					{formatRange(range.startsOn, range.endsOn, lang)} · {$_('absence.days', {
 						values: { count: cost }
-					})}
+					})}{#if overtimeCost}
+						· {$_('absence.fromOvertime', { values: { hours: overtimeCost } })}
+					{/if}
 				</p>
 
 				<form class="mt-4 flex flex-col gap-4" onsubmit={send}>

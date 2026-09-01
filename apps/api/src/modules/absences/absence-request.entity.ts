@@ -52,6 +52,17 @@ export class AbsenceRequest extends OrganizationScopedEntity {
   @Property({ type: new DecimalType('number'), precision: 5, scale: 2, default: 0 })
   costDays: number = 0;
 
+  /**
+   * What the request costs the overtime bank, in minutes, frozen the same way and for
+   * the same reason: the schedule is effective-dated, and a contract signed in
+   * November must not rewrite what an August day off was worth when it was granted.
+   *
+   * Minutes rather than days because the bank is kept in minutes and a part-time week
+   * is not a run of equal days.
+   */
+  @Property({ type: 'integer', default: 0 })
+  costMinutes: number = 0;
+
   /** The manager it routes to — `User.manager`, the same edge corrections use. */
   @ManyToOne(() => User, { ref: true, nullable: true, deleteRule: 'set null' })
   approver: Ref<User> | null = null;

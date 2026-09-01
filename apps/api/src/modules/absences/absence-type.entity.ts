@@ -7,9 +7,10 @@ import { OrganizationScopedEntity } from '../../common/entities/organization-sco
  * A kind of absence an organization offers, seeded from `DEFAULT_ABSENCE_TYPES` when
  * the tenant is created and editable afterwards.
  *
- * The three flags are independent on purpose: home office is not paid leave, it is a
- * working day that happens to appear on the calendar. Collapsing them into a single
- * "is it leave" would make the timesheet tag and the quota disagree.
+ * The four flags are independent on purpose: home office is not paid leave, it is a
+ * working day that happens to appear on the calendar, and overtime compensation is
+ * leave that costs no quota. Collapsing them into a single "is it leave" would make
+ * the timesheet tag, the quota and the overtime bank disagree.
  */
 @Entity({ tableName: 'absence_types' })
 @Unique({ properties: ['organization', 'key'] })
@@ -31,6 +32,15 @@ export class AbsenceType extends OrganizationScopedEntity {
   /** True for home office, training and business trips: real hours, still tagged. */
   @Property({ type: 'boolean', default: false })
   countsAsWork: boolean = false;
+
+  /**
+   * Time off in lieu: the day is bought out of the overtime bank rather than out of
+   * the leave quota. Independent of `deductsFromQuota` — a day off is paid for out of
+   * one, the other, both or neither, and the seeded `overtime-comp` is the only type
+   * that starts out spending this one.
+   */
+  @Property({ type: 'boolean', default: false })
+  deductsFromOvertime: boolean = false;
 
   /**
    * A palette role, not a hex value — the design tokens carry both themes, and a

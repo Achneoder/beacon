@@ -24,6 +24,10 @@ export class CreateAbsenceTypeDto {
   countsAsWork?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  deductsFromOvertime?: boolean;
+
+  @IsOptional()
   @IsIn(ABSENCE_COLOR_ROLES)
   colorRole?: AbsenceColorRole;
 

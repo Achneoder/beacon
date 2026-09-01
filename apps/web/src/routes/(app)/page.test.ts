@@ -87,6 +87,7 @@ function absence(overrides: Partial<AbsenceRequestSummary> = {}): AbsenceRequest
 		halfDayEnd: false,
 		status: 'approved',
 		costDays: 5,
+		costMinutes: 0,
 		workingDays: 5,
 		approverId: null,
 		approverName: null,

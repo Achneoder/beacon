@@ -290,6 +290,7 @@
 		"absenceTypes": "Abwesenheitsarten",
 		"absenceTypesHint": "Was beantragt werden kann. Eine stillgelegte Art lässt alte Anträge unberührt.",
 		"deducts": "Vom Kontingent",
+		"deductsOvertime": "Baut Überstunden ab",
 		"paid": "Bezahlt",
 		"countsAsWork": "Zählt als Arbeit",
 		"retire": "Stilllegen",
@@ -389,7 +390,8 @@
 			"parental": "Elternzeit",
 			"training": "Fortbildung",
 			"business-trip": "Dienstreise",
-			"special": "Sonderurlaub"
+			"special": "Sonderurlaub",
+			"overtime-comp": "Überstundenabbau"
 		},
 		"status": {
 			"pending": "Offen",
@@ -398,7 +400,8 @@
 			"taken": "Genommen"
 		},
 		"days": "{count, plural, one {# Tag} other {# Tage}}",
-		"halfDay": "Halber Tag"
+		"halfDay": "Halber Tag",
+		"fromOvertime": "Aus Überstunden · {hours}"
 	},
 	"calendar": {
 		"kicker": "Abwesenheit",

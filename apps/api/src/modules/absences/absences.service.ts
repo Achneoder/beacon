@@ -11,11 +11,14 @@ import {
   DEFAULT_ABSENCE_TYPES,
   absenceCostByYear,
   absenceCostDays,
+  absenceCostMinutes,
   datesBetween,
   fullName,
   isWeekend,
   rangesOverlap,
   remainingLeaveDays,
+  targetMinutesFor,
+  weekdayOf,
   type AbsenceCalendar,
   type AbsenceRequestSummary,
   type AbsenceStatus,
@@ -32,6 +35,13 @@ import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
 import { DocumentsService } from '../documents/documents.service.js';
 import { Document } from '../documents/document.entity.js';
+// Two files from the attendance module, never its service: attendance already imports
+// this one for `coverageOf`, so the dependency may only ever run in that direction.
+// `schedules.ts` and `overtime.ts` are free functions over entities and import nothing
+// back — the same containment `ReportsService` relies on to read attendance directly.
+import { WorkSchedule } from '../attendance/work-schedule.entity.js';
+import { scheduleInForce } from '../attendance/schedules.js';
+import { ensureOvertimeBalance } from '../attendance/overtime.js';
 import { AbsenceRequest } from './absence-request.entity.js';
 import { AbsenceType } from './absence-type.entity.js';
 import { Holiday } from './holiday.entity.js';
@@ -121,6 +131,7 @@ export class AbsencesService {
       deductsFromQuota: dto.deductsFromQuota ?? false,
       paid: dto.paid ?? true,
       countsAsWork: dto.countsAsWork ?? false,
+      deductsFromOvertime: dto.deductsFromOvertime ?? false,
       colorRole: dto.colorRole ?? 'accent',
       active: true,
       position: dto.position ?? 0,
@@ -193,9 +204,14 @@ export class AbsencesService {
   // ---------------------------------------------------------------- requests
 
   /**
-   * Raising a request. The cost is computed here, against the public holidays in
-   * force today, and then frozen on the row — a holiday added in November must not
-   * silently rewrite an August absence that has already been taken and paid.
+   * Raising a request. The cost is computed here, against the public holidays and the
+   * work schedule in force today, and then frozen on the row — a holiday added in
+   * November, or a contract signed in it, must not silently rewrite an August absence
+   * that has already been taken and paid.
+   *
+   * Two costs, because a type may spend either purse: `costDays` against the leave
+   * quota and `costMinutes` against the overtime bank. Both are zero for a type that
+   * spends neither, which is most of them.
    */
   async create(caller: Caller, dto: CreateAbsenceRequest): Promise<AbsenceRequestSummary> {
     const subjectId = await this.resolveSubject(caller, dto.userId ?? undefined, true);
@@ -255,6 +271,15 @@ export class AbsencesService {
         throw new BadRequestException('that range contains no working days');
       }
 
+      // Only a type that spends the bank needs the schedule read at all.
+      const costMinutes = type.deductsFromOvertime
+        ? absenceCostMinutes(
+            request,
+            await this.expectedMinutesOn(em, caller.organizationId, subjectId, dto.endsOn),
+            holidays,
+          )
+        : 0;
+
       const absence = em.create(AbsenceRequest, {
         organization: em.getReference(Organization, caller.organizationId, { wrapped: true }),
         user: ref(user),
@@ -262,6 +287,7 @@ export class AbsencesService {
         ...request,
         status: 'pending',
         costDays: type.deductsFromQuota ? absenceCostDays(request, holidays) : 0,
+        costMinutes,
         approver: user.manager,
         note: dto.note ?? null,
         document: documentId ? em.getReference(Document, documentId) : null,
@@ -332,7 +358,8 @@ export class AbsencesService {
 
   /**
    * Deciding. Approving commits the days to the balance of each year the request
-   * touches — a holiday over New Year spends two quotas, not one.
+   * touches — a holiday over New Year spends two quotas, not one — and, for time off
+   * in lieu, debits the overtime bank by the minutes frozen on the row.
    *
    * The advisory lock makes this atomic against a concurrent decide or withdraw:
    * two approvals would otherwise both pass the pending check and commit the days
@@ -367,6 +394,9 @@ export class AbsencesService {
 
       if (approved && request.type.getEntity().deductsFromQuota) {
         await this.commitToBalances(em, caller.organizationId, request, 1);
+      }
+      if (approved && request.type.getEntity().deductsFromOvertime) {
+        await this.commitToOvertime(em, caller.organizationId, request, 1);
       }
 
       await em.flush();
@@ -524,6 +554,10 @@ export class AbsencesService {
    * timesheet row and the tint on a calendar cell must be the same decision, and
    * `credited` — target met by the absence rather than by worked time — is exactly
    * the inverse of `countsAsWork`.
+   *
+   * Time off in lieu is credited like any other day away, deliberately: the bank was
+   * already debited once, on approval, and leaving the day uncredited would charge it
+   * again as a shortfall the same balance would then absorb.
    */
   async coverageOf(
     organizationId: string,
@@ -630,6 +664,52 @@ export class AbsencesService {
       const balance = await this.ensureBalance(em, organizationId, request.user.id, year);
       balance.takenDays = round(balance.takenDays + direction * days);
     }
+  }
+
+  /**
+   * Time off in lieu is paid for out of the bank. `direction` is `1` on approval — the
+   * balance goes *down* by what the request was frozen at — and a future rescission
+   * passes `-1` through the same path, exactly as {@link commitToBalances}.
+   *
+   * The balance moves by a delta, never by assignment, because `AttendanceService`
+   * folds finished days into the same row and the two must not overwrite each other.
+   * Nothing is refused for want of banked hours: the quota is not enforced at request
+   * time either, and a bank that can go negative is the honest record of an
+   * organization that let someone take the day.
+   */
+  private async commitToOvertime(
+    em: EntityManager,
+    organizationId: string,
+    request: AbsenceRequest,
+    direction: 1 | -1,
+  ): Promise<void> {
+    if (request.costMinutes === 0) return;
+
+    const balance = await ensureOvertimeBalance(em, organizationId, request.user.id);
+    balance.balanceMinutes -= direction * request.costMinutes;
+  }
+
+  /**
+   * What each day of a range was expected to be, under the schedule in force on it.
+   *
+   * The rows for the whole span are read once and `scheduleInForce` picks per day, so
+   * a request that straddles a contract change is priced against both halves — and so
+   * the effective-dating decision stays the one place the timesheet and the reports
+   * already make it.
+   */
+  private async expectedMinutesOn(
+    em: EntityManager,
+    organizationId: string,
+    userId: string,
+    through: string,
+  ): Promise<(date: string) => number> {
+    const rows = await em.find(
+      WorkSchedule,
+      { organization: organizationId, user: userId, effectiveFrom: { $lte: through } },
+      { orderBy: { effectiveFrom: 'desc' } },
+    );
+
+    return (date) => targetMinutesFor(scheduleInForce(rows, date), weekdayOf(date));
   }
 
   private async ensureBalance(
@@ -843,6 +923,7 @@ export function toAbsenceTypeSummary(type: AbsenceType): AbsenceTypeSummary {
     deductsFromQuota: type.deductsFromQuota,
     paid: type.paid,
     countsAsWork: type.countsAsWork,
+    deductsFromOvertime: type.deductsFromOvertime,
     colorRole: type.colorRole,
     active: type.active,
     position: type.position,
@@ -861,9 +942,10 @@ export function toHolidaySummary(holiday: Holiday): HolidaySummary {
 /**
  * Requires `user`, `type` and `approver` to be populated.
  *
- * `costDays` is read from the row rather than recomputed — it was frozen when the
- * request was raised. `workingDays` is a display figure, so it may be recomputed
- * against whatever holidays the caller passes, or fall back to the stored cost.
+ * `costDays` and `costMinutes` are read from the row rather than recomputed — both
+ * were frozen when the request was raised. `workingDays` is a display figure, so it
+ * may be recomputed against whatever holidays the caller passes, or fall back to the
+ * stored cost.
  */
 export function toAbsenceSummary(
   request: AbsenceRequest,
@@ -889,6 +971,7 @@ export function toAbsenceSummary(
     halfDayEnd: request.halfDayEnd,
     status: request.status,
     costDays: Number(request.costDays),
+    costMinutes: request.costMinutes,
     workingDays: absenceCostDays(
       { startsOn: request.startsOn, endsOn: request.endsOn },
       holidays,

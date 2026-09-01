@@ -1,10 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { ref } from '@mikro-orm/core';
-import { randomUUID } from 'node:crypto';
 import {
   CLOCK_SKEW_TOLERANCE_MS,
-  DEFAULT_OVERTIME_CAP_MINUTES,
   addDays,
   dayBalance,
   fullName,
@@ -38,9 +36,9 @@ import { AttendanceCorrection } from './attendance-correction.entity.js';
 import { AttendanceDay } from './attendance-day.entity.js';
 import { AttendanceEntry } from './attendance-entry.entity.js';
 import { BreakEntry } from './break-entry.entity.js';
-import { OvertimeBalance } from './overtime-balance.entity.js';
 import { WorkSchedule } from './work-schedule.entity.js';
 import { fallbackSchedule, scheduleInForce, toScheduleSummary } from './schedules.js';
+import { ensureOvertimeBalance } from './overtime.js';
 
 export interface AttendanceRangeFilter {
   userId?: string;
@@ -266,7 +264,7 @@ export class AttendanceService {
       });
     }
 
-    const balance = await this.balanceOf(caller.organizationId, subjectId);
+    const balance = await ensureOvertimeBalance(this.em, caller.organizationId, subjectId);
     const offsetForZone = offsetMinutes(timezone, new Date());
 
     return {
@@ -558,41 +556,6 @@ export class AttendanceService {
     return schedule ? toScheduleSummary(schedule) : fallbackSchedule(date);
   }
 
-  private async balanceOf(
-    organizationId: string,
-    userId: string,
-    em: EntityManager = this.em,
-  ): Promise<OvertimeBalance> {
-    const where = { organization: organizationId, user: userId };
-    const existing = await em.findOne(OvertimeBalance, where);
-    if (existing) return existing;
-
-    // Two concurrent first reads — the timesheet and a clock-out, say — would both
-    // pass the findOne above and collide on the (user) unique constraint. The upsert
-    // turns the loser's insert into a no-op, and the refresh re-reads the row the
-    // winner committed instead of returning the discarded stub.
-    await em.upsert(
-      OvertimeBalance,
-      {
-        // upsert hydrates without running the constructor, so the field initializers
-        // never run — every constructor-assigned column (the id, both timestamps and
-        // both defaults) has to be provided, or the not-null constraints bite.
-        id: randomUUID(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        organization: organizationId,
-        user: userId,
-        balanceMinutes: 0,
-        capMinutes: DEFAULT_OVERTIME_CAP_MINUTES,
-      },
-      // Without this the driver would conflict on the primary key we just generated;
-      // the guard that matters is the (user) unique constraint.
-      { onConflictAction: 'ignore', onConflictFields: ['user'] },
-    );
-
-    return em.findOneOrFail(OvertimeBalance, where, { refresh: true });
-  }
-
   /**
    * Fold a finished day into the running balance.
    *
@@ -653,7 +616,7 @@ export class AttendanceService {
       });
     }
 
-    const balance = await this.balanceOf(caller.organizationId, caller.id, em);
+    const balance = await ensureOvertimeBalance(em, caller.organizationId, caller.id);
     balance.balanceMinutes += balanceMinutes - previous;
 
     await em.flush();

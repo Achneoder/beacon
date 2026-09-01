@@ -33,13 +33,14 @@ export function isCommitted(status: AbsenceStatus): boolean {
 }
 
 /**
- * The eight types every new organization starts with.
+ * The nine types every new organization starts with.
  *
- * The three flags are genuinely independent, which is why they are three: home
+ * The four flags are genuinely independent, which is why they are four: home
  * office, training and a business trip are *working* days — they show on the calendar
  * and tag a timesheet row, but they cost no quota and credit no target, because the
  * hours are really worked. Vacation is the only type that spends the quota; unpaid
- * leave is the only one that is neither paid nor worked.
+ * leave is the only one that is neither paid nor worked; overtime compensation is the
+ * only one that is paid for out of the overtime bank instead of out of anything else.
  */
 export interface AbsenceTypeSeed {
   key: string;
@@ -47,18 +48,26 @@ export interface AbsenceTypeSeed {
   deductsFromQuota: boolean;
   paid: boolean;
   countsAsWork: boolean;
+  /**
+   * Time off in lieu — the day is bought with hours already banked. Independent of
+   * {@link AbsenceTypeSeed.deductsFromQuota} rather than opposed to it: a day off is
+   * paid for out of the leave quota, out of the overtime bank, or out of neither, and
+   * nothing stops an organization from defining a type that spends both.
+   */
+  deductsFromOvertime: boolean;
   colorRole: AbsenceColorRole;
 }
 
 export const DEFAULT_ABSENCE_TYPES: readonly AbsenceTypeSeed[] = [
-  { key: 'vacation', name: 'Vacation', deductsFromQuota: true, paid: true, countsAsWork: false, colorRole: 'accent' },
-  { key: 'sick', name: 'Sick leave', deductsFromQuota: false, paid: true, countsAsWork: false, colorRole: 'warning' },
-  { key: 'home-office', name: 'Home office', deductsFromQuota: false, paid: true, countsAsWork: true, colorRole: 'info' },
-  { key: 'unpaid', name: 'Unpaid leave', deductsFromQuota: false, paid: false, countsAsWork: false, colorRole: 'muted' },
-  { key: 'parental', name: 'Parental leave', deductsFromQuota: false, paid: false, countsAsWork: false, colorRole: 'muted' },
-  { key: 'training', name: 'Training', deductsFromQuota: false, paid: true, countsAsWork: true, colorRole: 'success' },
-  { key: 'business-trip', name: 'Business trip', deductsFromQuota: false, paid: true, countsAsWork: true, colorRole: 'success' },
-  { key: 'special', name: 'Special leave', deductsFromQuota: false, paid: true, countsAsWork: false, colorRole: 'info' },
+  { key: 'vacation', name: 'Vacation', deductsFromQuota: true, paid: true, countsAsWork: false, deductsFromOvertime: false, colorRole: 'accent' },
+  { key: 'sick', name: 'Sick leave', deductsFromQuota: false, paid: true, countsAsWork: false, deductsFromOvertime: false, colorRole: 'warning' },
+  { key: 'home-office', name: 'Home office', deductsFromQuota: false, paid: true, countsAsWork: true, deductsFromOvertime: false, colorRole: 'info' },
+  { key: 'unpaid', name: 'Unpaid leave', deductsFromQuota: false, paid: false, countsAsWork: false, deductsFromOvertime: false, colorRole: 'muted' },
+  { key: 'parental', name: 'Parental leave', deductsFromQuota: false, paid: false, countsAsWork: false, deductsFromOvertime: false, colorRole: 'muted' },
+  { key: 'training', name: 'Training', deductsFromQuota: false, paid: true, countsAsWork: true, deductsFromOvertime: false, colorRole: 'success' },
+  { key: 'business-trip', name: 'Business trip', deductsFromQuota: false, paid: true, countsAsWork: true, deductsFromOvertime: false, colorRole: 'success' },
+  { key: 'special', name: 'Special leave', deductsFromQuota: false, paid: true, countsAsWork: false, deductsFromOvertime: false, colorRole: 'info' },
+  { key: 'overtime-comp', name: 'Overtime compensation', deductsFromQuota: false, paid: true, countsAsWork: false, deductsFromOvertime: true, colorRole: 'success' },
 ] as const;
 
 export interface AbsenceTypeSummary {
@@ -69,6 +78,8 @@ export interface AbsenceTypeSummary {
   paid: boolean;
   /** Home office, training, a business trip — on the calendar, but still worked. */
   countsAsWork: boolean;
+  /** Overtime compensation — the day is bought out of the banked-hours balance. */
+  deductsFromOvertime: boolean;
   colorRole: AbsenceColorRole;
   active: boolean;
   position: number;
@@ -91,6 +102,12 @@ export interface AbsenceRequestSummary {
   status: AbsenceStatus;
   /** What the request costs the quota; `0` for a type that does not deduct. */
   costDays: number;
+  /**
+   * What the request costs the overtime bank, in minutes; `0` for a type that is not
+   * paid for out of it. Minutes rather than days because the bank is kept in minutes
+   * and a part-time Friday is not the same length as a part-time Monday.
+   */
+  costMinutes: number;
   /** Working days covered, whether or not they are charged. */
   workingDays: number;
   approverId: string | null;
@@ -230,6 +247,44 @@ export function absenceCostDays(
 }
 
 /**
+ * What a selection costs the overtime bank, in minutes.
+ *
+ * Days rather than minutes is the wrong unit here: the bank is kept in minutes, and a
+ * part-time pattern of "Mon–Thu 9h, Fri 4h" makes a Friday off worth less than a
+ * Monday off. `minutesOn` answers what a single date was expected to be — the caller
+ * resolves the effective-dated schedule, because only it knows which contract was in
+ * force — and the same half-day rule as {@link absenceCostDays} applies, halving the
+ * boundary day's own minutes rather than a notional average day.
+ */
+export function absenceCostMinutes(
+  request: AbsenceCostInput,
+  minutesOn: (date: string) => number,
+  holidays: Iterable<string> = [],
+): number {
+  const days = workingDaysBetween(request.startsOn, request.endsOn, holidays);
+  if (days.length === 0) return 0;
+
+  const firstIsHalf = Boolean(request.halfDayStart) && days[0] === request.startsOn;
+  const lastIsHalf = Boolean(request.halfDayEnd) && days[days.length - 1] === request.endsOn;
+
+  let minutes = 0;
+
+  for (const [index, date] of days.entries()) {
+    // On a one-day request both flags name the same morning and afternoon, so the
+    // day is halved once — the same reason `absenceCostDays` counts the halves once.
+    const half =
+      days.length === 1
+        ? firstIsHalf || lastIsHalf
+        : (index === 0 && firstIsHalf) || (index === days.length - 1 && lastIsHalf);
+
+    const expected = Math.max(0, minutesOn(date));
+    minutes += half ? expected / 2 : expected;
+  }
+
+  return Math.round(minutes);
+}
+
+/**
  * The cost split by calendar year, for a request that crosses New Year.
  *
  * Quotas are yearly, so a 28 December – 3 January holiday spends two of them. Charging
@@ -330,6 +385,11 @@ export function rangesOverlap(
  * timesheet asks for the tag and separately asks whether the day is *credited*:
  * credited means the target was met by the absence rather than by worked time, which
  * is exactly `!countsAsWork`.
+ *
+ * Overtime compensation is credited too, and deliberately so: the day was paid for,
+ * out of the bank rather than out of the quota, and the debit is taken once, from the
+ * balance, when the request is approved. Leaving the day uncredited would charge it a
+ * second time as a shortfall on the timesheet.
  */
 export function creditsTarget(type: Pick<AbsenceTypeSummary, 'countsAsWork'>): boolean {
   return !type.countsAsWork;

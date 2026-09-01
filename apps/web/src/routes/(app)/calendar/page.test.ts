@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { waitLocale } from 'svelte-i18n';
 import type {
@@ -6,12 +6,14 @@ import type {
 	AbsenceRequestSummary,
 	AbsenceTypeSummary,
 	CalendarDay,
-	LeaveBalanceSummary
+	LeaveBalanceSummary,
+	WorkScheduleSummary
 } from '@beacon/shared';
-import { datesBetween, isWeekend } from '@beacon/shared';
+import { datesBetween, defaultExpectedMinutes, isWeekend } from '@beacon/shared';
 import '$lib/i18n';
 import CalendarPage from './+page.svelte';
 import * as absences from '$lib/api/absences';
+import * as attendance from '$lib/api/attendance';
 import { session } from '$lib/auth/session.svelte';
 import { gridRange } from '$lib/absence/labels';
 
@@ -31,6 +33,7 @@ const types: AbsenceTypeSummary[] = [
 		deductsFromQuota: true,
 		paid: true,
 		countsAsWork: false,
+		deductsFromOvertime: false,
 		colorRole: 'accent',
 		active: true,
 		position: 0
@@ -42,9 +45,22 @@ const types: AbsenceTypeSummary[] = [
 		deductsFromQuota: false,
 		paid: true,
 		countsAsWork: true,
+		deductsFromOvertime: false,
 		colorRole: 'info',
 		active: true,
 		position: 2
+	},
+	{
+		id: 't3',
+		key: 'overtime-comp',
+		name: 'Overtime compensation',
+		deductsFromQuota: false,
+		paid: true,
+		countsAsWork: false,
+		deductsFromOvertime: true,
+		colorRole: 'success',
+		active: true,
+		position: 8
 	}
 ];
 
@@ -63,6 +79,7 @@ const request: AbsenceRequestSummary = {
 	halfDayEnd: false,
 	status: 'pending',
 	costDays: 1,
+	costMinutes: 0,
 	workingDays: 1,
 	approverId: 'u2',
 	approverName: 'Marc Bauer',
@@ -103,6 +120,20 @@ function firstWorkingDay(): string {
 	return datesBetween(FIRST, `${MONTH}-28`).find((date) => !isWeekend(date))!;
 }
 
+/** Full time, five even days — enough for the page to price time off in lieu. */
+const schedule: WorkScheduleSummary = {
+	id: 's1',
+	model: 'flextime',
+	weeklyMinutes: 2400,
+	expectedMinutes: defaultExpectedMinutes(2400),
+	coreStart: null,
+	coreEnd: null,
+	startTime: null,
+	endTime: null,
+	rosterRef: null,
+	effectiveFrom: `${MONTH}-01`
+};
+
 const calendar: AbsenceCalendar = {
 	from: RANGE.from,
 	to: RANGE.to,
@@ -118,6 +149,7 @@ beforeEach(async () => {
 	vi.spyOn(absences, 'listAbsenceTypes').mockResolvedValue(types);
 	vi.spyOn(absences, 'getLeaveBalance').mockResolvedValue(balance);
 	vi.spyOn(absences, 'listAbsences').mockResolvedValue([request]);
+	vi.spyOn(attendance, 'getSchedule').mockResolvedValue(schedule);
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -169,6 +201,23 @@ describe('calendar page', () => {
 		// screen before the request card is even submitted.
 		expect(await screen.findByText(/· 1 day$/)).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Send request' })).toBeInTheDocument();
+	});
+
+	it('prices time off in lieu in hours off the bank, not against the quota', async () => {
+		render(CalendarPage);
+
+		const cells = await screen.findAllByRole('gridcell');
+		const workday = cells[dayIndex(firstWorkingDay())];
+		workday.click();
+		workday.click();
+
+		// Vacation is the default, and it spends the quota rather than the bank.
+		expect(await screen.findByText(/· 1 day$/)).toBeInTheDocument();
+
+		await fireEvent.change(screen.getByLabelText('Type'), { target: { value: 't3' } });
+
+		// One full-time day, priced from the person's own schedule.
+		expect(await screen.findByText(/· From overtime · 8:00$/)).toBeInTheDocument();
 	});
 
 	it('shows the quota with its carry-over expiry', async () => {

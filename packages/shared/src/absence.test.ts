@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   absenceCostByYear,
   absenceCostDays,
+  absenceCostMinutes,
   datesBetween,
   formatDays,
   isCommitted,
@@ -10,6 +11,7 @@ import {
   remainingLeaveDays,
   workingDaysBetween,
 } from './absence.js';
+import { weekdayOf } from './attendance.js';
 
 describe('isWeekend', () => {
   it('names Saturday and Sunday', () => {
@@ -97,6 +99,68 @@ describe('absenceCostDays', () => {
     expect(absenceCostDays({ startsOn: '2026-08-24', endsOn: '2026-08-28' }, ['2026-08-26'])).toBe(
       4,
     );
+  });
+});
+
+describe('absenceCostMinutes', () => {
+  // Mon–Thu nine hours, Fri four: the part-time pattern the day-count cannot see.
+  const PART_TIME: Record<string, number> = {
+    monday: 540,
+    tuesday: 540,
+    wednesday: 540,
+    thursday: 540,
+    friday: 240,
+    saturday: 0,
+    sunday: 0,
+  };
+  const partTime = (date: string) => PART_TIME[weekdayOf(date)] ?? 0;
+  const fullTime = () => 480;
+
+  it('sums the working days of the range', () => {
+    // Mon 24 – Fri 28 Aug 2026, five full-time days.
+    expect(absenceCostMinutes({ startsOn: '2026-08-24', endsOn: '2026-08-28' }, fullTime)).toBe(
+      2400,
+    );
+  });
+
+  it('charges each weekday its own hours, not an average', () => {
+    // The same week under the part-time pattern: 4 × 9 h + 4 h, not 5 × 8 h.
+    expect(absenceCostMinutes({ startsOn: '2026-08-24', endsOn: '2026-08-28' }, partTime)).toBe(
+      2400 - 240 + 240,
+    );
+    expect(absenceCostMinutes({ startsOn: '2026-08-28', endsOn: '2026-08-28' }, partTime)).toBe(240);
+  });
+
+  it('skips weekends and public holidays', () => {
+    expect(absenceCostMinutes({ startsOn: '2026-08-29', endsOn: '2026-08-30' }, fullTime)).toBe(0);
+    expect(
+      absenceCostMinutes({ startsOn: '2026-08-24', endsOn: '2026-08-28' }, fullTime, [
+        '2026-08-26',
+      ]),
+    ).toBe(1920);
+  });
+
+  it('halves the boundary day by its own length', () => {
+    // Half of a four-hour Friday is two hours, not half of a notional eight.
+    expect(
+      absenceCostMinutes(
+        { startsOn: '2026-08-24', endsOn: '2026-08-28', halfDayEnd: true },
+        partTime,
+      ),
+    ).toBe(2400 - 120);
+  });
+
+  it('halves a one-day request once, whichever flag says so', () => {
+    const request = { startsOn: '2026-08-24', endsOn: '2026-08-24' };
+
+    expect(absenceCostMinutes({ ...request, halfDayStart: true }, fullTime)).toBe(240);
+    expect(
+      absenceCostMinutes({ ...request, halfDayStart: true, halfDayEnd: true }, fullTime),
+    ).toBe(240);
+  });
+
+  it('costs nothing when the range holds no working day', () => {
+    expect(absenceCostMinutes({ startsOn: '2026-08-30', endsOn: '2026-08-24' }, fullTime)).toBe(0);
   });
 });
 

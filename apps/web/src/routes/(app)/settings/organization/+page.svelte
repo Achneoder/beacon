@@ -308,6 +308,9 @@
 						{#if type.deductsFromQuota}
 							<span class="text-xs text-ink-muted">{$_('settings.deducts')}</span>
 						{/if}
+						{#if type.deductsFromOvertime}
+							<span class="text-xs text-ink-muted">{$_('settings.deductsOvertime')}</span>
+						{/if}
 						{#if type.countsAsWork}
 							<span class="text-xs text-ink-muted">{$_('settings.countsAsWork')}</span>
 						{/if}

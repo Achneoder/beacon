@@ -290,6 +290,7 @@
 		"absenceTypes": "Absence types",
 		"absenceTypesHint": "What people can ask for. Retiring a type keeps old requests intact.",
 		"deducts": "Deducts quota",
+		"deductsOvertime": "Deducts overtime",
 		"paid": "Paid",
 		"countsAsWork": "Counts as work",
 		"retire": "Retire",
@@ -389,7 +390,8 @@
 			"parental": "Parental leave",
 			"training": "Training",
 			"business-trip": "Business trip",
-			"special": "Special leave"
+			"special": "Special leave",
+			"overtime-comp": "Overtime compensation"
 		},
 		"status": {
 			"pending": "Pending",
@@ -398,7 +400,8 @@
 			"taken": "Taken"
 		},
 		"days": "{count, plural, one {# day} other {# days}}",
-		"halfDay": "Half day"
+		"halfDay": "Half day",
+		"fromOvertime": "From overtime · {hours}"
 	},
 	"calendar": {
 		"kicker": "Absence",

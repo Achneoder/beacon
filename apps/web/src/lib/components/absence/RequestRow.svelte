@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { _, locale } from 'svelte-i18n';
-	import type { AbsenceRequestSummary } from '@beacon/shared';
+	import { formatDuration, type AbsenceRequestSummary } from '@beacon/shared';
 	import { Badge, Button } from '$lib/components/ui';
 	import { formatRange, statusKey, statusTone, typeName } from '$lib/absence/labels';
 
@@ -22,6 +22,10 @@
 	// A type that costs no quota reports the working days it covers instead — a week
 	// of home office is still a week, it just is not deducted from anything.
 	const days = $derived(absence.costDays > 0 ? absence.costDays : absence.workingDays);
+	// Time off in lieu is still counted in days like everything else — the hours are
+	// what it *costs*, and naming the purse is the whole point of showing them: the
+	// day is off the overtime bank, not off the holiday quota.
+	const overtime = $derived(absence.costMinutes > 0 ? formatDuration(absence.costMinutes) : null);
 </script>
 
 <li class="rounded-card border border-border-default p-4">
@@ -37,7 +41,9 @@
 			<p class="mt-0.5 font-mono text-2xs text-ink-muted">
 				{formatRange(absence.startsOn, absence.endsOn, lang)} · {$_('absence.days', {
 					values: { count: days }
-				})}
+				})}{#if overtime}
+					· {$_('absence.fromOvertime', { values: { hours: overtime } })}
+				{/if}
 			</p>
 		</div>
 		<Badge tone={statusTone(absence.status)}>{$_(statusKey(absence.status))}</Badge>

@@ -69,6 +69,7 @@ describe('Absence (e2e)', () => {
   let otherId: string;
   let vacationTypeId: string;
   let homeOfficeTypeId: string;
+  let overtimeTypeId: string;
   /** A manager: holds `holiday:approve`, and — per DEFAULT_ROLES — not `holiday:request`. */
   let managerToken: string;
 
@@ -88,6 +89,13 @@ describe('Absence (e2e)', () => {
       .expect(201);
 
     return accepted.body.accessToken;
+  }
+
+  /** The running overtime bank, as the timesheet reports it. */
+  async function overtimeFor(token: string): Promise<number> {
+    const week = await http().get('/api/attendance/me/week').set(as(token)).expect(200);
+
+    return week.body.overtime.balanceMinutes as number;
   }
 
   async function balanceFor(token: string, year: number) {
@@ -140,27 +148,46 @@ describe('Absence (e2e)', () => {
   });
 
   describe('absence types', () => {
-    it('seeds the eight built-in types on first read', async () => {
+    it('seeds the nine built-in types on first read', async () => {
       const response = await http().get('/api/absences/types').set(as(staffToken)).expect(200);
 
-      expect(response.body).toHaveLength(8);
+      expect(response.body).toHaveLength(9);
 
       const vacation = response.body.find((type: { key: string }) => type.key === 'vacation');
       const homeOffice = response.body.find((type: { key: string }) => type.key === 'home-office');
+      const overtime = response.body.find((type: { key: string }) => type.key === 'overtime-comp');
 
-      // The three flags are independent: vacation spends the quota, home office is
-      // still a working day that merely shows on the calendar.
-      expect(vacation).toMatchObject({ deductsFromQuota: true, paid: true, countsAsWork: false });
-      expect(homeOffice).toMatchObject({ deductsFromQuota: false, paid: true, countsAsWork: true });
+      // The four flags are independent: vacation spends the quota, home office is
+      // still a working day that merely shows on the calendar, and time off in lieu
+      // spends the overtime bank and nothing else.
+      expect(vacation).toMatchObject({
+        deductsFromQuota: true,
+        paid: true,
+        countsAsWork: false,
+        deductsFromOvertime: false,
+      });
+      expect(homeOffice).toMatchObject({
+        deductsFromQuota: false,
+        paid: true,
+        countsAsWork: true,
+        deductsFromOvertime: false,
+      });
+      expect(overtime).toMatchObject({
+        deductsFromQuota: false,
+        paid: true,
+        countsAsWork: false,
+        deductsFromOvertime: true,
+      });
 
       vacationTypeId = vacation.id;
       homeOfficeTypeId = homeOffice.id;
+      overtimeTypeId = overtime.id;
     });
 
     it('seeds once, not once per read', async () => {
       const response = await http().get('/api/absences/types').set(as(otherToken)).expect(200);
 
-      expect(response.body).toHaveLength(8);
+      expect(response.body).toHaveLength(9);
     });
   });
 
@@ -326,6 +353,77 @@ describe('Absence (e2e)', () => {
         .set(as(ownerToken))
         .send({})
         .expect(403);
+    });
+  });
+
+  describe('time off in lieu', () => {
+    // Ten weeks out, so it collides with none of the ranges above.
+    const from = shift(THIS_MONDAY, 70);
+    const to = shift(THIS_MONDAY, 74);
+    let requestId: string;
+    let bankBefore: number;
+    let quotaBefore: number;
+
+    it('costs the overtime bank, not the quota', async () => {
+      bankBefore = await overtimeFor(staffToken);
+      quotaBefore = (await balanceFor(staffToken, yearOf(from))).takenDays;
+
+      const response = await http()
+        .post('/api/absences')
+        .set(as(staffToken))
+        .send({ typeId: overtimeTypeId, startsOn: from, endsOn: to })
+        .expect(201);
+
+      // Five full-time days, priced in minutes off the bank and nothing off the quota.
+      expect(response.body).toMatchObject({ costDays: 0, costMinutes: 5 * 480, workingDays: 5 });
+
+      requestId = response.body.id;
+    });
+
+    it('spends nothing until the request is approved', async () => {
+      expect(await overtimeFor(staffToken)).toBe(bankBefore);
+    });
+
+    it('halves a half day against the day it names', async () => {
+      const day = shift(THIS_MONDAY, 77);
+      const created = await http()
+        .post('/api/absences')
+        .set(as(staffToken))
+        .send({ typeId: overtimeTypeId, startsOn: day, endsOn: day, halfDayStart: true })
+        .expect(201);
+
+      expect(created.body.costMinutes).toBe(240);
+
+      await http().delete(`/api/absences/${created.body.id}`).set(as(staffToken)).expect(204);
+    });
+
+    it('debits the bank once approved and leaves the quota alone', async () => {
+      await http()
+        .post(`/api/absences/${requestId}/approve`)
+        .set(as(ownerToken))
+        .send({})
+        .expect(201);
+
+      expect(await overtimeFor(staffToken)).toBe(bankBefore - 5 * 480);
+      expect((await balanceFor(staffToken, yearOf(from))).takenDays).toBe(quotaBefore);
+    });
+
+    it('credits the day, so the timesheet does not charge it twice', async () => {
+      // The bank paid for the day already. Leaving it uncredited would book a
+      // full day of shortfall on top, against the same balance.
+      // Ten weeks ahead of the current one — `me/week` pages by offset, not by date.
+      const week = await http()
+        .get('/api/attendance/me/week?offset=10')
+        .set(as(staffToken))
+        .expect(200);
+      const monday = week.body.days.find((day: { date: string }) => day.date === from);
+
+      expect(monday).toMatchObject({
+        absenceTag: 'Overtime compensation',
+        credited: true,
+        balanceMinutes: 0,
+        targetMinutes: 480,
+      });
     });
   });
 
@@ -600,7 +698,7 @@ describe('Absence (e2e)', () => {
     it('reads the absence types, because every screen tags a day with one', async () => {
       const response = await http().get('/api/absences/types').set(as(managerToken)).expect(200);
 
-      expect(response.body).toHaveLength(8);
+      expect(response.body).toHaveLength(9);
     });
 
     it('reads the queue it is expected to decide', async () => {
