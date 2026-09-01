@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { _ } from 'svelte-i18n';
 	import { locale } from 'svelte-i18n';
+	import { SUPPORTED_LOCALES, type LocaleCode } from '@beacon/shared';
 	import type {
 		AbsenceTypeSummary,
 		DepartmentSummary,
@@ -22,6 +23,7 @@
 	import { reindexSearch } from '$lib/api/search';
 	import { formatDate, toneOf, typeName } from '$lib/absence/labels';
 	import { errorKey } from '$lib/auth/errors';
+	import { session } from '$lib/auth/session.svelte';
 
 	let organization = $state<OrganizationSummary | null>(null);
 	let roles = $state<RoleSummary[]>([]);
@@ -30,7 +32,7 @@
 
 	let name = $state('');
 	let timezone = $state('');
-	let defaultLocale = $state('');
+	let defaultLocale = $state<LocaleCode>('en');
 	let saving = $state(false);
 	let saved = $state(false);
 	let saveErrorKey = $state<string | null>(null);
@@ -84,9 +86,14 @@
 			organization = await apiSend<OrganizationSummary>('/organizations/current', 'PATCH', {
 				name: name.trim(),
 				timezone: timezone.trim(),
-				defaultLocale: defaultLocale.trim()
+				defaultLocale
 			});
 			saved = true;
+			// The default language is what everyone who has not chosen one of their own
+			// sees, quite possibly including whoever just changed it — so re-read the
+			// session rather than making them reload to find out whether it took. A
+			// failure here has not undone the save and must not be reported as one.
+			await session.reload().catch(() => {});
 		} catch (error) {
 			saveErrorKey = errorKey(error);
 		} finally {
@@ -210,12 +217,21 @@
 					hint="Europe/Berlin"
 					bind:value={timezone}
 				/>
-				<TextField
-					id="settings-locale"
-					label={$_('org.defaultLocale')}
-					hint="en · de"
-					bind:value={defaultLocale}
-				/>
+				<div class="flex flex-col gap-1.5">
+					<label for="settings-locale" class="text-sm font-semibold">
+						{$_('org.defaultLocale')}
+					</label>
+					<select
+						id="settings-locale"
+						bind:value={defaultLocale}
+						class="rounded-control border border-border-default bg-surface px-3.5 py-2.5 text-sm"
+					>
+						{#each SUPPORTED_LOCALES as code (code)}
+							<option value={code}>{$_(`org.locale.${code}`)}</option>
+						{/each}
+					</select>
+					<p class="text-xs text-ink-muted">{$_('org.defaultLocaleHint')}</p>
+				</div>
 			</div>
 
 			<Button type="submit" variant="primary" size="sm" class="self-start" disabled={saving}>

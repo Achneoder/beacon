@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException, type OnModule
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   DEFAULT_ROLES,
+  resolveLocale,
   type DefaultRole,
   type OrganizationSummary,
   type RoleSummary,
@@ -132,7 +133,9 @@ export class OrganizationService implements OnModuleInit {
       const organization = em.create(Organization, {
         name: input.organizationName,
         slug,
-        defaultLocale: input.locale ?? 'en',
+        // Resolved, not stored raw: registration may pass a browser tag like `de-DE`,
+        // and this column is the language every user without one of their own is shown.
+        defaultLocale: resolveLocale(input.locale),
         timezone: input.timezone ?? 'UTC',
       });
 
@@ -153,7 +156,8 @@ export class OrganizationService implements OnModuleInit {
         firstName: input.firstName,
         lastName: input.lastName,
         status: UserStatus.Active,
-        locale: input.locale ?? organization.defaultLocale,
+        // No locale of their own — the owner follows the organization's default like
+        // everyone else, so changing it in Settings moves them too.
       });
 
       const ownerRole = roles.find((role) => role.key === OWNER_ROLE_KEY);

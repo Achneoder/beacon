@@ -7,6 +7,8 @@
  * `@beacon/shared` and never redeclared there.
  */
 
+import type { LocaleCode } from './locale.js';
+
 /** Lifecycle of an account. A user with history is disabled, never deleted. */
 export const USER_STATUSES = ['invited', 'active', 'disabled'] as const;
 
@@ -71,7 +73,8 @@ export interface UserSummary {
 
 /** Everything the Profile screen draws, plus the fields only a manager may edit. */
 export interface UserDetail extends UserSummary {
-  locale: string;
+  /** The person's own choice. Null means "use the organization's default language". */
+  locale: LocaleCode | null;
   timezone: string | null;
   phone: string | null;
   contractType: ContractType | null;
@@ -101,7 +104,8 @@ export interface EmploymentFields {
   workLocation?: WorkLocation | null;
   phone?: string | null;
   timezone?: string | null;
-  locale?: string;
+  /** Null clears the personal choice and hands the person back to the organization's. */
+  locale?: LocaleCode | null;
   startsOn?: string | null;
   endsOn?: string | null;
 }
@@ -121,7 +125,8 @@ export type UpdateUserRequest = Partial<Omit<CreateUserRequest, 'email' | 'roleI
 /** What a person may change about themselves — nothing that affects employment. */
 export interface UpdateOwnProfileRequest {
   phone?: string | null;
-  locale?: string;
+  /** Null clears the personal choice and hands the person back to the organization's. */
+  locale?: LocaleCode | null;
   timezone?: string | null;
 }
 

@@ -1,5 +1,5 @@
-import { IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import type { UpdateOwnProfileRequest } from '@beacon/shared';
+import { IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { SUPPORTED_LOCALES, type LocaleCode, type UpdateOwnProfileRequest } from '@beacon/shared';
 
 /**
  * Deliberately three fields. Everything else on the Profile screen is employment data,
@@ -13,10 +13,11 @@ export class UpdateProfileDto implements UpdateOwnProfileRequest {
   @MaxLength(40)
   phone?: string | null;
 
+  /** Null hands the person back to the organization's default language. */
   @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  locale?: string;
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(SUPPORTED_LOCALES)
+  locale?: LocaleCode | null;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)

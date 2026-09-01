@@ -4,6 +4,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import { ref, type Ref } from '@mikro-orm/core';
 import {
   fullName,
+  resolveLocale,
   type CreatedInvitation,
   type InvitationSummary,
   type Permission,
@@ -95,7 +96,10 @@ export class InvitationsService {
       office: dto.office ?? null,
       workLocation: dto.workLocation ?? null,
       timezone: dto.timezone ?? null,
-      locale: dto.locale ?? 'en',
+      // Null, not 'en': an invitation with no language of its own follows the
+      // organization's default — both for the email below and for the account it
+      // becomes.
+      locale: dto.locale ?? null,
       startsOn: dto.startsOn ?? null,
     });
 
@@ -103,6 +107,7 @@ export class InvitationsService {
     await this.em.flush();
     await this.em.populate(invitation, ['roles', 'invitedBy', 'organization']);
 
+    const organization = invitation.organization.getEntity();
     const summary = toInvitationSummary(invitation);
     const url = acceptUrl(this.webBaseUrl(), token);
     // After the flush, and never inside it: a relay that is slow or down must not roll
@@ -111,10 +116,10 @@ export class InvitationsService {
       invitationEmail({
         email: invitation.email,
         firstName: invitation.firstName,
-        organizationName: invitation.organization.getEntity().name,
+        organizationName: organization.name,
         invitedByName: summary.invitedByName,
         acceptUrl: url,
-        locale: invitation.locale,
+        locale: resolveLocale(invitation.locale, organization.defaultLocale),
       }),
     );
 

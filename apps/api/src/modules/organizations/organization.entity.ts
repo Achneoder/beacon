@@ -1,4 +1,5 @@
 import { Entity, Property, Unique } from '@mikro-orm/core';
+import type { LocaleCode } from '@beacon/shared';
 import { BaseEntity } from '../../common/entities/base.entity.js';
 
 /**
@@ -16,8 +17,9 @@ export class Organization extends BaseEntity {
   @Property({ type: 'string', length: 100 })
   slug!: string;
 
+  /** The language every user who has not chosen one of their own is shown. */
   @Property({ type: 'string', length: 10, default: 'en' })
-  defaultLocale: string = 'en';
+  defaultLocale: LocaleCode = 'en';
 
   @Property({ type: 'string', length: 64, default: 'UTC' })
   timezone: string = 'UTC';

@@ -53,18 +53,18 @@ class SessionState {
 	/** Restores the session from the refresh cookie. A failure just means "signed out". */
 	async bootstrap(): Promise<void> {
 		try {
-			this.adopt(await apiSend<AuthResponse>('/auth/refresh', 'POST'));
+			await this.adopt(await apiSend<AuthResponse>('/auth/refresh', 'POST'));
 		} catch {
 			this.clear();
 		}
 	}
 
 	async login(credentials: LoginRequest): Promise<void> {
-		this.adopt(await apiSend<AuthResponse>('/auth/login', 'POST', credentials));
+		await this.adopt(await apiSend<AuthResponse>('/auth/login', 'POST', credentials));
 	}
 
 	async register(registration: RegisterOrganizationRequest): Promise<void> {
-		this.adopt(await apiSend<AuthResponse>('/auth/register', 'POST', registration));
+		await this.adopt(await apiSend<AuthResponse>('/auth/register', 'POST', registration));
 	}
 
 	/**
@@ -72,7 +72,7 @@ class SessionState {
 	 * no existing session — and acceptance signs the newcomer straight in.
 	 */
 	async acceptInvitation(request: AcceptInvitationRequest): Promise<void> {
-		this.adopt(await apiSend<AuthResponse>('/invitations/accept', 'POST', request));
+		await this.adopt(await apiSend<AuthResponse>('/invitations/accept', 'POST', request));
 	}
 
 	async logout(): Promise<void> {
@@ -89,11 +89,35 @@ class SessionState {
 		if (this.#user) this.#user = { ...this.#user, ...changes };
 	}
 
-	private adopt(response: AuthResponse): void {
+	/**
+	 * Re-reads the account, which is what lets a change to the organization's default
+	 * language show up without a reload. `SessionUser.locale` is resolved per request
+	 * against the organization, so the API is the only side that can answer it.
+	 */
+	async reload(): Promise<void> {
+		if (!this.isAuthenticated) return;
+
+		await this.apply(await api<SessionUser>('/auth/me'));
+	}
+
+	private async adopt(response: AuthResponse): Promise<void> {
 		setAccessToken(response.accessToken);
-		this.#user = response.user;
 		this.#status = 'authenticated';
-		locale.set(response.user.locale);
+		await this.apply(response.user);
+	}
+
+	/**
+	 * The language comes from the API already resolved — the person's own choice when
+	 * they made one, the organization's `defaultLocale` when they did not.
+	 *
+	 * Awaited rather than fired and forgotten: `locale.set` has to fetch the dictionary,
+	 * and the root layout gates its first render on `bootstrap()`, so awaiting here is
+	 * what opens the app in the right language instead of repainting out of English a
+	 * tick later.
+	 */
+	private async apply(user: SessionUser): Promise<void> {
+		this.#user = user;
+		await locale.set(user.locale);
 	}
 
 	private clear(): void {

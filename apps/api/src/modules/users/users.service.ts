@@ -115,7 +115,9 @@ export class UsersService {
         email,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        locale: dto.locale ?? 'en',
+        // No locale: unset means "follow the organization's default language", and
+        // `applyEmployment` below is the one place a caller-supplied one is written.
+        //
         // Created without a password: the account is reachable only once someone sets
         // one, which is what an invitation is for.
         status: UserStatus.Invited,

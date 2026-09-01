@@ -119,6 +119,16 @@ a reason.
   finish booting if it asked for `sse-s3` and the bucket does not confirm it.
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
   (`apps/web/src/lib/i18n/`, locales `en` + `de`). No hardcoded strings. Target WCAG 2.1.
+- **The API decides which language, and `SUPPORTED_LOCALES` is the list.** `User.locale`
+  and `Invitation.locale` are nullable, meaning "follow `Organization.defaultLocale`" —
+  the same shape as the `timezone` column beside each of them. `resolveLocale`
+  (`@beacon/shared`) is the one resolution rule: first preference that Beacon has copy
+  for, `en` if none, and a regional tag matches its base (`de-DE` → `de`). `toSessionUser`
+  applies it, so `SessionUser.locale` is an answer and `UserDetail.locale` is the raw,
+  still-nullable preference. The web only ever reads the resolved one — the SPA has no
+  business re-deriving it, and cannot: it does not hold the organization's default.
+  Anything taking a locale from a client validates `@IsIn(SUPPORTED_LOCALES)`; free text
+  used to be accepted and a language with no dictionary saved cleanly and changed nothing.
 
 ## Auth
 

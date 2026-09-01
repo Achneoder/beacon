@@ -9,7 +9,7 @@ import {
   Unique,
   type Ref,
 } from '@mikro-orm/core';
-import type { ContractType, Permission, WorkLocation } from '@beacon/shared';
+import type { ContractType, LocaleCode, Permission, WorkLocation } from '@beacon/shared';
 import { CONTRACT_TYPES, WORK_LOCATIONS } from '@beacon/shared';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
 import { Department } from '../departments/department.entity.js';
@@ -54,8 +54,13 @@ export class User extends OrganizationScopedEntity<'permissions'> {
   @Enum({ items: () => UserStatus, type: 'string', default: UserStatus.Active })
   status: UserStatus = UserStatus.Active;
 
-  @Property({ type: 'string', length: 10, default: 'en' })
-  locale: string = 'en';
+  /**
+   * The person's own language. Null falls back to `Organization.defaultLocale` at the
+   * edge, exactly like `timezone` below — that is what makes the organization setting
+   * a *default* rather than a value only ever read once, at registration.
+   */
+  @Property({ type: 'string', length: 10, nullable: true })
+  locale: LocaleCode | null = null;
 
   /** IANA zone. Null falls back to `Organization.timezone` at the edge. */
   @Property({ type: 'string', length: 64, nullable: true })

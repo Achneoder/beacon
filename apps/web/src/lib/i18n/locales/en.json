@@ -157,7 +157,12 @@
 	"org": {
 		"label": "Organization",
 		"timezone": "Time zone",
-		"defaultLocale": "Default language"
+		"defaultLocale": "Default language",
+		"defaultLocaleHint": "Everyone who has not chosen a language of their own sees this one.",
+		"locale": {
+			"en": "English",
+			"de": "German"
+		}
 	},
 	"roles": {
 		"owner": "Owner",

@@ -1,5 +1,5 @@
 import { Collection, Entity, Enum, Index, ManyToMany, ManyToOne, Property, type Ref } from '@mikro-orm/core';
-import type { ContractType, WorkLocation } from '@beacon/shared';
+import type { ContractType, LocaleCode, WorkLocation } from '@beacon/shared';
 import { CONTRACT_TYPES, WORK_LOCATIONS } from '@beacon/shared';
 import { OrganizationScopedEntity } from '../../common/entities/organization-scoped.entity.js';
 import { Department } from '../departments/department.entity.js';
@@ -67,8 +67,12 @@ export class Invitation extends OrganizationScopedEntity {
   @Property({ type: 'string', length: 64, nullable: true })
   timezone: string | null = null;
 
-  @Property({ type: 'string', length: 10, default: 'en' })
-  locale: string = 'en';
+  /**
+   * The language the invitation email is written in, and the invitee's own once they
+   * accept. Null follows `Organization.defaultLocale`, like `timezone` above.
+   */
+  @Property({ type: 'string', length: 10, nullable: true })
+  locale: LocaleCode | null = null;
 
   @Property({ type: 'date', nullable: true })
   startsOn: string | null = null;

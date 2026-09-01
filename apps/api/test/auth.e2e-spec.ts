@@ -228,6 +228,47 @@ describe('Auth (e2e)', () => {
       expect(updated.body.timezone).toBe('Europe/Berlin');
     });
 
+    it('refuses a default language Beacon has no copy for', async () => {
+      // Free text used to be accepted here, so a typo saved cleanly and changed
+      // nothing — which is exactly what "I set de and still see English" looked like.
+      await request(app.getHttpServer())
+        .patch('/api/organizations/current')
+        .set('authorization', `Bearer ${accessToken}`)
+        .send({ defaultLocale: 'de-DE' })
+        .expect(400);
+    });
+
+    it('moves everyone without a language of their own to the new default', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/organizations/current')
+        .set('authorization', `Bearer ${accessToken}`)
+        .send({ defaultLocale: 'de' })
+        .expect(200);
+
+      // The owner never chose a language, so the organization's default is theirs —
+      // the whole point of calling it a default. No new token needed: `locale` is
+      // resolved per request, not carried in the access token.
+      const me = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(me.body.locale).toBe('de');
+
+      await request(app.getHttpServer())
+        .patch('/api/organizations/current')
+        .set('authorization', `Bearer ${accessToken}`)
+        .send({ defaultLocale: 'en' })
+        .expect(200);
+
+      const back = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(back.body.locale).toBe('en');
+    });
+
     it('seeds the four built-in roles', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/organizations/current/roles')

@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { createHash, randomBytes } from 'node:crypto';
 import type { AuthResponse, SessionUser, SetupState, SsoErrorCode } from '@beacon/shared';
+import { resolveLocale } from '@beacon/shared';
 import { OrganizationService } from '../organizations/organization.service.js';
 import { lockAdvisory } from '../../common/db/advisory-lock.js';
 import { SsoProvider } from '../sso/sso-provider.entity.js';
@@ -287,7 +288,9 @@ export function toSessionUser(user: User): SessionUser {
     permissions: user.permissions,
     firstName: user.firstName,
     lastName: user.lastName,
-    locale: user.locale,
+    // The one place both halves are known, so the SPA is handed an answer rather
+    // than a preference it would have to resolve without the organization at hand.
+    locale: resolveLocale(user.locale, organization.defaultLocale),
     timezone: user.timezone,
     jobTitle: user.jobTitle,
     roleKeys: user.roles.getItems().map((role) => role.key),

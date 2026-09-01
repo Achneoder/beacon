@@ -163,6 +163,41 @@ describe('People (e2e)', () => {
       expect(response.body).toMatchObject({ phone: '+49 30 123456', timezone: 'Europe/Berlin' });
     });
 
+    it('lets a person pick their own language, and hand it back to the organization', async () => {
+      const chosen = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set(auth())
+        .send({ locale: 'de' })
+        .expect(200);
+
+      expect(chosen.body.locale).toBe('de');
+
+      // Their own choice outranks the organization's default while it stands.
+      const me = await request(app.getHttpServer()).get('/api/auth/me').set(auth()).expect(200);
+      expect(me.body.locale).toBe('de');
+
+      // Null is how a person stops choosing — `UserDetail.locale` goes back to null and
+      // the session follows the organization again, exactly like `timezone` beside it.
+      const cleared = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set(auth())
+        .send({ locale: null })
+        .expect(200);
+
+      expect(cleared.body.locale).toBeNull();
+
+      const back = await request(app.getHttpServer()).get('/api/auth/me').set(auth()).expect(200);
+      expect(back.body.locale).toBe('en');
+    });
+
+    it('refuses a language Beacon has no copy for', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set(auth())
+        .send({ locale: 'fr' })
+        .expect(400);
+    });
+
     it('refuses an employment field smuggled into the self-service patch', async () => {
       // The DTO whitelist is the guard: a person cannot promote themselves by
       // patching their own job title, even holding employee:manage.

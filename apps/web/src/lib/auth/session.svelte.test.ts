@@ -1,7 +1,10 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import { get } from 'svelte/store';
+import { locale } from 'svelte-i18n';
 import type { SessionUser } from '@beacon/shared';
 import { session } from './session.svelte';
 import { apiSend, getAccessToken } from '$lib/api/client';
+import '$lib/i18n';
 
 const user: SessionUser = {
 	id: 'u1',
@@ -18,8 +21,17 @@ const user: SessionUser = {
 	organizationSlug: 'acme'
 };
 
-const authResponse = (token = 'token-abc') =>
-	new Response(JSON.stringify({ accessToken: token, expiresIn: 900, user }), {
+const authResponse = (token = 'token-abc', overrides: Partial<SessionUser> = {}) =>
+	new Response(
+		JSON.stringify({ accessToken: token, expiresIn: 900, user: { ...user, ...overrides } }),
+		{
+			status: 200,
+			headers: { 'content-type': 'application/json' }
+		}
+	);
+
+const json = (body: unknown) =>
+	new Response(JSON.stringify(body), {
 		status: 200,
 		headers: { 'content-type': 'application/json' }
 	});
@@ -74,6 +86,30 @@ describe('session', () => {
 
 		expect(session.status).toBe('anonymous');
 		expect(getAccessToken()).toBeNull();
+	});
+
+	// The API resolves the language — the user's own choice, or the organization's
+	// default when they never made one — so signing in is what puts the SPA into it.
+	// Without this the whole app stayed on the browser's language whatever Settings said.
+	it('renders in the language the API resolved for the account', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(authResponse('token-de', { locale: 'de' })));
+
+		await session.login({ email: user.email, password: 'correct-horse-battery' });
+
+		expect(get(locale)).toBe('de');
+	});
+
+	it('follows the language again when the session is re-read', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(authResponse('token-de', { locale: 'de' })));
+		await session.login({ email: user.email, password: 'correct-horse-battery' });
+
+		// What Settings → Organization does after saving a new default language, so the
+		// person who changed it sees it without reloading the app.
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ ...user, locale: 'en' })));
+		await session.reload();
+
+		expect(get(locale)).toBe('en');
+		expect(session.user?.locale).toBe('en');
 	});
 
 	it('drops to anonymous when a mid-session refresh fails', async () => {

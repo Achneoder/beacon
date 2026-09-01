@@ -12,9 +12,11 @@ import {
 } from 'class-validator';
 import {
   CONTRACT_TYPES,
+  SUPPORTED_LOCALES,
   WORK_LOCATIONS,
   type ContractType,
   type EmploymentFields,
+  type LocaleCode,
   type WorkLocation,
 } from '@beacon/shared';
 
@@ -81,10 +83,11 @@ export class EmploymentDto implements EmploymentFields {
   @MaxLength(64)
   timezone?: string | null;
 
+  /** Null, or omitted, follows the organization's default language. */
   @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  locale?: string;
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(SUPPORTED_LOCALES)
+  locale?: LocaleCode | null;
 
   /** A plain calendar date — an employment start has no time of day. */
   @IsOptional()

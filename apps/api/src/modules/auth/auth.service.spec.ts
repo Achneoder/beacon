@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { AuthService } from './auth.service.js';
+import { AuthService, toSessionUser } from './auth.service.js';
 import { SsoProvider } from '../sso/sso-provider.entity.js';
 import { User, UserStatus } from '../users/user.entity.js';
 
@@ -119,5 +119,37 @@ describe('AuthService.login — sso enforcement', () => {
     em.findOne.mockImplementation((entity: unknown) => (entity === User ? Promise.resolve(null) : Promise.resolve(null)));
 
     await expect(service.login(CREDENTIALS)).rejects.toThrow(UnauthorizedException);
+  });
+});
+
+describe('toSessionUser', () => {
+  const sessionSource = (locale: string | null, defaultLocale: string) =>
+    ({
+      id: 'user-1',
+      email: 'ada@acme.test',
+      permissions: [],
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      locale,
+      timezone: null,
+      jobTitle: null,
+      roles: { getItems: () => [] },
+      organization: {
+        getEntity: () => ({ id: 'org-1', name: 'Acme', slug: 'acme', defaultLocale }),
+      },
+    }) as unknown as User;
+
+  it('hands the SPA the organization default when the user chose no language', () => {
+    // The bug this replaced: `users.locale` was `not null default 'en'`, so setting the
+    // organization's default language moved nobody and the whole install stayed English.
+    expect(toSessionUser(sessionSource(null, 'de')).locale).toBe('de');
+  });
+
+  it("prefers the user's own choice over the organization's default", () => {
+    expect(toSessionUser(sessionSource('en', 'de')).locale).toBe('en');
+  });
+
+  it('falls back to english when neither is a language Beacon ships', () => {
+    expect(toSessionUser(sessionSource(null, 'fr')).locale).toBe('en');
   });
 });

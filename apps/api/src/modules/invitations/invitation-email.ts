@@ -7,7 +7,10 @@ export interface InvitationEmailInput {
   organizationName: string;
   invitedByName: string | null;
   acceptUrl: string;
-  /** The invitee's locale, as recorded on the invitation. Anything else falls back to `en`. */
+  /**
+   * The language to write in — already resolved by the caller against the invitation
+   * and then the organization's default. Anything unrecognised still falls back to `en`.
+   */
   locale: string;
   expiresInDays?: number;
 }
@@ -17,7 +20,8 @@ export interface InvitationEmailInput {
  * justify a renderer, and a pure function is the part worth testing.
  *
  * The invitee has no account yet, so the API cannot read a preference — the locale is
- * whatever the inviter chose on the invitation, defaulting to the organization's.
+ * whatever the inviter chose on the invitation, and the organization's default when
+ * they chose nothing.
  */
 const COPY = {
   en: {
