@@ -128,6 +128,24 @@ a reason.
   `attachment`: a pdf rendered inline would run on the API's origin. The web app opens
   what a browser can render from a `blob:` URL (`openBlob`, `lib/api/client.ts`) and
   saves the rest, so nothing personal reaches a shared machine's disk unless it must.
+- **An absence type spends a named purse, and the flags are independent.**
+  `deductsFromQuota` is the leave quota, `deductsFromOvertime` is the overtime bank,
+  `countsAsWork` is neither — home office is a working day that merely shows on the
+  calendar. `overtime-comp` (time off in lieu) is seeded spending the bank and nothing
+  else, which is the whole point: it must never touch someone's holiday. Both costs are
+  **frozen onto the row** when the request is raised (`costDays`, `costMinutes`) and
+  committed on approval, because a public holiday declared in November and a contract
+  signed in it must not rewrite what an August day off was worth. The bank is debited in
+  minutes, priced per weekday from the effective-dated schedule — a part-time Friday is
+  not a part-time Monday, and a day count could not see the difference.
+- **The day stays credited, and the bank is charged exactly once.** `creditsTarget` is
+  `!countsAsWork`, so a compensated day meets its target and reads `0:00` on the
+  timesheet; the debit happens once, on approval, through `commitToOvertime`. Leaving it
+  uncredited would look right and charge the same balance twice — once explicitly, once
+  as the day's shortfall. `AbsencesService` writes `OvertimeBalance` directly through
+  `ensureOvertimeBalance` (`modules/attendance/overtime.ts`) rather than through
+  `AttendanceService`, which imports it for `coverageOf`; both writers move the row by a
+  *delta*, never by assignment, which is what lets them share it.
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
   (`apps/web/src/lib/i18n/`, locales `en` + `de`). No hardcoded strings. Target WCAG 2.1.
 - **The API decides which language, and `SUPPORTED_LOCALES` is the list.** `User.locale`
