@@ -16,6 +16,7 @@ import { InstanceModule } from './modules/instance/instance.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard.js';
 import { OrganizationModule } from './modules/organizations/organization.module.js';
+import { RolesModule } from './modules/roles/roles.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { DepartmentsModule } from './modules/departments/departments.module.js';
 import { TeamsModule } from './modules/teams/teams.module.js';
@@ -50,6 +51,7 @@ import { SsoModule } from './modules/sso/sso.module.js';
     InstanceModule,
     AuthModule,
     OrganizationModule,
+    RolesModule,
     UsersModule,
     DepartmentsModule,
     TeamsModule,

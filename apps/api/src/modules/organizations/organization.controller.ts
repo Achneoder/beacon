@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch } from '@nestjs/common';
-import type { AuthenticatedUser, OrganizationSummary, RoleSummary } from '@beacon/shared';
+import type { AuthenticatedUser, OrganizationSummary } from '@beacon/shared';
 import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
 import { OrganizationService, toOrganizationSummary } from './organization.service.js';
@@ -26,11 +26,5 @@ export class OrganizationController {
     @Body() changes: UpdateOrganizationDto,
   ): Promise<OrganizationSummary> {
     return toOrganizationSummary(await this.organizations.update(user.organizationId, changes));
-  }
-
-  @Get('current/roles')
-  @RequirePermissions('organization:read')
-  listRoles(@CurrentUser() user: AuthenticatedUser): Promise<RoleSummary[]> {
-    return this.organizations.listRoles(user.organizationId);
   }
 }

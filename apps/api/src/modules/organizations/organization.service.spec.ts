@@ -29,13 +29,16 @@ describe('OrganizationService.onModuleInit', () => {
     expect(em.flush).toHaveBeenCalledTimes(1);
   });
 
-  it('only queries roles marked isSystem', async () => {
+  it('only queries system roles the organization has not edited', async () => {
+    // The query is the whole protection: a role somebody edited in the role editor
+    // must never be handed to the loop below, which would rewrite it from
+    // DEFAULT_ROLES on the next boot and silently undo their change.
     const em = fakeEm([]);
     const service = new OrganizationService(em as never);
 
     await service.onModuleInit();
 
-    expect(em.find).toHaveBeenCalledWith(Role, { isSystem: true });
+    expect(em.find).toHaveBeenCalledWith(Role, { isSystem: true, customized: false });
   });
 
   it('does not flush when every system role already matches its defaults', async () => {

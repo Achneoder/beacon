@@ -517,7 +517,7 @@ describe('Absence (e2e)', () => {
       const bossId = people.body.find((person: { email: string }) => person.email === BOSS_EMAIL).id;
 
       const roles = await http()
-        .get('/api/organizations/current/roles')
+        .get('/api/roles')
         .set(as(ownerToken))
         .expect(200);
       const manager = roles.body.find((role: { key: string }) => role.key === 'manager');
