@@ -501,4 +501,159 @@ describe('Attendance (e2e)', () => {
       await http().post('/api/attendance/clock-out').set(as(ownerToken)).expect(201);
     });
   });
+  /**
+   * `Organization.selfApproveCorrections` — the switch that lets people put their own
+   * timesheet right without a manager deciding it. Runs last because it changes an
+   * organization-wide setting, and puts it back before it finishes.
+   */
+  describe('self-approved corrections', () => {
+    /** A Saturday, so the fallback schedule expects nothing and the balance move is exact. */
+    const SATURDAY = '2026-08-15';
+
+    async function setSelfApproval(enabled: boolean): Promise<void> {
+      const response = await http()
+        .patch('/api/organizations/current')
+        .set(as(ownerToken))
+        .send({ selfApproveCorrections: enabled })
+        .expect(200);
+
+      expect(response.body.selfApproveCorrections).toBe(enabled);
+    }
+
+    async function balanceOf(token: string): Promise<number> {
+      const week = await http().get('/api/attendance/me/week').set(as(token)).expect(200);
+
+      return week.body.overtime.balanceMinutes;
+    }
+
+    it('is off until an administrator turns it on', async () => {
+      const week = await http().get('/api/attendance/me/week').set(as(staffToken)).expect(200);
+
+      // The week carries it because the timesheet needs it and an employee holds
+      // `attendance:read` but not `organization:read`.
+      expect(week.body.selfApproveCorrections).toBe(false);
+    });
+
+    it('refuses an employee the setting itself', async () => {
+      await http()
+        .patch('/api/organizations/current')
+        .set(as(staffToken))
+        .send({ selfApproveCorrections: true })
+        .expect(403);
+    });
+
+    it('refuses anything but a boolean', async () => {
+      // `"false"` is truthy, so a looser validator would switch the safeguard off.
+      await http()
+        .patch('/api/organizations/current')
+        .set(as(ownerToken))
+        .send({ selfApproveCorrections: 'false' })
+        .expect(400);
+    });
+
+    it('applies a person’s own correction on the spot, and banks the hours', async () => {
+      await setSelfApproval(true);
+
+      const before = await balanceOf(staffToken);
+
+      const created = await http()
+        .post('/api/attendance/corrections')
+        .set(as(staffToken))
+        .send({
+          kind: 'add',
+          startedAt: `${SATURDAY}T07:00:00.000Z`,
+          endedAt: `${SATURDAY}T11:00:00.000Z`,
+          breakMinutes: 0,
+          reason: 'Came in on the Saturday for the migration.',
+        })
+        .expect(201);
+
+      // Approved on creation, with the requester recorded as its own decider — not
+      // left pending against a manager who never saw it.
+      expect(created.body).toMatchObject({ status: 'approved', requestedByName: 'Sam Tester' });
+      expect(created.body.decidedAt).not.toBeNull();
+      expect(created.body.approverName).toBe('Sam Tester');
+
+      const segments = await http()
+        .get(`/api/attendance?from=${SATURDAY}&to=${SATURDAY}`)
+        .set(as(staffToken))
+        .expect(200);
+
+      const work = segments.body.find((segment: { kind: string }) => segment.kind === 'work');
+      expect(work).toMatchObject({ source: 'manual', durationMinutes: 240 });
+
+      // A Saturday expects nothing, so the four hours are pure overtime — banked by
+      // the correction itself, with no second request anywhere.
+      expect(await balanceOf(staffToken)).toBe(before + 240);
+    });
+
+    it('leaves nothing behind in the approval queue', async () => {
+      const queue = await http()
+        .get('/api/attendance/corrections?mine=false')
+        .set(as(ownerToken))
+        .expect(200);
+
+      const forSaturday = queue.body.filter(
+        (correction: { date: string }) => correction.date === SATURDAY,
+      );
+      expect(forSaturday).toHaveLength(1);
+      expect(forSaturday[0].status).toBe('approved');
+    });
+
+    it('still refuses an employee someone else’s correction', async () => {
+      const created = await http()
+        .post('/api/attendance/corrections')
+        .set(as(outsiderToken))
+        .send({
+          kind: 'add',
+          startedAt: `${SATURDAY}T09:00:00.000Z`,
+          endedAt: `${SATURDAY}T10:00:00.000Z`,
+          breakMinutes: 0,
+          reason: 'An hour of my own on the Saturday.',
+        })
+        .expect(201);
+
+      // Self-approval is the organization deciding what an *own* correction does. It
+      // is not a permission over the approval queue: deciding someone else's still
+      // needs `attendance:approve`, and an already-decided row cannot be redecided.
+      await http()
+        .post(`/api/attendance/corrections/${created.body.id}/approve`)
+        .set(as(staffToken))
+        .send({})
+        .expect(403);
+
+      await http()
+        .post(`/api/attendance/corrections/${created.body.id}/reject`)
+        .set(as(ownerToken))
+        .send({})
+        .expect(400);
+    });
+
+    it('routes to the manager again once it is turned back off', async () => {
+      await setSelfApproval(false);
+
+      const created = await http()
+        .post('/api/attendance/corrections')
+        .set(as(staffToken))
+        .send({
+          kind: 'add',
+          startedAt: '2026-08-16T07:00:00.000Z',
+          endedAt: '2026-08-16T09:00:00.000Z',
+          breakMinutes: 0,
+          reason: 'And the Sunday, which needs asking for.',
+        })
+        .expect(201);
+
+      expect(created.body).toMatchObject({ status: 'pending' });
+      expect(created.body.decidedAt).toBeNull();
+
+      const segments = await http()
+        .get('/api/attendance?from=2026-08-16&to=2026-08-16')
+        .set(as(staffToken))
+        .expect(200);
+
+      // Nothing is written until it is decided.
+      expect(segments.body).toEqual([]);
+    });
+  });
 });

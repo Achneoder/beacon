@@ -74,6 +74,12 @@ export interface UpdateOrganizationRequest {
    */
   defaultLocale?: LocaleCode;
   timezone?: string;
+  /**
+   * Whether a person's own timesheet correction takes effect on the spot instead of
+   * waiting for their manager. Off by default: approval is the safer arrangement, so
+   * dropping it has to be an administrator's explicit decision.
+   */
+  selfApproveCorrections?: boolean;
 }
 
 export interface OrganizationSummary {
@@ -82,6 +88,8 @@ export interface OrganizationSummary {
   slug: string;
   defaultLocale: LocaleCode;
   timezone: string;
+  /** See {@link UpdateOrganizationRequest.selfApproveCorrections}. */
+  selfApproveCorrections: boolean;
 }
 
 /**

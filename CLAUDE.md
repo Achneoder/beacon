@@ -93,6 +93,22 @@ a reason.
   `SELF_SERVICE_PERMISSIONS` (`@beacon/shared`) is the exemption that keeps an admin able to
   hand out the default `employee` role; add to it only for a permission whose every code path
   is scoped to the holder's own record.
+- **A timesheet only ever changes through a correction row.** Once a week locks, an entry is
+  amended by `AttendanceCorrection`, never by an edit — the row is the audit trail, which is why
+  approving writes the change through. `Organization.selfApproveCorrections` decides only
+  *whether the row waits*: `requestCorrection` creates it `pending` for the requester's manager,
+  or `approved` and applied in the same transaction with the requester recorded as its own
+  decider. It is not a second write path, and the trail of a trust-based organization reads like
+  an approving one's. It defaults false and reads false whenever the organization cannot be
+  resolved — approval is the arrangement the flow was built around, and no upgrade may drop it
+  silently. `decideCorrection` is untouched: deciding *someone else's* correction still needs
+  `attendance:approve` and still refuses a caller their own row, because self-approval is a
+  standing organization decision and not a permission over the approval queue. Self-applied
+  corrections serialize on `CORRECTION_SELF_APPROVE_LOCK`, keyed on the person and the day —
+  there is no row to collide on, but two landing together would recompute one day's balance from
+  the same stale figure. The web reads the setting off `TimesheetWeek.selfApproveCorrections`,
+  because a plain employee holds `attendance:read` but not `organization:read`, and it changes
+  copy only.
 - **Every response carries the same headers**, set by `securityHeaders`
   (`common/http/`) before routing: `Cache-Control: no-store` above all, because
   everything this API returns is personal data and Beacon runs on shared workstations,

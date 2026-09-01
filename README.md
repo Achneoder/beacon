@@ -107,8 +107,11 @@ different projects or tasks.
 
 A dashboard for users to view their attendance and time tracking data, plus a calendar view for
 planning holidays and breaks. Employers can manage their employees' attendance and time tracking
-data, and approve or reject holiday requests and breaks. Reporting and analytics let organizations
-track attendance trends and identify areas for improvement.
+data, and approve or reject holiday requests and breaks. Once a week is closed, changing a day is
+a correction request that the person's manager decides — or, where the organization prefers to
+trust its people, one that applies straight away and is simply recorded against the name of
+whoever made it (Settings → Organization → Time tracking). Reporting and analytics let
+organizations track attendance trends and identify areas for improvement.
 
 ### Documents
 

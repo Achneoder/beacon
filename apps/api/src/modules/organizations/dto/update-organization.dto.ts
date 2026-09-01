@@ -1,4 +1,12 @@
-import { IsIn, IsOptional, IsString, IsTimeZone, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsTimeZone,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { SUPPORTED_LOCALES, type LocaleCode, type UpdateOrganizationRequest } from '@beacon/shared';
 
 /** The slug and id are never client-settable — they identify the tenant. */
@@ -22,4 +30,13 @@ export class UpdateOrganizationDto implements UpdateOrganizationRequest {
   @IsTimeZone()
   @MaxLength(64)
   timezone?: string;
+
+  /**
+   * Turning approval off for a person's own corrections. A boolean rather than
+   * anything looser: `class-validator` would otherwise let the string `"false"`
+   * through as truthy and switch the safeguard off by accident.
+   */
+  @IsOptional()
+  @IsBoolean()
+  selfApproveCorrections?: boolean;
 }

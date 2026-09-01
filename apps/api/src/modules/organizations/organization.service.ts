@@ -180,6 +180,9 @@ export class OrganizationService implements OnModuleInit {
     if (changes.name !== undefined) organization.name = changes.name;
     if (changes.defaultLocale !== undefined) organization.defaultLocale = changes.defaultLocale;
     if (changes.timezone !== undefined) organization.timezone = changes.timezone;
+    if (changes.selfApproveCorrections !== undefined) {
+      organization.selfApproveCorrections = changes.selfApproveCorrections;
+    }
 
     await this.em.flush();
 
@@ -211,5 +214,6 @@ export function toOrganizationSummary(organization: Organization): OrganizationS
     slug: organization.slug,
     defaultLocale: organization.defaultLocale,
     timezone: organization.timezone,
+    selfApproveCorrections: organization.selfApproveCorrections,
   };
 }
