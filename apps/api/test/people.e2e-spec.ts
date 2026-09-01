@@ -198,6 +198,16 @@ describe('People (e2e)', () => {
         .expect(400);
     });
 
+    it('refuses a zone no formatter would accept', async () => {
+      // The same reason the language is not free text: `Europe/Berlon` used to save
+      // cleanly and then put every clock-in of the day on the wrong clock.
+      await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set(auth())
+        .send({ timezone: 'Europe/Berlon' })
+        .expect(400);
+    });
+
     it('refuses an employment field smuggled into the self-service patch', async () => {
       // The DTO whitelist is the guard: a person cannot promote themselves by
       // patching their own job title, even holding employee:manage.

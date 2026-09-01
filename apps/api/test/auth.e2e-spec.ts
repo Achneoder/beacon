@@ -228,6 +228,16 @@ describe('Auth (e2e)', () => {
       expect(updated.body.timezone).toBe('Europe/Berlin');
     });
 
+    it('refuses a default zone no formatter would accept', async () => {
+      // The zone everyone without one of their own is measured against, so a typo
+      // here misplaces the whole organization's day, silently.
+      await request(app.getHttpServer())
+        .patch('/api/organizations/current')
+        .set('authorization', `Bearer ${accessToken}`)
+        .send({ timezone: 'Europe/Berlon' })
+        .expect(400);
+    });
+
     it('refuses a default language Beacon has no copy for', async () => {
       // Free text used to be accepted here, so a typo saved cleanly and changed
       // nothing — which is exactly what "I set de and still see English" looked like.

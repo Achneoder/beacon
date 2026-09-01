@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsTimeZone, MaxLength, MinLength } from 'class-validator';
 import { SUPPORTED_LOCALES, type LocaleCode, type UpdateOrganizationRequest } from '@beacon/shared';
 
 /** The slug and id are never client-settable — they identify the tenant. */
@@ -17,8 +17,9 @@ export class UpdateOrganizationDto implements UpdateOrganizationRequest {
   @IsIn(SUPPORTED_LOCALES)
   defaultLocale?: LocaleCode;
 
+  /** Only a zone `Intl` accepts — the same reason `defaultLocale` is not free text. */
   @IsOptional()
-  @IsString()
+  @IsTimeZone()
   @MaxLength(64)
   timezone?: string;
 }

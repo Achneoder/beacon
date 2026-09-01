@@ -2,6 +2,7 @@ import {
   IsEmail,
   IsOptional,
   IsString,
+  IsTimeZone,
   Matches,
   MaxLength,
   MinLength,
@@ -47,8 +48,9 @@ export class RegisterDto implements RegisterOrganizationRequest {
   @MaxLength(10)
   locale?: string;
 
+  /** Seeds `Organization.timezone`; an IANA zone, as everywhere else. */
   @IsOptional()
-  @IsString()
+  @IsTimeZone()
   @MaxLength(64)
   timezone?: string;
 }

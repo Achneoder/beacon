@@ -5,6 +5,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  IsTimeZone,
   IsUUID,
   MaxLength,
   MinLength,
@@ -77,9 +78,10 @@ export class EmploymentDto implements EmploymentFields {
   @MaxLength(40)
   phone?: string | null;
 
+  /** An IANA zone; null follows the organization's. */
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
-  @IsString()
+  @IsTimeZone()
   @MaxLength(64)
   timezone?: string | null;
 

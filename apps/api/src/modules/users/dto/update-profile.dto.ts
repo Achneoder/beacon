@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsTimeZone, MaxLength, ValidateIf } from 'class-validator';
 import { SUPPORTED_LOCALES, type LocaleCode, type UpdateOwnProfileRequest } from '@beacon/shared';
 
 /**
@@ -19,9 +19,14 @@ export class UpdateProfileDto implements UpdateOwnProfileRequest {
   @IsIn(SUPPORTED_LOCALES)
   locale?: LocaleCode | null;
 
+  /**
+   * An IANA zone `Intl` will actually accept. Null hands the person back to the
+   * organization's. Free text used to be taken here, so `Europe/Berlon` saved
+   * cleanly and then quietly put every clock-in on the wrong clock.
+   */
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
-  @IsString()
+  @IsTimeZone()
   @MaxLength(64)
   timezone?: string | null;
 }
