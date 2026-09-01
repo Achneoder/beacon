@@ -225,13 +225,28 @@ describe('timesheet page', () => {
 
 		render(TimesheetPage);
 
-		const open = await screen.findByRole('button', { name: 'Correct a day' });
-		await fireEvent.click(open);
-		// The panel opens on Monday, which has a record — switch to Friday, which has
-		// none tracked at all.
-		await fireEvent.input(screen.getByLabelText('Date'), { target: { value: '2026-08-28' } });
+		// Friday has nothing tracked — clicking its row in the table opens the panel
+		// on that day directly, with no date picker involved.
+		await fireEvent.click(await screen.findByRole('button', { name: /Friday/ }));
 
 		expect(await screen.findByText('Nothing tracked for this day yet.')).toBeInTheDocument();
+	});
+
+	it('opens the panel on the day clicked in the table, not a fixed default', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+
+		render(TimesheetPage);
+
+		await fireEvent.click(await screen.findByRole('button', { name: /Friday/ }));
+
+		expect(await screen.findByText('Records for this day')).toBeInTheDocument();
+		expect(screen.getByText('Nothing tracked for this day yet.')).toBeInTheDocument();
+
+		// Clicking a different day while the panel is open switches it, rather than
+		// requiring it to be closed and reopened.
+		await fireEvent.click(screen.getByRole('button', { name: /Monday/ }));
+
+		expect(await screen.findByRole('listitem')).toHaveTextContent('09:00 – 16:35');
 	});
 
 	it('adds a new record alongside an existing one rather than overwriting it', async () => {

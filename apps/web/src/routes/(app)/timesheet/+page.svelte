@@ -96,11 +96,6 @@
 		resetForm();
 	}
 
-	function pickDate(date: string) {
-		requestDate = date;
-		resetForm();
-	}
-
 	function editRecord(entry: TimesheetEntry) {
 		action = 'amend';
 		editingEntryId = entry.id;
@@ -213,13 +208,19 @@
 				{#each week.days as day (day.date)}
 					<tr
 						class="border-b border-border-subtle last:border-b-0
-						       {day.date === todayDate ? 'bg-accent-soft/40' : ''}"
+						       {requesting && day.date === requestDate
+							? 'bg-accent-soft/60'
+							: day.date === todayDate
+								? 'bg-accent-soft/40'
+								: ''}"
 					>
 						<th scope="row" class="py-3 pr-3 text-left font-semibold">
-							<span>{$_(weekdayKey(day.weekday))}</span>
-							<span class="ml-2 font-mono text-2xs font-normal text-ink-muted">
-								{formatDayLabel(day.date, lang)}
-							</span>
+							<button type="button" class="hover:underline" onclick={() => openRequest(day.date)}>
+								<span>{$_(weekdayKey(day.weekday))}</span>
+								<span class="ml-2 font-mono text-2xs font-normal text-ink-muted">
+									{formatDayLabel(day.date, lang)}
+								</span>
+							</button>
 							{#if day.holiday}
 								<Badge tone="neutral" class="ml-2">{day.holiday}</Badge>
 							{:else if day.absenceTag}
@@ -303,20 +304,14 @@
 				{selfApproves ? $_('timesheet.correctHint') : $_('timesheet.requestHint')}
 			</p>
 
-			<label class="mt-4 flex max-w-56 flex-col gap-1.5 text-sm font-semibold">
-				{$_('timesheet.date')}
-				<input
-					type="date"
-					value={requestDate}
-					oninput={(event) => pickDate((event.currentTarget as HTMLInputElement).value)}
-					min={week.from}
-					max={week.to}
-					required
-					class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
-				/>
-			</label>
-
 			{#if requestDay}
+				<p class="mt-4 text-sm font-semibold">
+					{$_(weekdayKey(requestDay.weekday))}
+					<span class="ml-2 font-mono text-2xs font-normal text-ink-muted">
+						{formatDayLabel(requestDay.date, lang)}
+					</span>
+				</p>
+
 				<div class="mt-4">
 					<h3 class="text-sm font-semibold">{$_('timesheet.recordsForDay')}</h3>
 					{#if requestDay.entries.length === 0}

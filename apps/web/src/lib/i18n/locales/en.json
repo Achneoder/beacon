@@ -424,7 +424,6 @@
 		"requestCorrection": "Request correction",
 		"requestTitle": "Request a correction",
 		"requestHint": "Your manager decides. Say what the day should have been and why.",
-		"date": "Date",
 		"breakMinutes": "Break (minutes)",
 		"reason": "Reason",
 		"reasonHint": "Visible to your manager.",
