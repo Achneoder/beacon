@@ -84,7 +84,16 @@ a reason.
   being trusted.
 - **Check permissions, never role names.** Roles are customizable per organization.
   Handlers declare `@RequirePermissions(...)` from `apps/api/src/common/auth/`; the permission
-  union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`.
+  union and `DEFAULT_ROLES` live in `packages/shared/src/permissions.ts`. `modules/roles/` is
+  where an organization edits them (Settings → Roles, `organization:manage`), which is what makes
+  that rule load-bearing rather than aspirational: `manager` is now whatever this installation
+  says it is. Two invariants keep the editor safe. `owner` is immutable — it always holds every
+  permission, so no sequence of edits can leave an install with nobody able to administer it, the
+  same lockout `enforced` SSO exempts `organization:manage` to avoid. And a built-in role the
+  organization has edited carries `Role.customized`, which is what stops
+  `OrganizationService.reconcileSystemRoles` re-syncing it from `DEFAULT_ROLES` at the next boot;
+  drift alone cannot tell an edit from a default an install has not caught up with, so the fact
+  is recorded rather than inferred.
 - **You may not grant authority you do not hold.** `employee:manage` assigns roles — at user
   creation, on an invitation, and through `POST /users/:id/roles` — so without a check it is
   also a way to *acquire* any permission: `admin` holds it but not `organization:manage`, and
@@ -93,6 +102,12 @@ a reason.
   `SELF_SERVICE_PERMISSIONS` (`@beacon/shared`) is the exemption that keeps an admin able to
   hand out the default `employee` role; add to it only for a permission whose every code path
   is scoped to the holder's own record.
+  **Defining a role is a grant too.** `POST /roles` and `PATCH /roles/:id` run the same
+  `assertGrantable`, because packaging a permission and then wearing the role reaches the same
+  place as assigning one — without it `organization:manage` alone would be a route to every
+  other permission. `assertRoleEditable` beside it is that rule read backwards: a role already
+  holding authority beyond the caller's is not theirs to rewrite or delete, which is what stops
+  an edit *stripping* a permission its author never had.
 - **Every response carries the same headers**, set by `securityHeaders`
   (`common/http/`) before routing: `Cache-Control: no-store` above all, because
   everything this API returns is personal data and Beacon runs on shared workstations,

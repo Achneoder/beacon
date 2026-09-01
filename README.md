@@ -173,7 +173,11 @@ NestJS, TypeScript, PostgreSQL, MikroORM, Passport.js, JWT.
 
 Data is stored in PostgreSQL; schema changes ship as migrations. Records are scoped by organization,
 and authorization is checked against permissions rather than role names, so organizations can define
-their own roles.
+their own roles. Settings → Roles is where they do: an administrator adds a role, names it, and picks
+its permissions from the closed list Beacon actually checks. A caller can only ever put permissions
+they hold themselves into a role — otherwise `organization:manage` would be a route to every other
+permission in the system — and the `owner` role is left alone entirely, so an installation can never
+be edited into having nobody who can administer it.
 
 Authentication supports multiple methods — email/password, passkeys, social login, and single sign-on
 (SSO) via OAuth2 or SAML — with two-factor authentication (2FA) for added security. *(Email/password
