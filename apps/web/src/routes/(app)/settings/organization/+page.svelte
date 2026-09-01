@@ -9,7 +9,7 @@
 		OrganizationSummary,
 		RoleSummary
 	} from '@beacon/shared';
-	import { Alert, Badge, Button, Card, TextField } from '$lib/components/ui';
+	import { Alert, Badge, Button, Card, SelectField, TextField } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
 	import { api, apiSend } from '$lib/api/client';
 	import { createDepartment, deleteDepartment, listDepartments } from '$lib/api/people';
@@ -21,6 +21,7 @@
 		retireAbsenceType
 	} from '$lib/api/absences';
 	import { reindexSearch } from '$lib/api/search';
+	import { timezoneGroups } from '$lib/time/zone';
 	import { formatDate, toneOf, typeName } from '$lib/absence/labels';
 	import { errorKey } from '$lib/auth/errors';
 	import { session } from '$lib/auth/session.svelte';
@@ -57,6 +58,12 @@
 	const lang = $derived($locale ?? 'en');
 	const year = new Date().getUTCFullYear();
 
+	// Chosen from the list `Intl` will actually accept, not typed: the organization's
+	// zone is what everyone without one of their own is measured against, and a typo
+	// there used to save cleanly and misplace every clock-in. Built from the saved
+	// value so a zone this browser cannot name survives opening the form.
+	const zones = $derived(timezoneGroups(organization?.timezone));
+
 	$effect(() => {
 		void load();
 	});
@@ -85,7 +92,7 @@
 		try {
 			organization = await apiSend<OrganizationSummary>('/organizations/current', 'PATCH', {
 				name: name.trim(),
-				timezone: timezone.trim(),
+				timezone,
 				defaultLocale
 			});
 			saved = true;
@@ -211,27 +218,30 @@
 
 			<TextField id="settings-name" label={$_('settings.name')} required bind:value={name} />
 			<div class="grid gap-4 sm:grid-cols-2">
-				<TextField
+				<SelectField
 					id="settings-timezone"
 					label={$_('org.timezone')}
-					hint="Europe/Berlin"
+					hint={$_('org.timezoneHint')}
 					bind:value={timezone}
-				/>
-				<div class="flex flex-col gap-1.5">
-					<label for="settings-locale" class="text-sm font-semibold">
-						{$_('org.defaultLocale')}
-					</label>
-					<select
-						id="settings-locale"
-						bind:value={defaultLocale}
-						class="rounded-control border border-border-default bg-surface px-3.5 py-2.5 text-sm"
-					>
-						{#each SUPPORTED_LOCALES as code (code)}
-							<option value={code}>{$_(`org.locale.${code}`)}</option>
-						{/each}
-					</select>
-					<p class="text-xs text-ink-muted">{$_('org.defaultLocaleHint')}</p>
-				</div>
+				>
+					{#each zones as group (group.region)}
+						<optgroup label={group.region}>
+							{#each group.zones as zone (zone.value)}
+								<option value={zone.value}>{zone.label}</option>
+							{/each}
+						</optgroup>
+					{/each}
+				</SelectField>
+				<SelectField
+					id="settings-locale"
+					label={$_('org.defaultLocale')}
+					hint={$_('org.defaultLocaleHint')}
+					bind:value={defaultLocale}
+				>
+					{#each SUPPORTED_LOCALES as code (code)}
+						<option value={code}>{$_(`org.locale.${code}`)}</option>
+					{/each}
+				</SelectField>
 			</div>
 
 			<Button type="submit" variant="primary" size="sm" class="self-start" disabled={saving}>

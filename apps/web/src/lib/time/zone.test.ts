@@ -4,6 +4,7 @@ import {
 	resolveTimezone,
 	timezoneAbbreviation,
 	timezoneCity,
+	timezoneGroups,
 	timezoneLabel
 } from './zone';
 
@@ -63,5 +64,54 @@ describe('formatHeaderDate', () => {
 	it('uses the zone, not the runtime’s, to decide the day', () => {
 		const lateUtc = new Date('2026-08-28T23:30:00Z');
 		expect(formatHeaderDate(lateUtc, 'Europe/Berlin', 'en-GB')).toBe('Saturday, 29 August 2026');
+	});
+});
+
+describe('timezoneGroups', () => {
+	const flat = () => timezoneGroups().flatMap((group) => group.zones.map((zone) => zone.value));
+
+	it('offers the zones Intl itself accepts', () => {
+		expect(flat()).toContain('Europe/Berlin');
+		expect(flat()).toContain('America/New_York');
+	});
+
+	it('groups by region and labels the option with the city', () => {
+		const europe = timezoneGroups().find((group) => group.region === 'Europe');
+		expect(europe?.zones).toContainEqual({ value: 'Europe/Berlin', label: 'Berlin' });
+		// A zone under a sub-region keeps it, so the label stays unambiguous.
+		const america = timezoneGroups('America/Argentina/Buenos_Aires').find(
+			(group) => group.region === 'America'
+		);
+		expect(america?.zones).toContainEqual({
+			value: 'America/Argentina/Buenos_Aires',
+			label: 'Argentina / Buenos Aires'
+		});
+	});
+
+	it('always offers UTC, which a fresh organization starts on', () => {
+		// Some ICU builds leave it out of the enumeration; a picker without it would
+		// silently move an untouched organization off UTC on the next save.
+		expect(flat()).toContain('UTC');
+	});
+
+	it('collects the region-less zones last, under Other', () => {
+		const groups = timezoneGroups();
+		expect(groups.at(-1)?.region).toBe('Other');
+		expect(groups.at(-1)?.zones.map((zone) => zone.value)).toContain('UTC');
+	});
+
+	it('keeps a stored zone selectable even when the runtime has never heard of it', () => {
+		// Opening the form must not be able to rewrite a zone nobody touched.
+		const groups = timezoneGroups('Mars/Olympus_Mons');
+		expect(groups.find((group) => group.region === 'Mars')?.zones).toEqual([
+			{ value: 'Mars/Olympus_Mons', label: 'Olympus Mons' }
+		]);
+	});
+
+	it('does not repeat a stored zone that is already on the list', () => {
+		const berlin = timezoneGroups('Europe/Berlin')
+			.flatMap((group) => group.zones)
+			.filter((zone) => zone.value === 'Europe/Berlin');
+		expect(berlin).toHaveLength(1);
 	});
 });

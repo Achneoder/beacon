@@ -99,3 +99,66 @@ export function formatHeaderDate(at: Date, timezone: string, locale: string): st
 		return at.toISOString().slice(0, 10);
 	}
 }
+
+/** A region of the IANA database and the zones under it, ready for an `<optgroup>`. */
+export interface TimezoneGroup {
+	/** The first segment of the id — `Europe`, `America` — or `Other` for `UTC`. */
+	region: string;
+	zones: { value: string; label: string }[];
+}
+
+/** Zones with no region of their own (`UTC`) are collected under this heading. */
+const OTHER_REGION = 'Other';
+
+/**
+ * Every zone the runtime knows, grouped by region, with `current` guaranteed to be
+ * among them.
+ *
+ * The picker exists so a zone cannot be mistyped: `Europe/Berlon` used to save
+ * cleanly and then quietly misplace every clock-in, exactly as a typo'd locale
+ * used to. `Intl.supportedValuesOf` is the same list the formatter will accept,
+ * which is why it — and not a hand-kept table — is the source. Where it is missing
+ * the list collapses to what we can still name; a stored value is always added
+ * back, so opening the form can never rewrite a zone nobody touched.
+ */
+export function timezoneGroups(current?: string | null): TimezoneGroup[] {
+	// `UTC` is added by hand: it is a zone every runtime formats against and the one
+	// a fresh organization starts on, yet some ICU builds leave it out of the
+	// enumeration — and a picker missing the saved value silently reassigns it.
+	const zones = new Set(['UTC', ...supportedTimezones()]);
+	const saved = current?.trim();
+	if (saved) zones.add(saved);
+
+	const groups = new Map<string, { value: string; label: string }[]>();
+	for (const zone of zones) {
+		const [head, ...rest] = zone.split('/');
+		const region = rest.length ? head : OTHER_REGION;
+		const label = rest.length ? rest.join(' / ').replace(/_/g, ' ') : zone;
+		const group = groups.get(region) ?? [];
+		group.push({ value: zone, label });
+		groups.set(region, group);
+	}
+
+	return [...groups.entries()]
+		.map(([region, list]) => ({
+			region,
+			zones: list.sort((left, right) => left.label.localeCompare(right.label))
+		}))
+		.sort(byRegion);
+}
+
+/** Alphabetical, except `Other` — a leftovers bucket rather than a region — last. */
+function byRegion(left: TimezoneGroup, right: TimezoneGroup): number {
+	if (left.region === OTHER_REGION) return right.region === OTHER_REGION ? 0 : 1;
+	if (right.region === OTHER_REGION) return -1;
+
+	return left.region.localeCompare(right.region);
+}
+
+function supportedTimezones(): string[] {
+	try {
+		return Intl.supportedValuesOf('timeZone');
+	} catch {
+		return [browserTimezone(), 'UTC'];
+	}
+}

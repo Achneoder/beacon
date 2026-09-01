@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { _, locale } from 'svelte-i18n';
-	import type { UserDetail } from '@beacon/shared';
-	import { Alert, Badge, Button, Card, TextField } from '$lib/components/ui';
+	import type { LocaleCode, UserDetail } from '@beacon/shared';
+	import { Alert, Badge, Button, Card, SelectField, TextField } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
 	import { Field, PersonCard } from '$lib/components/people';
-	import { fullName } from '@beacon/shared';
+	import { fullName, SUPPORTED_LOCALES } from '@beacon/shared';
+	import { timezoneGroups } from '$lib/time/zone';
 	import { getOwnProfile, updateOwnProfile } from '$lib/api/people';
 	import { session } from '$lib/auth/session.svelte';
 	import { errorKey } from '$lib/auth/errors';
@@ -19,8 +20,19 @@
 
 	// The three fields a person may change about themselves. Everything else on this
 	// screen is employment data, maintained by whoever holds employee:manage.
+	//
+	// Language and zone are chosen from a list rather than typed: both are stored
+	// values other code formats against, and a plausible-looking typo — `de-DE`,
+	// `Europe/Berlon` — used to save cleanly and then quietly change nothing, or
+	// the wrong thing. An empty string is "no choice of my own", which the API
+	// stores as null and reads as the organization's setting.
 	let phone = $state('');
+	let language = $state<LocaleCode | ''>('');
 	let timezone = $state('');
+
+	// Built from the saved value, so a zone this browser cannot name is still offered
+	// back rather than silently rewritten by opening the form.
+	const zones = $derived(timezoneGroups(profile?.timezone));
 
 	const lang = $derived($locale ?? 'en');
 	const notSet = $derived($_('people.notSet'));
@@ -39,6 +51,7 @@
 
 	function startEditing() {
 		phone = profile?.phone ?? '';
+		language = profile?.locale ?? '';
 		timezone = profile?.timezone ?? '';
 		saveErrorKey = null;
 		saved = false;
@@ -53,10 +66,14 @@
 		try {
 			profile = await updateOwnProfile({
 				phone: phone.trim() || null,
-				timezone: timezone.trim() || null
+				locale: language || null,
+				timezone: timezone || null
 			});
-			// The page header reads the zone off the session, so it has to hear about it.
-			session.patch({ timezone: profile.timezone });
+			// The header reads the zone off the session and the whole app renders in its
+			// language, so re-read it. `SessionUser.locale` is resolved per request against
+			// the organization's default, which is why clearing a choice needs the API to
+			// answer rather than a local patch. A failure here has not undone the save.
+			await session.reload().catch(() => {});
 			editing = false;
 			saved = true;
 		} catch (error) {
@@ -147,12 +164,32 @@
 						autocomplete="tel"
 						bind:value={phone}
 					/>
-					<TextField
+					<SelectField
+						id="profile-language"
+						label={$_('profile.language')}
+						hint={$_('profile.followsOrganization')}
+						bind:value={language}
+					>
+						<option value="">{$_('profile.organizationDefault')}</option>
+						{#each SUPPORTED_LOCALES as code (code)}
+							<option value={code}>{$_(`org.locale.${code}`)}</option>
+						{/each}
+					</SelectField>
+					<SelectField
 						id="profile-timezone"
 						label={$_('profile.timezone')}
-						hint="Europe/Berlin"
+						hint={$_('profile.followsOrganization')}
 						bind:value={timezone}
-					/>
+					>
+						<option value="">{$_('profile.organizationDefault')}</option>
+						{#each zones as group (group.region)}
+							<optgroup label={group.region}>
+								{#each group.zones as zone (zone.value)}
+									<option value={zone.value}>{zone.label}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					</SelectField>
 				</div>
 
 				<div class="mt-5 flex gap-3">

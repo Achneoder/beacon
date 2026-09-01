@@ -157,6 +157,7 @@
 	"org": {
 		"label": "Organization",
 		"timezone": "Time zone",
+		"timezoneHint": "Everyone who has not chosen a zone of their own is measured against this one.",
 		"defaultLocale": "Default language",
 		"defaultLocaleHint": "Everyone who has not chosen a language of their own sees this one.",
 		"locale": {
@@ -184,6 +185,8 @@
 		"phone": "Phone",
 		"timezone": "Time zone",
 		"language": "Language",
+		"followsOrganization": "Leave on the organization’s setting to follow it.",
+		"organizationDefault": "Organization default",
 		"workModel": "Work model",
 		"workModelPending": "Your schedule and hours appear here once time tracking is switched on.",
 		"reportsTo": "Reports to",

@@ -49,4 +49,19 @@ test.describe('language', () => {
 		const field = ownerPage.getByLabel('Default language');
 		await expect(field.getByRole('option')).toHaveText(['English', 'German']);
 	});
+
+	test('picks the organization zone from a list, keeping the saved one selected', async ({
+		ownerPage
+	}) => {
+		// The zone is the other half of the same bug: `Europe/Berlon` also saved
+		// cleanly, and then put every clock-in on a clock nobody works to. The
+		// installation starts on UTC, which some ICU builds leave out of the
+		// enumeration — so the picker has to still offer it, or opening this form
+		// would move the organization off it on the next save.
+		await ownerPage.goto('/settings/organization');
+
+		const field = ownerPage.getByLabel('Time zone');
+		await expect(field).toHaveValue('UTC');
+		await expect(field.getByRole('option', { name: 'Berlin', exact: true })).toBeAttached();
+	});
 });

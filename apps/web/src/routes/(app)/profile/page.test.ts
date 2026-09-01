@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/svelte';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/svelte';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { waitLocale } from 'svelte-i18n';
 import type { UserDetail } from '@beacon/shared';
@@ -73,32 +73,64 @@ describe('profile page', () => {
 		expect(screen.queryByRole('button', { name: /role/i })).not.toBeInTheDocument();
 	});
 
-	it('offers only phone and time zone for self-service editing', async () => {
-		const update = vi
-			.spyOn(people, 'updateOwnProfile')
-			.mockResolvedValue({ ...profile, phone: '+49 30 999', timezone: 'Europe/Vienna' });
-		const patch = vi.spyOn(session, 'patch').mockImplementation(() => {});
+	it('offers phone, language and time zone for self-service editing', async () => {
+		const update = vi.spyOn(people, 'updateOwnProfile').mockResolvedValue({
+			...profile,
+			phone: '+49 30 999',
+			locale: 'de',
+			timezone: 'Europe/Vienna'
+		});
+		const reload = vi.spyOn(session, 'reload').mockResolvedValue();
 		render(ProfilePage);
 
 		await fireEvent.click(await screen.findByRole('button', { name: 'Edit your details' }));
 
 		expect(screen.getByLabelText('Phone')).toBeInTheDocument();
+		expect(screen.getByLabelText('Language')).toBeInTheDocument();
 		expect(screen.getByLabelText('Time zone')).toBeInTheDocument();
 		// Employment data is maintained by the organization, never edited here.
 		expect(screen.queryByLabelText('Job title')).not.toBeInTheDocument();
 		expect(screen.queryByLabelText('Department')).not.toBeInTheDocument();
 
 		await fireEvent.input(screen.getByLabelText('Phone'), { target: { value: '+49 30 999' } });
-		await fireEvent.input(screen.getByLabelText('Time zone'), {
+		await fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'de' } });
+		await fireEvent.change(screen.getByLabelText('Time zone'), {
 			target: { value: 'Europe/Vienna' }
 		});
 		await fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
 		await waitFor(() =>
-			expect(update).toHaveBeenCalledWith({ phone: '+49 30 999', timezone: 'Europe/Vienna' })
+			expect(update).toHaveBeenCalledWith({
+				phone: '+49 30 999',
+				locale: 'de',
+				timezone: 'Europe/Vienna'
+			})
 		);
-		// The page header reads the zone off the session, so it has to be told.
-		expect(patch).toHaveBeenCalledWith({ timezone: 'Europe/Vienna' });
+		// The header reads the zone off the session and the app renders in its language,
+		// and only the API can resolve a cleared choice — so it is re-read, not patched.
+		expect(reload).toHaveBeenCalled();
+	});
+
+	it('picks language and zone from a list, so neither can be mistyped', async () => {
+		render(ProfilePage);
+
+		await fireEvent.click(await screen.findByRole('button', { name: 'Edit your details' }));
+
+		const language = screen.getByLabelText('Language');
+		expect(language.tagName).toBe('SELECT');
+		expect(
+			within(language)
+				.getAllByRole('option')
+				.map((option) => option.textContent)
+		).toEqual(['Organization default', 'English', 'German']);
+
+		const zone = screen.getByLabelText('Time zone');
+		expect(zone.tagName).toBe('SELECT');
+		// The saved zone is selected, and clearing it is an option rather than an
+		// empty text box that could hold anything.
+		expect((zone as HTMLSelectElement).value).toBe('Europe/Berlin');
+		expect(within(zone).getByRole('option', { name: 'Berlin' })).toBeInTheDocument();
+		expect(within(zone).getByRole('option', { name: 'Organization default' })).toBeInTheDocument();
 	});
 
 	it('says so plainly when a field has not been filled in', async () => {

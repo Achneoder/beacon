@@ -157,6 +157,7 @@
 	"org": {
 		"label": "Organisation",
 		"timezone": "Zeitzone",
+		"timezoneHint": "Alle, die keine eigene Zeitzone gewählt haben, werden an dieser gemessen.",
 		"defaultLocale": "Standardsprache",
 		"defaultLocaleHint": "Alle, die keine eigene Sprache gewählt haben, sehen diese.",
 		"locale": {
@@ -184,6 +185,8 @@
 		"phone": "Telefon",
 		"timezone": "Zeitzone",
 		"language": "Sprache",
+		"followsOrganization": "Auf der Vorgabe der Organisation belassen, um ihr zu folgen.",
+		"organizationDefault": "Vorgabe der Organisation",
 		"workModel": "Arbeitszeitmodell",
 		"workModelPending": "Ihr Arbeitszeitmodell und Ihre Stunden erscheinen hier, sobald die Zeiterfassung aktiv ist.",
 		"reportsTo": "Vorgesetzte Person",

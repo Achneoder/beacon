@@ -140,6 +140,15 @@ a reason.
   business re-deriving it, and cannot: it does not hold the organization's default.
   Anything taking a locale from a client validates `@IsIn(SUPPORTED_LOCALES)`; free text
   used to be accepted and a language with no dictionary saved cleanly and changed nothing.
+- **Neither language nor timezone is free text, on either side.** Every DTO taking a
+  zone validates `@IsTimeZone()` — the same failure as the locale one, since
+  `Europe/Berlon` saved cleanly and then put a day's clock-ins on a clock nobody works
+  to — and the web offers both as a `SelectField` (`components/ui/`) rather than a text
+  box: `SUPPORTED_LOCALES` for the language, `timezoneGroups` (`lib/time/zone.ts`) for
+  the zone. That picker is built from `Intl.supportedValuesOf`, the list the formatter
+  itself accepts, plus `UTC` and whatever is already saved — a picker missing the stored
+  value would reassign it the moment someone opened the form. On a person, the empty
+  option is null: "follow the organization".
 
 ## Auth
 

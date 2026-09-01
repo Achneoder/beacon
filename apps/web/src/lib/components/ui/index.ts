@@ -6,6 +6,7 @@ export { default as Card } from './Card.svelte';
 export { default as Clock } from './Clock.svelte';
 export { default as Eyebrow } from './Eyebrow.svelte';
 export { default as ProgressBar } from './ProgressBar.svelte';
+export { default as SelectField } from './SelectField.svelte';
 export { default as StatTile } from './StatTile.svelte';
 export { default as StatusDot } from './StatusDot.svelte';
 export { default as TextField } from './TextField.svelte';
