@@ -200,6 +200,16 @@ export interface TimesheetWeek {
   locked: boolean;
   /** The instant the week locks, so the notice can name it. */
   locksAt: string;
+  /**
+   * Whether a correction this person raises applies immediately instead of waiting
+   * for their manager — the organization's `selfApproveCorrections` setting.
+   *
+   * It rides on the week rather than being read from the organization because the
+   * screen that needs it is the timesheet, and a plain employee holds
+   * `attendance:read` but not `organization:read`. It changes the copy and nothing
+   * else: the API decides what a correction does, and always did.
+   */
+  selfApproveCorrections: boolean;
 }
 
 export interface ClockRequest {

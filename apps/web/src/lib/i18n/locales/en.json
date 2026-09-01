@@ -395,7 +395,11 @@
 		"noHolidays": "No public holidays for this year yet.",
 		"ssoTitle": "Single sign-on",
 		"ssoHint": "Let people sign in through your identity provider instead of a Beacon password.",
-		"ssoManage": "Manage single sign-on"
+		"ssoManage": "Manage single sign-on",
+		"attendance": "Time tracking",
+		"attendanceHint": "How a change to a day that is already closed is handled.",
+		"selfApprove": "Let people correct their own timesheet without approval",
+		"selfApproveHint": "On, a correction someone raises for themselves applies straight away and is recorded against their own name. Off, it waits for their manager."
 	},
 	"timesheet": {
 		"kicker": "Time tracking",
@@ -426,7 +430,15 @@
 		"send": "Send request",
 		"sending": "Sending…",
 		"cancel": "Cancel",
-		"requestSent": "Your correction request has been sent."
+		"requestSent": "Your correction request has been sent.",
+		"lockedSelfApprove": "This week is closed, but your own corrections still apply straight away.",
+		"correctDay": "Correct a day",
+		"correctTitle": "Correct a day",
+		"correctHint": "Your change applies straight away. Say what the day should have been and why.",
+		"reasonHintSelf": "Kept on the record, and visible to your manager.",
+		"apply": "Apply correction",
+		"applying": "Applying…",
+		"correctionApplied": "Your correction has been applied."
 	},
 	"approvals": {
 		"kicker": "Time tracking",

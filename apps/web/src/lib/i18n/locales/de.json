@@ -395,7 +395,11 @@
 		"noHolidays": "Für dieses Jahr sind noch keine Feiertage hinterlegt.",
 		"ssoTitle": "Single Sign-on",
 		"ssoHint": "Ermöglichen Sie die Anmeldung über Ihren Identitätsanbieter statt mit einem Beacon-Passwort.",
-		"ssoManage": "Single Sign-on verwalten"
+		"ssoManage": "Single Sign-on verwalten",
+		"attendance": "Zeiterfassung",
+		"attendanceHint": "Wie eine Änderung an einem bereits abgeschlossenen Tag behandelt wird.",
+		"selfApprove": "Eigene Zeiterfassung ohne Genehmigung korrigieren lassen",
+		"selfApproveHint": "Aktiv wirkt eine Korrektur, die jemand für sich selbst erfasst, sofort und wird auf den eigenen Namen dokumentiert. Inaktiv wartet sie auf die Führungskraft."
 	},
 	"timesheet": {
 		"kicker": "Zeiterfassung",
@@ -426,7 +430,15 @@
 		"send": "Antrag senden",
 		"sending": "Wird gesendet…",
 		"cancel": "Abbrechen",
-		"requestSent": "Dein Korrekturantrag wurde gesendet."
+		"requestSent": "Dein Korrekturantrag wurde gesendet.",
+		"lockedSelfApprove": "Diese Woche ist abgeschlossen, eigene Korrekturen wirken aber sofort.",
+		"correctDay": "Tag korrigieren",
+		"correctTitle": "Tag korrigieren",
+		"correctHint": "Deine Änderung wirkt sofort. Gib an, wie der Tag hätte aussehen sollen, und warum.",
+		"reasonHintSelf": "Wird dokumentiert und ist für deine Führungskraft sichtbar.",
+		"apply": "Korrektur übernehmen",
+		"applying": "Wird übernommen…",
+		"correctionApplied": "Deine Korrektur wurde übernommen."
 	},
 	"approvals": {
 		"kicker": "Zeiterfassung",
