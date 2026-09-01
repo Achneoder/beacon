@@ -439,7 +439,15 @@
 		"reasonHintSelf": "Wird dokumentiert und ist für deine Führungskraft sichtbar.",
 		"apply": "Korrektur übernehmen",
 		"applying": "Wird übernommen…",
-		"correctionApplied": "Deine Korrektur wurde übernommen."
+		"correctionApplied": "Deine Korrektur wurde übernommen.",
+		"recordsForDay": "Einträge für diesen Tag",
+		"noRecords": "Für diesen Tag ist noch nichts erfasst.",
+		"edit": "Bearbeiten",
+		"delete": "Löschen",
+		"addRecord": "Eintrag hinzufügen",
+		"deleteWarning": "Der Eintrag wird vollständig entfernt. Das kann nicht rückgängig gemacht werden.",
+		"deleteRecord": "Eintrag löschen",
+		"deleting": "Wird gelöscht…"
 	},
 	"approvals": {
 		"kicker": "Zeiterfassung",

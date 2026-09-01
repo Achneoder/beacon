@@ -439,7 +439,15 @@
 		"reasonHintSelf": "Kept on the record, and visible to your manager.",
 		"apply": "Apply correction",
 		"applying": "Applying…",
-		"correctionApplied": "Your correction has been applied."
+		"correctionApplied": "Your correction has been applied.",
+		"recordsForDay": "Records for this day",
+		"noRecords": "Nothing tracked for this day yet.",
+		"edit": "Edit",
+		"delete": "Delete",
+		"addRecord": "Add a record",
+		"deleteWarning": "This removes the record entirely. It cannot be undone.",
+		"deleteRecord": "Delete record",
+		"deleting": "Deleting…"
 	},
 	"approvals": {
 		"kicker": "Time tracking",

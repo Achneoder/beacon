@@ -18,7 +18,7 @@ function day(overrides: Partial<TimesheetDay> & Pick<TimesheetDay, 'date' | 'wee
 		credited: false,
 		holiday: null,
 		hasPendingCorrection: false,
-		entryId: null,
+		entries: [],
 		...overrides
 	} satisfies TimesheetDay;
 }
@@ -37,7 +37,17 @@ const week: TimesheetWeek = {
 			workedMinutes: 425,
 			breakMinutes: 30,
 			balanceMinutes: 65,
-				entryId: 'entry-monday'
+			entries: [
+				{
+					id: 'entry-monday',
+					startedAt: '2026-08-24T07:00:00.000Z',
+					endedAt: '2026-08-24T14:35:00.000Z',
+					breakMinutes: 30,
+					source: 'web',
+					note: null,
+					approvalStatus: 'approved'
+				}
+			]
 		}),
 		day({
 			date: '2026-08-25',
@@ -187,7 +197,44 @@ describe('timesheet page', () => {
 		expect(screen.getByRole('button', { name: 'Apply correction' })).toBeInTheDocument();
 	});
 
-	it('amends the day’s existing entry instead of adding a duplicate one', async () => {
+	it('lists a day’s records and offers to add one when it opens', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Correct a day' });
+		await fireEvent.click(open);
+
+		// Monday's one tracked record is listed, with its own edit/delete actions.
+		expect(await screen.findByText('Records for this day')).toBeInTheDocument();
+		const record = screen.getByRole('listitem');
+		expect(record).toHaveTextContent('09:00 – 16:35');
+		expect(record).toHaveTextContent('Break 0:30');
+		expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+
+		// The form itself opens blank, ready to add a new record rather than assuming
+		// the existing one is being changed.
+		expect(screen.getByLabelText('Start')).toHaveValue('09:00');
+		expect(screen.getByLabelText('End')).toHaveValue('17:00');
+		expect(screen.getByLabelText('Break (minutes)')).toHaveValue(30);
+	});
+
+	it('says a day with nothing tracked yet has no records', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Correct a day' });
+		await fireEvent.click(open);
+		// The panel opens on Monday, which has a record — switch to Friday, which has
+		// none tracked at all.
+		await fireEvent.input(screen.getByLabelText('Date'), { target: { value: '2026-08-28' } });
+
+		expect(await screen.findByText('Nothing tracked for this day yet.')).toBeInTheDocument();
+	});
+
+	it('adds a new record alongside an existing one rather than overwriting it', async () => {
 		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
 		const request = vi
 			.spyOn(attendance, 'requestCorrection')
@@ -198,9 +245,33 @@ describe('timesheet page', () => {
 		const open = await screen.findByRole('button', { name: 'Correct a day' });
 		await fireEvent.click(open);
 
-		// Monday already carries one entry — the form loads what is on the books
-		// (09:00–16:35 Berlin, 30 minutes' break) instead of the blank-day defaults.
-		expect(await screen.findByLabelText('Start')).toHaveValue('09:00');
+		await fireEvent.input(screen.getByLabelText('Start'), { target: { value: '18:00' } });
+		await fireEvent.input(screen.getByLabelText('End'), { target: { value: '19:00' } });
+		await fireEvent.input(screen.getByLabelText('Reason'), {
+			target: { value: 'a short evening stint I forgot to clock' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Apply correction' }));
+
+		await waitFor(() =>
+			expect(request).toHaveBeenCalledWith(expect.objectContaining({ kind: 'add', entryId: null }))
+		);
+	});
+
+	it('amends an existing record once it is picked for editing', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+		const request = vi
+			.spyOn(attendance, 'requestCorrection')
+			.mockResolvedValue({} as CorrectionSummary);
+
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Correct a day' });
+		await fireEvent.click(open);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+
+		// The form now loads what is on the books (09:00–16:35 Berlin, 30 minutes'
+		// break) instead of the blank-record defaults.
+		expect(screen.getByLabelText('Start')).toHaveValue('09:00');
 		expect(screen.getByLabelText('End')).toHaveValue('16:35');
 		expect(screen.getByLabelText('Break (minutes)')).toHaveValue(30);
 
@@ -213,6 +284,39 @@ describe('timesheet page', () => {
 			expect(request).toHaveBeenCalledWith(
 				expect.objectContaining({ kind: 'amend', entryId: 'entry-monday' })
 			)
+		);
+	});
+
+	it('removes a record once its deletion is confirmed with a reason', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+		const request = vi
+			.spyOn(attendance, 'requestCorrection')
+			.mockResolvedValue({} as CorrectionSummary);
+
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Correct a day' });
+		await fireEvent.click(open);
+		await fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+
+		// Removing needs no times — just the warning and why.
+		expect(screen.queryByLabelText('Start')).not.toBeInTheDocument();
+		expect(
+			screen.getByText('This removes the record entirely. It cannot be undone.')
+		).toBeInTheDocument();
+
+		await fireEvent.input(screen.getByLabelText('Reason'), {
+			target: { value: 'duplicate of the corrected entry' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Delete record' }));
+
+		await waitFor(() =>
+			expect(request).toHaveBeenCalledWith(
+				expect.objectContaining({ kind: 'remove', entryId: 'entry-monday' })
+			)
+		);
+		expect(request).toHaveBeenCalledWith(
+			expect.not.objectContaining({ startedAt: expect.anything() })
 		);
 	});
 

@@ -22,6 +22,7 @@ import {
   type CorrectionSummary,
   type CreateCorrectionRequest,
   type TimesheetDay,
+  type TimesheetEntry,
   type TimesheetWeek,
   type TodayStatus,
   type WorkScheduleSummary,
@@ -271,9 +272,7 @@ export class AttendanceService {
         credited,
         holiday,
         hasPendingCorrection: pendingDates.has(date),
-        // A correction amends this entry only when it is the day's only one — see
-        // the field's doc comment in `@beacon/shared`.
-        entryId: forDay.length === 1 ? forDay[0].id : null,
+        entries: forDay.map((entry) => toTimesheetEntry(entry)),
       });
     }
 
@@ -804,6 +803,24 @@ export function toSegments(entry: AttendanceEntry): AttendanceSegment[] {
   }));
 
   return [work, ...breaks].sort((left, right) => left.startedAt.localeCompare(right.startedAt));
+}
+
+/** Requires `breaks` to be populated. */
+function toTimesheetEntry(entry: AttendanceEntry): TimesheetEntry {
+  const now = new Date();
+  const breakMinutes = entry.breaks
+    .getItems()
+    .reduce((total, pause) => total + minutesBetween(pause.startedAt, pause.endedAt ?? now), 0);
+
+  return {
+    id: entry.id,
+    startedAt: entry.startedAt.toISOString(),
+    endedAt: entry.endedAt?.toISOString() ?? null,
+    breakMinutes,
+    source: entry.source,
+    note: entry.note,
+    approvalStatus: entry.approvalStatus,
+  };
 }
 
 /** Requires `user` and `approver` to be populated. */

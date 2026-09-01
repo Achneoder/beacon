@@ -3,7 +3,9 @@
 	import {
 		formatDuration,
 		formatSignedDuration,
+		type CorrectionKind,
 		type CreateCorrectionRequest,
+		type TimesheetEntry,
 		type TimesheetWeek
 	} from '@beacon/shared';
 	import { Alert, Badge, Button, Card, TextField } from '$lib/components/ui';
@@ -57,8 +59,14 @@
 	}
 
 	// ── The correction request ───────────────────────────────────────────────────
+	// One panel handles all three: adding a record the day is missing, amending one
+	// that is wrong, and removing one that should never have been there. `action`
+	// says which correction `send` builds; `editingEntryId` is the entry `amend` and
+	// `remove` apply to, and is unused (and unread) while adding.
 	let requesting = $state(false);
 	let requestDate = $state('');
+	let action = $state<CorrectionKind>('add');
+	let editingEntryId = $state<string | null>(null);
 	let requestStart = $state('09:00');
 	let requestEnd = $state('17:00');
 	let requestBreak = $state('30');
@@ -67,40 +75,50 @@
 	let requestErrorKey = $state<string | null>(null);
 	let sent = $state(false);
 
-	/** The day the correction form is currently editing, if the week has loaded it. */
+	/** The day the panel is currently open on, if the week has loaded it. */
 	const requestDay = $derived(week?.days.find((day) => day.date === requestDate) ?? null);
 
-	/**
-	 * Loads the form's start/end/break from the day already on the books, so
-	 * correcting a tracked day edits what actually happened instead of overwriting it
-	 * from the form's blank-day defaults.
-	 */
-	function prefillFor(date: string) {
-		const day = week?.days.find((entry) => entry.date === date) ?? null;
-
-		if (week && day?.startedAt && day.endedAt) {
-			requestStart = formatTimeOfDay(day.startedAt, week.timezone, lang) ?? requestStart;
-			requestEnd = formatTimeOfDay(day.endedAt, week.timezone, lang) ?? requestEnd;
-			requestBreak = String(day.breakMinutes);
-		} else {
-			requestStart = '09:00';
-			requestEnd = '17:00';
-			requestBreak = '30';
-		}
+	/** Back to a blank, unselected "add a record" — the panel's resting state. */
+	function resetForm() {
+		action = 'add';
+		editingEntryId = null;
+		requestStart = '09:00';
+		requestEnd = '17:00';
+		requestBreak = '30';
+		requestReason = '';
+		requestErrorKey = null;
+		sent = false;
 	}
 
 	function openRequest(date: string) {
 		requesting = true;
 		requestDate = date;
-		requestReason = '';
-		requestErrorKey = null;
-		sent = false;
-		prefillFor(date);
+		resetForm();
 	}
 
 	function pickDate(date: string) {
 		requestDate = date;
-		prefillFor(date);
+		resetForm();
+	}
+
+	function editRecord(entry: TimesheetEntry) {
+		action = 'amend';
+		editingEntryId = entry.id;
+		requestStart = (week && formatTimeOfDay(entry.startedAt, week.timezone, lang)) || '09:00';
+		requestEnd =
+			(entry.endedAt && week && formatTimeOfDay(entry.endedAt, week.timezone, lang)) || '17:00';
+		requestBreak = String(entry.breakMinutes);
+		requestReason = '';
+		requestErrorKey = null;
+		sent = false;
+	}
+
+	function removeRecord(entry: TimesheetEntry) {
+		action = 'remove';
+		editingEntryId = entry.id;
+		requestReason = '';
+		requestErrorKey = null;
+		sent = false;
 	}
 
 	async function send(event: SubmitEvent) {
@@ -115,21 +133,22 @@
 		requestErrorKey = null;
 
 		try {
-			// A day that already has its one entry is amended, not duplicated — see
-			// `TimesheetDay.entryId`. Only a day with no entry (or an ambiguous one with
-			// more than one) still adds a fresh one.
-			const entryId = requestDay?.entryId ?? null;
-
-			// The times are the user's own wall clock; the browser's offset turns them
+			// A removal only ever names the entry it targets; add and amend both state
+			// the times the user's own wall clock. The browser's offset turns those
 			// into the instants the API stores.
-			await requestCorrection({
-				kind: entryId ? 'amend' : 'add',
-				entryId,
-				startedAt: new Date(`${requestDate}T${requestStart}`).toISOString(),
-				endedAt: new Date(`${requestDate}T${requestEnd}`).toISOString(),
-				breakMinutes: Number(requestBreak) || 0,
-				reason: requestReason.trim()
-			} satisfies CreateCorrectionRequest);
+			const body: CreateCorrectionRequest =
+				action === 'remove'
+					? { kind: 'remove', entryId: editingEntryId, reason: requestReason.trim() }
+					: {
+							kind: action,
+							entryId: action === 'amend' ? editingEntryId : null,
+							startedAt: new Date(`${requestDate}T${requestStart}`).toISOString(),
+							endedAt: new Date(`${requestDate}T${requestEnd}`).toISOString(),
+							breakMinutes: Number(requestBreak) || 0,
+							reason: requestReason.trim()
+						};
+
+			await requestCorrection(body);
 
 			sent = true;
 			requesting = false;
@@ -284,50 +303,102 @@
 				{selfApproves ? $_('timesheet.correctHint') : $_('timesheet.requestHint')}
 			</p>
 
+			<label class="mt-4 flex max-w-56 flex-col gap-1.5 text-sm font-semibold">
+				{$_('timesheet.date')}
+				<input
+					type="date"
+					value={requestDate}
+					oninput={(event) => pickDate((event.currentTarget as HTMLInputElement).value)}
+					min={week.from}
+					max={week.to}
+					required
+					class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
+				/>
+			</label>
+
+			{#if requestDay}
+				<div class="mt-4">
+					<h3 class="text-sm font-semibold">{$_('timesheet.recordsForDay')}</h3>
+					{#if requestDay.entries.length === 0}
+						<p class="mt-1 text-2xs text-ink-muted">{$_('timesheet.noRecords')}</p>
+					{:else}
+						<ul class="mt-2 flex flex-col gap-2">
+							{#each requestDay.entries as entry (entry.id)}
+								<li
+									class="flex flex-wrap items-center justify-between gap-2 rounded-control border px-3 py-2 text-sm
+									       {editingEntryId === entry.id
+										? 'border-accent-fill bg-accent-soft/30'
+										: 'border-border-default'}"
+								>
+									<span class="font-mono tabular-nums">
+										{formatTimeOfDay(entry.startedAt, week.timezone, lang)} – {entry.endedAt
+											? formatTimeOfDay(entry.endedAt, week.timezone, lang)
+											: '…'}
+										<span class="text-ink-muted">
+											· {$_('timesheet.break')}
+											{formatDuration(entry.breakMinutes)}
+										</span>
+									</span>
+									<span class="flex gap-2">
+										<Button size="sm" variant="ghost" onclick={() => editRecord(entry)}>
+											{$_('timesheet.edit')}
+										</Button>
+										<Button
+											size="sm"
+											variant="ghost"
+											class="text-warning"
+											onclick={() => removeRecord(entry)}
+										>
+											{$_('timesheet.delete')}
+										</Button>
+									</span>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					<Button size="sm" variant="quiet" class="mt-2" onclick={resetForm}>
+						{$_('timesheet.addRecord')}
+					</Button>
+				</div>
+			{/if}
+
 			<form class="mt-4 grid gap-4 sm:grid-cols-2" onsubmit={send}>
-				<label class="flex flex-col gap-1.5 text-sm font-semibold">
-					{$_('timesheet.date')}
-					<input
-						type="date"
-						value={requestDate}
-						oninput={(event) => pickDate((event.currentTarget as HTMLInputElement).value)}
-						min={week.from}
-						max={week.to}
-						required
-						class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
-					/>
-				</label>
+				{#if action === 'remove'}
+					<div class="sm:col-span-2">
+						<Alert tone="warning">{$_('timesheet.deleteWarning')}</Alert>
+					</div>
+				{:else}
+					<label class="flex flex-col gap-1.5 text-sm font-semibold">
+						{$_('timesheet.start')}
+						<input
+							type="time"
+							bind:value={requestStart}
+							required
+							class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
+						/>
+					</label>
 
-				<label class="flex flex-col gap-1.5 text-sm font-semibold">
-					{$_('timesheet.breakMinutes')}
-					<input
-						type="number"
-						bind:value={requestBreak}
-						min="0"
-						max="1440"
-						class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
-					/>
-				</label>
+					<label class="flex flex-col gap-1.5 text-sm font-semibold">
+						{$_('timesheet.end')}
+						<input
+							type="time"
+							bind:value={requestEnd}
+							required
+							class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
+						/>
+					</label>
 
-				<label class="flex flex-col gap-1.5 text-sm font-semibold">
-					{$_('timesheet.start')}
-					<input
-						type="time"
-						bind:value={requestStart}
-						required
-						class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
-					/>
-				</label>
-
-				<label class="flex flex-col gap-1.5 text-sm font-semibold">
-					{$_('timesheet.end')}
-					<input
-						type="time"
-						bind:value={requestEnd}
-						required
-						class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
-					/>
-				</label>
+					<label class="flex flex-col gap-1.5 text-sm font-semibold">
+						{$_('timesheet.breakMinutes')}
+						<input
+							type="number"
+							bind:value={requestBreak}
+							min="0"
+							max="1440"
+							class="rounded-control border border-border-default bg-surface px-3 py-2 font-mono text-sm font-normal"
+						/>
+					</label>
+				{/if}
 
 				<div class="sm:col-span-2">
 					<TextField
@@ -344,8 +415,15 @@
 				{/if}
 
 				<div class="flex gap-2 sm:col-span-2">
-					<Button type="submit" variant="primary" disabled={sending}>
-						{#if selfApproves}
+					<Button
+						type="submit"
+						variant={action === 'remove' ? 'secondary' : 'primary'}
+						class={action === 'remove' ? 'border-warning text-warning' : ''}
+						disabled={sending}
+					>
+						{#if action === 'remove'}
+							{sending ? $_('timesheet.deleting') : $_('timesheet.deleteRecord')}
+						{:else if selfApproves}
 							{sending ? $_('timesheet.applying') : $_('timesheet.apply')}
 						{:else}
 							{sending ? $_('timesheet.sending') : $_('timesheet.send')}

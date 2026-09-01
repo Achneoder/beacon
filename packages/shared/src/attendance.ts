@@ -181,13 +181,24 @@ export interface TimesheetDay {
   holiday: string | null;
   hasPendingCorrection: boolean;
   /**
-   * The day's one {@link AttendanceEntry}, when it has exactly one — what a
-   * correction should amend rather than add alongside. Null on an empty day, and
-   * also null when the day already holds more than one entry: a correction has no
-   * single row to target there, and `null` falls back to `add`, the same as an
-   * empty day, rather than guessing which one the person means.
+   * Every entry making up the day, each amendable or removable on its own — what
+   * lets the timesheet edit one clock-in/out pair without disturbing another the
+   * same day. Empty on a day with nothing tracked yet.
    */
-  entryId: string | null;
+  entries: TimesheetEntry[];
+}
+
+/** One of a day's underlying entries, as the timesheet's per-record editor shows it. */
+export interface TimesheetEntry {
+  id: string;
+  startedAt: string;
+  /** Null while the entry is still open. */
+  endedAt: string | null;
+  /** The entry's break total — see {@link CreateCorrectionRequest.breakMinutes}. */
+  breakMinutes: number;
+  source: AttendanceSource;
+  note: string | null;
+  approvalStatus: ApprovalStatus;
 }
 
 /** `GET /attendance/me/week`. */
