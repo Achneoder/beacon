@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { waitLocale } from 'svelte-i18n';
-import type { TimesheetDay, TimesheetWeek } from '@beacon/shared';
+import type { CorrectionSummary, TimesheetDay, TimesheetWeek } from '@beacon/shared';
 import '$lib/i18n';
 import TimesheetPage from './+page.svelte';
 import * as attendance from '$lib/api/attendance';
@@ -18,6 +18,7 @@ function day(overrides: Partial<TimesheetDay> & Pick<TimesheetDay, 'date' | 'wee
 		credited: false,
 		holiday: null,
 		hasPendingCorrection: false,
+		entryId: null,
 		...overrides
 	} satisfies TimesheetDay;
 }
@@ -35,7 +36,8 @@ const week: TimesheetWeek = {
 			endedAt: '2026-08-24T14:35:00.000Z',
 			workedMinutes: 425,
 			breakMinutes: 30,
-			balanceMinutes: 65
+			balanceMinutes: 65,
+				entryId: 'entry-monday'
 		}),
 		day({
 			date: '2026-08-25',
@@ -183,6 +185,35 @@ describe('timesheet page', () => {
 			)
 		).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Apply correction' })).toBeInTheDocument();
+	});
+
+	it('amends the day’s existing entry instead of adding a duplicate one', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+		const request = vi
+			.spyOn(attendance, 'requestCorrection')
+			.mockResolvedValue({} as CorrectionSummary);
+
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Correct a day' });
+		await fireEvent.click(open);
+
+		// Monday already carries one entry — the form loads what is on the books
+		// (09:00–16:35 Berlin, 30 minutes' break) instead of the blank-day defaults.
+		expect(await screen.findByLabelText('Start')).toHaveValue('09:00');
+		expect(screen.getByLabelText('End')).toHaveValue('16:35');
+		expect(screen.getByLabelText('Break (minutes)')).toHaveValue(30);
+
+		await fireEvent.input(screen.getByLabelText('Reason'), {
+			target: { value: 'left too early on the original clock-out' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Apply correction' }));
+
+		await waitFor(() =>
+			expect(request).toHaveBeenCalledWith(
+				expect.objectContaining({ kind: 'amend', entryId: 'entry-monday' })
+			)
+		);
 	});
 
 	it('says a closed week can still be put right by the person it belongs to', async () => {

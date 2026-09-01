@@ -180,6 +180,14 @@ export interface TimesheetDay {
    */
   holiday: string | null;
   hasPendingCorrection: boolean;
+  /**
+   * The day's one {@link AttendanceEntry}, when it has exactly one — what a
+   * correction should amend rather than add alongside. Null on an empty day, and
+   * also null when the day already holds more than one entry: a correction has no
+   * single row to target there, and `null` falls back to `add`, the same as an
+   * empty day, rather than guessing which one the person means.
+   */
+  entryId: string | null;
 }
 
 /** `GET /attendance/me/week`. */

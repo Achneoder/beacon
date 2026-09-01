@@ -67,12 +67,40 @@
 	let requestErrorKey = $state<string | null>(null);
 	let sent = $state(false);
 
+	/** The day the correction form is currently editing, if the week has loaded it. */
+	const requestDay = $derived(week?.days.find((day) => day.date === requestDate) ?? null);
+
+	/**
+	 * Loads the form's start/end/break from the day already on the books, so
+	 * correcting a tracked day edits what actually happened instead of overwriting it
+	 * from the form's blank-day defaults.
+	 */
+	function prefillFor(date: string) {
+		const day = week?.days.find((entry) => entry.date === date) ?? null;
+
+		if (week && day?.startedAt && day.endedAt) {
+			requestStart = formatTimeOfDay(day.startedAt, week.timezone, lang) ?? requestStart;
+			requestEnd = formatTimeOfDay(day.endedAt, week.timezone, lang) ?? requestEnd;
+			requestBreak = String(day.breakMinutes);
+		} else {
+			requestStart = '09:00';
+			requestEnd = '17:00';
+			requestBreak = '30';
+		}
+	}
+
 	function openRequest(date: string) {
 		requesting = true;
 		requestDate = date;
 		requestReason = '';
 		requestErrorKey = null;
 		sent = false;
+		prefillFor(date);
+	}
+
+	function pickDate(date: string) {
+		requestDate = date;
+		prefillFor(date);
 	}
 
 	async function send(event: SubmitEvent) {
@@ -87,10 +115,16 @@
 		requestErrorKey = null;
 
 		try {
+			// A day that already has its one entry is amended, not duplicated — see
+			// `TimesheetDay.entryId`. Only a day with no entry (or an ambiguous one with
+			// more than one) still adds a fresh one.
+			const entryId = requestDay?.entryId ?? null;
+
 			// The times are the user's own wall clock; the browser's offset turns them
 			// into the instants the API stores.
 			await requestCorrection({
-				kind: 'add',
+				kind: entryId ? 'amend' : 'add',
+				entryId,
 				startedAt: new Date(`${requestDate}T${requestStart}`).toISOString(),
 				endedAt: new Date(`${requestDate}T${requestEnd}`).toISOString(),
 				breakMinutes: Number(requestBreak) || 0,
@@ -255,7 +289,8 @@
 					{$_('timesheet.date')}
 					<input
 						type="date"
-						bind:value={requestDate}
+						value={requestDate}
+						oninput={(event) => pickDate((event.currentTarget as HTMLInputElement).value)}
 						min={week.from}
 						max={week.to}
 						required

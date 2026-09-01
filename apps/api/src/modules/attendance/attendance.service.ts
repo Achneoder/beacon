@@ -271,6 +271,9 @@ export class AttendanceService {
         credited,
         holiday,
         hasPendingCorrection: pendingDates.has(date),
+        // A correction amends this entry only when it is the day's only one — see
+        // the field's doc comment in `@beacon/shared`.
+        entryId: forDay.length === 1 ? forDay[0].id : null,
       });
     }
 
