@@ -58,7 +58,8 @@ const week: TimesheetWeek = {
 	balanceMinutes: 105,
 	overtime: { balanceMinutes: 860, capMinutes: 2400, overCap: false, overCapMinutes: 0 },
 	locked: false,
-	locksAt: '2026-08-31T07:00:00.000Z'
+	locksAt: '2026-08-31T07:00:00.000Z',
+	selfApproveCorrections: false
 };
 
 const balance: LeaveBalanceSummary = {

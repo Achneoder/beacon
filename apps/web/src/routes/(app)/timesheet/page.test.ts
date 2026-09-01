@@ -66,7 +66,8 @@ const week: TimesheetWeek = {
 	balanceMinutes: 40,
 	overtime: { balanceMinutes: 860, capMinutes: 2400, overCap: false, overCapMinutes: 0 },
 	locked: false,
-	locksAt: '2026-08-31T07:00:00.000Z'
+	locksAt: '2026-08-31T07:00:00.000Z',
+	selfApproveCorrections: false
 };
 
 beforeEach(async () => {
@@ -152,6 +153,53 @@ describe('timesheet page', () => {
 		render(TimesheetPage);
 
 		expect(await screen.findByText('Correction pending')).toBeInTheDocument();
+	});
+
+	it('says a manager decides the correction it is asking for', async () => {
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Request correction' });
+		open.click();
+
+		expect(
+			await screen.findByText('Your manager decides. Say what the day should have been and why.')
+		).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Send request' })).toBeInTheDocument();
+	});
+
+	it('offers to correct a day outright where the organization allows it', async () => {
+		// The API decides what a correction does; the week says so, and only the copy
+		// changes — the form and the request it sends are the same either way.
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({ ...week, selfApproveCorrections: true });
+
+		render(TimesheetPage);
+
+		const open = await screen.findByRole('button', { name: 'Correct a day' });
+		open.click();
+
+		expect(
+			await screen.findByText(
+				'Your change applies straight away. Say what the day should have been and why.'
+			)
+		).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Apply correction' })).toBeInTheDocument();
+	});
+
+	it('says a closed week can still be put right by the person it belongs to', async () => {
+		vi.spyOn(attendance, 'getWeek').mockResolvedValue({
+			...week,
+			locked: true,
+			offset: -3,
+			selfApproveCorrections: true
+		});
+
+		render(TimesheetPage);
+
+		expect(
+			await screen.findByText(
+				'This week is closed, but your own corrections still apply straight away.'
+			)
+		).toBeInTheDocument();
 	});
 
 	it('pages back a week and refuses to page past the current one', async () => {
