@@ -5,14 +5,13 @@ import {
 	type DocumentAccessSummary,
 	type DocumentCategorySummary,
 	type DocumentDetail,
-	type DocumentDownload,
 	type DocumentSummary,
 	type DocumentUploadPolicy,
 	type DocumentVersionSummary,
 	type GrantDocumentAccessRequest,
 	type UpdateDocumentRequest
 } from '@beacon/shared';
-import { api, apiSend, apiUpload } from './client';
+import { api, apiDownload, apiSend, apiUpload } from './client';
 
 /** The documents half of the REST API. Every shape comes from `@beacon/shared`. */
 
@@ -35,11 +34,16 @@ export function listVersions(id: string): Promise<DocumentVersionSummary[]> {
 	return api<DocumentVersionSummary[]>(`/documents/${id}/versions`);
 }
 
-/** Mints a short-lived signed URL — never call this ahead of the click that needs it. */
-export function downloadDocument(id: string, versionId?: string): Promise<DocumentDownload> {
-	return api<DocumentDownload>(
-		`/documents/${id}/download${versionId ? `?versionId=${versionId}` : ''}`
-	);
+/**
+ * The document's own bytes, served by the API rather than by the object store — that
+ * store is internal to the server, so nothing it could sign is reachable from here.
+ * Never called ahead of the click that needs it: this transfers the whole file.
+ */
+export function downloadDocument(
+	id: string,
+	versionId?: string
+): Promise<{ blob: Blob; filename: string | null }> {
+	return apiDownload(`/documents/${id}/download${versionId ? `?versionId=${versionId}` : ''}`);
 }
 
 export function getUploadPolicy(): Promise<DocumentUploadPolicy> {

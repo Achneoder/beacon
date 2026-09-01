@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseFilters,
   UseInterceptors,
@@ -20,7 +21,6 @@ import {
   type AuthenticatedUser,
   type DocumentAccessSummary,
   type DocumentDetail,
-  type DocumentDownload,
   type DocumentSummary,
   type DocumentUploadPolicy,
   type DocumentVersionSummary,
@@ -31,6 +31,7 @@ import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { DocumentsService, type DocumentCaller } from './documents.service.js';
 import { DocumentFilePipe, type UploadedDocumentFile } from './document-file.pipe.js';
 import { MulterExceptionFilter } from './multer-exception.filter.js';
+import { attachmentDisposition } from './content-disposition.js';
 import { CreateDocumentDto } from './dto/create-document.dto.js';
 import { UpdateDocumentDto } from './dto/update-document.dto.js';
 import { GrantDocumentAccessDto } from './dto/grant-document-access.dto.js';
@@ -85,15 +86,27 @@ export class DocumentsController {
     return this.documents.listVersions(callerOf(user), id);
   }
 
-  /** A short-lived signed URL, never proxied bytes. */
+  /**
+   * The bytes, streamed from storage through this process — the object store is an
+   * internal service in an on-premise install and a URL signed against its address is
+   * one the browser can never reach. Streamed rather than buffered so a 20 MB document
+   * is not held in memory to feed a socket that takes it a chunk at a time; the length
+   * is known from the version row, so the client still gets a progress bar.
+   */
   @Get(':id/download')
   @RequirePermissions('document:read')
-  download(
+  async download(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('versionId', optionalUuid) versionId?: string,
-  ): Promise<DocumentDownload> {
-    return this.documents.download(callerOf(user), id, versionId);
+  ): Promise<StreamableFile> {
+    const file = await this.documents.download(callerOf(user), id, versionId);
+
+    return new StreamableFile(file.stream, {
+      type: file.contentType,
+      disposition: attachmentDisposition(file.filename),
+      length: file.size,
+    });
   }
 
   @Post()

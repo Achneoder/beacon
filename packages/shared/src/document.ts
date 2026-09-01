@@ -31,9 +31,6 @@ export const ACCEPTED_DOCUMENT_EXTENSIONS = ['.pdf', '.docx', '.jpg', '.jpeg'] a
 /** 20 MB, the cap the canvas's dropzone states. */
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 
-/** How long a minted download link stays valid before it must be re-requested. */
-export const DOWNLOAD_URL_TTL_SECONDS = 300;
-
 export function isAcceptedDocumentType(contentType: string): contentType is AcceptedDocumentType {
   return (ACCEPTED_DOCUMENT_TYPES as readonly string[]).includes(contentType);
 }
@@ -141,15 +138,6 @@ export interface DocumentAccessSummary {
 export interface DocumentDetail extends DocumentSummary {
   versions: DocumentVersionSummary[];
   access: DocumentAccessSummary[];
-}
-
-export interface DocumentDownload {
-  url: string;
-  expiresInSeconds: number;
-  filename: string;
-  contentType: string;
-  size: number;
-  versionId: string;
 }
 
 /** What the dropzone is actually allowed to promise, read from the server at load. */

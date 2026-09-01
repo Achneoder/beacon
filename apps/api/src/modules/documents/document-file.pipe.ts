@@ -37,7 +37,7 @@ function sniff(buffer: Buffer, declaredMimeType: string, filename: string): Acce
   // A ZIP signature alone is not enough — plenty of formats are ZIPs underneath.
   // docx is accepted only when the client also declared the OOXML wordprocessing
   // type and named the file `.docx`; this is heuristic, not proof, and the crafted
-  // case is stored inert and served only through a presigned download, never executed.
+  // case is stored inert and served only as an attachment this API streams, never executed.
   const isZip =
     buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
   if (isZip && declaredMimeType === DOCX_TYPE && filename.toLowerCase().endsWith('.docx')) {

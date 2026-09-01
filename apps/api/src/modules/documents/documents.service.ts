@@ -14,17 +14,16 @@ import {
   type FilterQuery,
 } from '@mikro-orm/core';
 import { randomUUID } from 'node:crypto';
+import type { Readable } from 'node:stream';
 import {
   ACCEPTED_DOCUMENT_EXTENSIONS,
   ACCEPTED_DOCUMENT_TYPES,
   DEFAULT_DOCUMENT_CATEGORIES,
-  DOWNLOAD_URL_TTL_SECONDS,
   MAX_DOCUMENT_BYTES,
   fullName,
   type DocumentAccessSummary,
   type DocumentCategorySummary,
   type DocumentDetail,
-  type DocumentDownload,
   type DocumentSummary,
   type DocumentUploadPolicy,
   type DocumentVersionSummary,
@@ -50,6 +49,19 @@ export interface DocumentCaller {
   id: string;
   organizationId: string;
   canManage: boolean;
+}
+
+/**
+ * One version's bytes and the metadata the response headers are built from. Not a
+ * `@beacon/shared` shape: the route answers with the file itself, so nothing here is
+ * ever parsed by a client.
+ */
+export interface DocumentDownloadStream {
+  stream: Readable;
+  filename: string;
+  contentType: string;
+  size: number;
+  versionId: string;
 }
 
 /** `org/<orgId>/documents/<docId>/<versionId>` — ids only, so no filename or path
@@ -277,7 +289,20 @@ export class DocumentsService {
       .map(toVersionSummary);
   }
 
-  async download(caller: DocumentCaller, id: string, versionId?: string): Promise<DocumentDownload> {
+  /**
+   * The bytes themselves, opened from storage after the same visibility check every
+   * other read runs. Deliberately not a signed URL: the object store is reachable
+   * from the API, not from the browser — an on-premise install runs it on an internal
+   * network — and a URL minted against that address is one no client can follow. It
+   * also keeps a document inside the response headers `securityHeaders` sets, which
+   * matters most for `Cache-Control: no-store`: this is personal data on a shared
+   * workstation.
+   */
+  async download(
+    caller: DocumentCaller,
+    id: string,
+    versionId?: string,
+  ): Promise<DocumentDownloadStream> {
     const document = await this.findVisible(caller, id, ['currentVersion']);
 
     let version: DocumentVersion;
@@ -295,11 +320,8 @@ export class DocumentsService {
       version = current;
     }
 
-    const url = await this.storage.signedUrl(version.storageKey, DOWNLOAD_URL_TTL_SECONDS);
-
     return {
-      url,
-      expiresInSeconds: DOWNLOAD_URL_TTL_SECONDS,
+      stream: await this.storage.get(version.storageKey),
       filename: version.originalFilename,
       contentType: version.contentType,
       size: version.size,

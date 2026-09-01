@@ -28,7 +28,9 @@ async function upload(
 }
 
 test.describe('documents', () => {
-	test('uploads a document and opens it through a signed URL', async ({ ownerPage: page }) => {
+	test('uploads a document and opens the bytes the API streams back', async ({
+		ownerPage: page
+	}) => {
 		const title = unique('Employee handbook');
 		await upload(page, title);
 
@@ -36,15 +38,23 @@ test.describe('documents', () => {
 		const row = page.getByRole('row', { name: title });
 		await expect(row.getByText(/\d+ B/)).toBeVisible();
 
-		// Not waitForLoadState: the fixture is a magic-byte stub, not a real PDF, and
-		// Chromium's own PDF viewer can hang trying to render it. The signed URL
-		// resolving to something other than about:blank is what a signed URL was
-		// actually minted, which is the thing under test.
-		const [popup] = await Promise.all([
+		// The response is what is under test: the bytes come from the API itself, over
+		// the origin the SPA is already talking to. A URL signed for the object store
+		// named an address only the server can reach, and the tab opened on nothing.
+		//
+		// The popup is asserted to exist but not read: the fixture is a magic-byte stub
+		// rather than a real PDF, and headless Chromium has no viewer to render the
+		// `blob:` URL it is handed, so its own url() never commits.
+		const [popup, response] = await Promise.all([
 			page.waitForEvent('popup'),
+			page.waitForResponse((it) => it.url().includes('/download')),
 			row.getByRole('button', { name: 'Open' }).click()
 		]);
-		await expect.poll(() => popup.url()).not.toBe('about:blank');
+
+		expect(response.status()).toBe(200);
+		expect(response.headers()['content-type']).toContain('application/pdf');
+		// The uploaded filename, not the title — a document is renamed without its file being.
+		expect(response.headers()['content-disposition']).toContain('filename="contract.pdf"');
 		await popup.close();
 	});
 

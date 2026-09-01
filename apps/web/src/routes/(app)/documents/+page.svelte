@@ -2,13 +2,14 @@
 	import { _, locale } from 'svelte-i18n';
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
-	import type {
-		DocumentAccessLevel,
-		DocumentAccessSubject,
-		DocumentCategorySummary,
-		DocumentDetail,
-		DocumentSummary,
-		DocumentUploadPolicy
+	import {
+		documentKindOf,
+		type DocumentAccessLevel,
+		type DocumentAccessSubject,
+		type DocumentCategorySummary,
+		type DocumentDetail,
+		type DocumentSummary,
+		type DocumentUploadPolicy
 	} from '@beacon/shared';
 	import { Alert, Button, Card, TextField } from '$lib/components/ui';
 	import { PageHeader } from '$lib/components/shell';
@@ -31,6 +32,7 @@
 		uploadDocument,
 		uploadVersion
 	} from '$lib/api/documents';
+	import { openBlob, saveBlob } from '$lib/api/client';
 	import { documentErrorKey } from '$lib/documents/errors';
 	import { session } from '$lib/auth/session.svelte';
 
@@ -158,12 +160,21 @@
 	// ── Opening a document ──────────────────────────────────────────────────────
 	let openingId = $state<string | null>(null);
 
+	/**
+	 * The API answers with the file itself, so opening one means holding its bytes
+	 * here. A pdf or a photo goes to a tab, which is what the button promises; a docx
+	 * the browser cannot render is saved instead, under the name it was uploaded with
+	 * rather than the object URL's uuid.
+	 */
 	async function openDocument(document: DocumentSummary) {
 		openingId = document.id;
 
 		try {
-			const { url } = await downloadDocument(document.id);
-			window.open(url, '_blank', 'noopener');
+			const { blob, filename } = await downloadDocument(document.id);
+			const name = filename ?? document.filename;
+
+			if (documentKindOf(document.contentType) === 'docx') saveBlob(blob, name);
+			else openBlob(blob, name);
 		} catch (error) {
 			loadErrorKey = documentErrorKey(error);
 		} finally {

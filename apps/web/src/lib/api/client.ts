@@ -166,10 +166,54 @@ export async function apiDownload(path: string): Promise<{ blob: Blob; filename:
 
 /** The server names the file; the client should not have to guess the range back. */
 function filenameOf(response: Response): string | null {
-	const match = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '');
+	const header = response.headers.get('content-disposition') ?? '';
+	// `filename*` first: it carries the name as it was uploaded, where the quoted form
+	// beside it is an ASCII reduction the server made for browsers that need one.
+	const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
 
-	return match?.[1] ?? null;
+	if (encoded) {
+		try {
+			return decodeURIComponent(encoded[1]);
+		} catch {
+			// A malformed escape is not worth failing a download over — fall through.
+		}
+	}
+
+	return /filename="([^"]+)"/.exec(header)?.[1] ?? null;
 }
+
+/**
+ * Opens a downloaded blob in a new tab, falling back to saving it when the browser
+ * refuses the window — a pop-up blocker is the usual reason, and a click that asked
+ * to see a document must not end in nothing at all.
+ *
+ * Preferred over saving whenever the browser can render the type itself: the bytes
+ * stay in this page's memory and die with the tab, where a saved file lingers in a
+ * downloads folder. That is the same reason every API response carries
+ * `Cache-Control: no-store` — Beacon runs on shared workstations.
+ *
+ * The object URL is revoked on a timer rather than on the next frame like `saveBlob`:
+ * the new tab reads it for as long as it is open, and revoking early leaves it blank.
+ */
+export function openBlob(blob: Blob, filename: string): void {
+	const url = URL.createObjectURL(blob);
+	// No `noopener`: it makes `window.open` return null even on success, and then a
+	// blocked pop-up would be indistinguishable from an opened one. Only types the
+	// API has sniffed as pdf or jpeg reach here, neither of which can script an opener.
+	const opened = window.open(url, '_blank');
+
+	if (!opened) {
+		URL.revokeObjectURL(url);
+		saveBlob(blob, filename);
+		return;
+	}
+
+	setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS);
+}
+
+/** Long enough for the new tab to have read the object URL, short enough that the
+ *  bytes are not held for the life of the session. */
+const BLOB_URL_LIFETIME_MS = 60_000;
 
 /**
  * Hands a downloaded blob to the browser.

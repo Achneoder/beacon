@@ -20,6 +20,10 @@ export function configureApp(app: INestApplication): INestApplication {
   app.enableCors({
     origin: corsOrigins(),
     credentials: true,
+    // A download names its own file, and cross-origin JavaScript cannot read a header
+    // it was not handed: without this the SPA on :5173 falls back to a guessed name
+    // for a document only the API knows the real name of.
+    exposedHeaders: ['Content-Disposition'],
   });
   app.use(securityHeaders);
   app.use(cookieParser());

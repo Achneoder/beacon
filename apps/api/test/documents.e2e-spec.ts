@@ -254,8 +254,9 @@ describe('Documents (e2e)', () => {
       const download = await http()
         .get(`/api/documents/${personalDocId}/download`)
         .set(as(bToken))
+        .responseType('blob')
         .expect(200);
-      expect(download.body.url).toBeTruthy();
+      expect(download.body).toEqual(PDF_HEADER);
     });
 
     it('a read grant does not permit a new version; a write grant does', async () => {
@@ -343,19 +344,32 @@ describe('Documents (e2e)', () => {
       expect(list.body.find((d: { id: string }) => d.id === personalDocId)).toBeTruthy();
     });
 
-    it('a signed download URL actually resolves to the uploaded bytes', async () => {
-      const created = await upload(aToken, { title: 'Roundtrip', categoryId }, PDF_HEADER).expect(201);
-
-      const download = await http()
-        .get(`/api/documents/${created.body.id}/download`)
-        .set(as(aToken))
-        .expect(200);
+    it('the download streams back exactly the uploaded bytes', async () => {
+      const created = await upload(
+        aToken,
+        { title: 'Roundtrip', categoryId },
+        PDF_HEADER,
+        'Gehaltsabrechnung Mai.pdf',
+      ).expect(201);
 
       // Mocking StorageService would prove the call was made, not the MinIO
       // conversation — this is the only layer where the round trip is visible.
-      const response = await fetch(download.body.url);
-      expect(response.status).toBe(200);
-      expect(Buffer.from(await response.arrayBuffer())).toEqual(PDF_HEADER);
+      const download = await http()
+        .get(`/api/documents/${created.body.id}/download`)
+        .set(as(aToken))
+        .responseType('blob')
+        .expect(200)
+        .expect('Content-Type', 'application/pdf')
+        .expect('Cache-Control', 'no-store');
+
+      expect(download.body).toEqual(PDF_HEADER);
+      expect(download.headers['content-length']).toBe(String(PDF_HEADER.length));
+      // The uploader's own filename comes back, in both forms. What a hostile one
+      // does to the header is content-disposition.spec.ts's subject, not this one's:
+      // multipart re-encodes anything exotic on the way in.
+      expect(download.headers['content-disposition']).toBe(
+        `attachment; filename="Gehaltsabrechnung Mai.pdf"; filename*=UTF-8''Gehaltsabrechnung%20Mai.pdf`,
+      );
     });
   });
 

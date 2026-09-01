@@ -117,6 +117,17 @@ a reason.
   monitoring. Objects are encrypted at rest only when `STORAGE_ENCRYPTION=sse-s3` —
   the bundled dev MinIO runs no KMS, so the default is `none` and `MinioStorageService` refuses to
   finish booting if it asked for `sse-s3` and the bucket does not confirm it.
+- **A document's bytes are served by the API, never by the object store.**
+  `GET /documents/:id/download` streams from `StorageService.get` behind the same
+  visibility check every other read runs. A presigned URL was the original design and
+  could not survive deployment: the store is an internal service, so the address it
+  signed (`http://minio:9000/...`) was one no browser could reach, and exposing it
+  publicly would serve personal data outside `securityHeaders` — `Cache-Control:
+  no-store` matters most for exactly a payslip. `attachmentDisposition`
+  (`modules/documents/`) escapes the uploader's own filename into the header, always as
+  `attachment`: a pdf rendered inline would run on the API's origin. The web app opens
+  what a browser can render from a `blob:` URL (`openBlob`, `lib/api/client.ts`) and
+  saves the rest, so nothing personal reaches a shared machine's disk unless it must.
 - **i18n and a11y are not optional.** All copy goes through `svelte-i18n`
   (`apps/web/src/lib/i18n/`, locales `en` + `de`). No hardcoded strings. Target WCAG 2.1.
 - **The API decides which language, and `SUPPORTED_LOCALES` is the list.** `User.locale`

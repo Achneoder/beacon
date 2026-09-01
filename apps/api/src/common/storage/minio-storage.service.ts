@@ -94,8 +94,4 @@ export class MinioStorageService extends StorageService implements OnModuleInit 
   delete(key: string): Promise<void> {
     return this.client.removeObject(this.bucket, key);
   }
-
-  signedUrl(key: string, expiresInSeconds: number): Promise<string> {
-    return this.client.presignedGetObject(this.bucket, key, expiresInSeconds);
-  }
 }
