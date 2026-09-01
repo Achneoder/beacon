@@ -9,8 +9,8 @@
 		UserSummary
 	} from '@beacon/shared';
 	import { Button } from '$lib/components/ui';
-	import { api } from '$lib/api/client';
 	import { listDepartments, listPeople } from '$lib/api/people';
+	import { listRoles } from '$lib/api/roles';
 
 	type Props = {
 		access: DocumentAccessSummary[];
@@ -38,11 +38,7 @@
 		if (loadedPickers) return;
 		loadedPickers = true;
 
-		void Promise.all([
-			listPeople(),
-			listDepartments(),
-			api<RoleSummary[]>('/organizations/current/roles')
-		]).then(([p, d, r]) => {
+		void Promise.all([listPeople(), listDepartments(), listRoles()]).then(([p, d, r]) => {
 			people = p;
 			departments = d;
 			roles = r;

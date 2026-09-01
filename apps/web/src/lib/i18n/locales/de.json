@@ -171,6 +171,97 @@
 		"manager": "Manager",
 		"employee": "Mitarbeiter"
 	},
+	"permission": {
+		"group": {
+			"organization": "Organisation",
+			"employee": "Personen",
+			"attendance": "Anwesenheit",
+			"holiday": "Abwesenheit",
+			"document": "Dokumente",
+			"report": "Auswertungen"
+		},
+		"organization": {
+			"read": "Einstellungen der Organisation sehen",
+			"manage": "Einstellungen der Organisation ändern"
+		},
+		"employee": {
+			"read": "Andere Personen sehen",
+			"manage": "Personen anlegen und bearbeiten"
+		},
+		"attendance": {
+			"read": "Anwesenheit sehen",
+			"write": "Kommen und gehen buchen",
+			"approve": "Über Korrekturen entscheiden"
+		},
+		"holiday": {
+			"request": "Abwesenheit beantragen",
+			"approve": "Über Abwesenheitsanträge entscheiden"
+		},
+		"document": {
+			"read": "Dokumente sehen",
+			"write": "Dokumente hochladen",
+			"manage": "Alle Dokumente verwalten"
+		},
+		"report": {
+			"read": "Auswertungen sehen"
+		},
+		"hint": {
+			"organization": {
+				"read": "Die Organisation mit ihren Abteilungen, Rollen und Abwesenheitsarten lesen.",
+				"manage": "Diese Einstellungen ändern, samt Rollen und Single Sign-on. Diese Berechtigung führt auf diese Seite."
+			},
+			"employee": {
+				"read": "Das Personenverzeichnis und fremde Profile öffnen.",
+				"manage": "Personen einladen, bearbeiten, deaktivieren und ihnen Rollen zuweisen."
+			},
+			"attendance": {
+				"read": "Buchungen und Stundenzettel anderer Personen sehen.",
+				"write": "Kommen, gehen und Pausen buchen. Immer nur für sich selbst.",
+				"approve": "Über Korrekturanträge der betreuten Personen entscheiden."
+			},
+			"holiday": {
+				"request": "Abwesenheit beantragen. Immer nur für sich selbst.",
+				"approve": "Über Abwesenheitsanträge der betreuten Personen entscheiden."
+			},
+			"document": {
+				"read": "Die für sie freigegebenen Dokumente öffnen.",
+				"write": "Dokumente hochladen und eigene bearbeiten.",
+				"manage": "Alle Dokumente der Organisation sehen, freigeben und löschen, wem sie auch gehören."
+			},
+			"report": {
+				"read": "Anwesenheits- und Abwesenheitsauswertungen öffnen und exportieren."
+			}
+		}
+	},
+	"roleSettings": {
+		"kicker": "Organisation",
+		"title": "Rollen",
+		"intro": "Eine Rolle bündelt Berechtigungen unter einem Namen. Beacon prüft nie den Rollennamen, sondern immer die Berechtigung — legen Sie also die Rollen an, die Ihre Organisation wirklich braucht, statt eine eingebaute zu verbiegen.",
+		"tokenNote": "Eine geänderte Berechtigung greift, sobald die Sitzung der Person erneuert wird, spätestens nach fünfzehn Minuten.",
+		"readOnly": "Sie können die Rollen sehen. Zum Ändern brauchen Sie die Berechtigung, die Organisation zu verwalten.",
+		"back": "Zurück zu den Einstellungen",
+		"newRole": "Neue Rolle",
+		"name": "Name der Rolle",
+		"permissions": "Berechtigungen",
+		"noPermissions": "Diese Rolle gewährt für sich genommen nichts.",
+		"create": "Rolle anlegen",
+		"save": "Rolle speichern",
+		"saving": "Wird gespeichert…",
+		"cancel": "Abbrechen",
+		"edit": "Bearbeiten",
+		"delete": "Löschen",
+		"created": "Rolle angelegt.",
+		"saved": "Rolle gespeichert.",
+		"deleted": "Rolle gelöscht.",
+		"customized": "Bearbeitet",
+		"builtInName": "Eine eingebaute Rolle behält ihren Namen, den Beacon übersetzt. Ihre Berechtigungen können Sie ändern.",
+		"ownerLocked": "Die Rolle „Eigentümer“ hält immer alle Berechtigungen — so kann sich niemand selbst aussperren.",
+		"notEditable": "Diese Rolle hält Berechtigungen, die Sie selbst nicht haben. Sie können sie deshalb nicht ändern.",
+		"cannotGrant": "Sie halten diese Berechtigung nicht und können sie deshalb nicht vergeben.",
+		"inUse": "{count, plural, one {# Person hat diese Rolle} other {# Personen haben diese Rolle}}",
+		"unused": "Niemand hat diese Rolle",
+		"deleteBlocked": "Geben Sie diesen Personen erst eine andere Rolle."
+	},
 	"profile": {
 		"kicker": "Ihr Konto",
 		"title": "Profil",
@@ -284,7 +375,9 @@
 		"members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
 		"delete": "Löschen",
 		"roles": "Rollen",
-		"rolesHint": "Die eingebauten Rollen sind noch nicht bearbeitbar. Ein Rolleneditor kommt mit den Manager-Ansichten.",
+		"rolesHint": "Eine Rolle bündelt Berechtigungen unter einem Namen. Beacon prüft immer die Berechtigung, nie den Rollennamen.",
+		"rolesManage": "Rollen verwalten",
+		"rolesView": "Rollen ansehen",
 		"systemRole": "Eingebaut",
 		"permissionCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
 		"absenceTypes": "Abwesenheitsarten",

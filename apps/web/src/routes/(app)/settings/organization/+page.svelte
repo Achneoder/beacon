@@ -20,6 +20,7 @@
 		listHolidays,
 		retireAbsenceType
 	} from '$lib/api/absences';
+	import { listRoles } from '$lib/api/roles';
 	import { reindexSearch } from '$lib/api/search';
 	import { timezoneGroups } from '$lib/time/zone';
 	import { formatDate, toneOf, typeName } from '$lib/absence/labels';
@@ -74,7 +75,7 @@
 			name = organization.name;
 			timezone = organization.timezone;
 			defaultLocale = organization.defaultLocale;
-			roles = await api<RoleSummary[]>('/organizations/current/roles');
+			roles = await listRoles();
 			departments = await listDepartments();
 			absenceTypes = await listAllAbsenceTypes();
 			holidays = await listHolidays(`${year}-01-01`, `${year}-12-31`);
@@ -412,6 +413,10 @@
 				</li>
 			{/each}
 		</ul>
+
+		<Button size="sm" class="mt-5" href="/settings/roles">
+			{session.can('organization:manage') ? $_('settings.rolesManage') : $_('settings.rolesView')}
+		</Button>
 	</Card>
 
 	<Card variant="panel" as="section" class="mt-6">

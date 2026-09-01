@@ -65,7 +65,7 @@ export async function inviteMember(
 ): Promise<Account> {
 	const headers = { Authorization: `Bearer ${await accessToken(request, INSTANCE)}` };
 
-	const rolesResponse = await request.get(`${API_URL}/organizations/current/roles`, { headers });
+	const rolesResponse = await request.get(`${API_URL}/roles`, { headers });
 	expect(rolesResponse.status(), await rolesResponse.text()).toBe(200);
 	const role = (await rolesResponse.json()).find((it: { key: string }) => it.key === roleKey);
 	expect(role, `no ${roleKey} role in the organization`).toBeTruthy();
