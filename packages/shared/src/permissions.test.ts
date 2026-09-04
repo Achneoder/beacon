@@ -24,6 +24,8 @@ describe('PERMISSIONS', () => {
       'attendance',
       'holiday',
       'document',
+      'project',
+      'time',
       'report',
     ]);
     // Nothing is left out: the editor renders area by area, so a permission in no
@@ -43,6 +45,9 @@ describe('PERMISSIONS', () => {
     expect(isSelfServicePermission('organization:manage')).toBe(false);
     // The one an administrator holds and must not be able to hand out by accident.
     expect(isSelfServicePermission('document:manage')).toBe(false);
+    // Booking time is self-scoped like clocking in; administering the catalog is not.
+    expect(isSelfServicePermission('time:write')).toBe(true);
+    expect(isSelfServicePermission('project:manage')).toBe(false);
   });
 });
 

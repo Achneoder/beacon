@@ -7,6 +7,8 @@ export * from './attendance.js';
 export * from './employee.js';
 export * from './absence.js';
 export * from './document.js';
+export * from './project.js';
+export * from './time-entry.js';
 export * from './search.js';
 export * from './report.js';
 export * from './sso.js';

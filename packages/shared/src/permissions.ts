@@ -15,6 +15,9 @@ export const PERMISSIONS = [
   'document:read',
   'document:write',
   'document:manage',
+  'project:manage',
+  'time:read',
+  'time:write',
   'report:read',
 ] as const;
 
@@ -33,6 +36,8 @@ export const DEFAULT_ROLES = {
     'document:read',
     'document:write',
     'document:manage',
+    'project:manage',
+    'time:read',
     'report:read',
   ],
   manager: [
@@ -42,7 +47,15 @@ export const DEFAULT_ROLES = {
     'holiday:approve',
     'report:read',
   ],
-  employee: ['attendance:read', 'attendance:write', 'holiday:request', 'document:read', 'document:write'],
+  employee: [
+    'attendance:read',
+    'attendance:write',
+    'holiday:request',
+    'document:read',
+    'document:write',
+    'time:read',
+    'time:write',
+  ],
 } as const satisfies Record<string, readonly Permission[]>;
 
 export type DefaultRole = keyof typeof DEFAULT_ROLES;
@@ -65,11 +78,19 @@ export type DefaultRole = keyof typeof DEFAULT_ROLES;
  * `resolveOwner` will accept an `ownerId` that is not the caller's
  * (`documents.service.ts`). Adding to this list widens what a non-owner may grant, so
  * a permission belongs here only once every path that reads it is self-scoped.
+ *
+ * `time:write` joins this list for the same reason `attendance:write` does: every
+ * code path it guards — starting/stopping the timer, creating/editing/deleting a
+ * manual entry — acts on `caller.id` only (`time-entries.service.ts`), never an
+ * arbitrary `userId`. `time:read` needs no entry here — `admin` already holds it
+ * directly. `project:manage` must never join this list: its writes reach any
+ * project in the organization, not the caller's own record.
  */
 export const SELF_SERVICE_PERMISSIONS = [
   'attendance:write',
   'holiday:request',
   'document:write',
+  'time:write',
 ] as const satisfies readonly Permission[];
 
 export function isSelfServicePermission(permission: Permission): boolean {

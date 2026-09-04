@@ -109,6 +109,48 @@ export interface AbsenceSummary {
   };
 }
 
+// ---------------------------------------------------------------- billable
+
+/** What the billable summary's rows stand for. */
+export const BILLABLE_GROUP_BY = ['project', 'task', 'client', 'user'] as const;
+
+export type BillableGroupBy = (typeof BILLABLE_GROUP_BY)[number];
+
+export function isBillableGroupBy(value: string): value is BillableGroupBy {
+  return (BILLABLE_GROUP_BY as readonly string[]).includes(value);
+}
+
+/**
+ * One row of the billable summary — a project, task, client tag or user, depending on
+ * `BillableSummary.groupBy`.
+ *
+ * `amount` is the sum of each entry's frozen `TimeEntry.amount` only — never a live
+ * estimate off a project's current rate — so it always matches what was actually billed
+ * at the time each entry was booked, the same discipline the entry itself keeps.
+ */
+export interface BillableSummaryRow {
+  /** A project/task/user id, the client tag itself, or `null` for the ungrouped bucket. */
+  key: string | null;
+  label: string;
+  /** Includes live minutes from a currently running entry. */
+  minutes: number;
+  billableMinutes: number;
+  amount: number;
+  /** Billable minutes with no rate resolved, and so contributing nothing to `amount`. */
+  unratedMinutes: number;
+  entryCount: number;
+}
+
+/** `GET /reports/time/summary`. */
+export interface BillableSummary {
+  range: ReportRange;
+  groupBy: BillableGroupBy;
+  rows: BillableSummaryRow[];
+  total: BillableSummaryRow;
+  /** How many rows include a still-running entry, so the screen can flag them as live. */
+  runningCount: number;
+}
+
 // ---------------------------------------------------------------- csv
 
 /** RFC 4180 separator. Fixed rather than localized — the header row is machine-read. */

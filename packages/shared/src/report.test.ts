@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CSV_BOM, csvCell, csvHours, csvRow, isReportGroupBy } from './report.js';
+import { CSV_BOM, csvCell, csvHours, csvRow, isBillableGroupBy, isReportGroupBy } from './report.js';
 
 describe('csvCell', () => {
   it('leaves ordinary text alone', () => {
@@ -81,5 +81,16 @@ describe('isReportGroupBy', () => {
     expect(isReportGroupBy('department')).toBe(true);
     expect(isReportGroupBy('team')).toBe(false);
     expect(isReportGroupBy('')).toBe(false);
+  });
+});
+
+describe('isBillableGroupBy', () => {
+  it('accepts the four groupings and refuses anything else', () => {
+    expect(isBillableGroupBy('project')).toBe(true);
+    expect(isBillableGroupBy('task')).toBe(true);
+    expect(isBillableGroupBy('client')).toBe(true);
+    expect(isBillableGroupBy('user')).toBe(true);
+    expect(isBillableGroupBy('department')).toBe(false);
+    expect(isBillableGroupBy('')).toBe(false);
   });
 });
