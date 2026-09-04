@@ -1,4 +1,10 @@
-import type { AbsenceSummary, AttendanceSummary, ReportGroupBy } from '@beacon/shared';
+import type {
+	AbsenceSummary,
+	AttendanceSummary,
+	BillableGroupBy,
+	BillableSummary,
+	ReportGroupBy
+} from '@beacon/shared';
 import { api, apiDownload, saveBlob } from './client';
 
 /**
@@ -25,6 +31,21 @@ export function getAttendanceSummary(query: AttendanceReportQuery): Promise<Atte
 
 export function getAbsenceSummary(year: number): Promise<AbsenceSummary> {
 	return api<AbsenceSummary>(`/reports/absences/summary?year=${year}`);
+}
+
+export interface BillableReportQuery {
+	from: string;
+	to: string;
+	groupBy?: BillableGroupBy;
+	projectId?: string;
+}
+
+export function getBillableSummary(query: BillableReportQuery): Promise<BillableSummary> {
+	const params = new URLSearchParams({ from: query.from, to: query.to });
+	if (query.groupBy) params.set('groupBy', query.groupBy);
+	if (query.projectId) params.set('projectId', query.projectId);
+
+	return api<BillableSummary>(`/reports/time/summary?${params}`);
 }
 
 /**

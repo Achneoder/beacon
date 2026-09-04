@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { _, locale } from 'svelte-i18n';
 	import {
+		BILLABLE_GROUP_BY,
 		formatDays,
 		formatDuration,
 		formatSignedDuration,
@@ -8,6 +9,8 @@
 		type AbsenceSummary,
 		type AttendanceSummary,
 		type AttendanceSummaryRow,
+		type BillableGroupBy,
+		type BillableSummary,
 		type CorrectionSummary,
 		type ReportGroupBy
 	} from '@beacon/shared';
@@ -15,9 +18,15 @@
 	import { PageHeader } from '$lib/components/shell';
 	import { BarChart, type BarRow, type BarSeries } from '$lib/components/charts';
 	import { balanceTone } from '$lib/attendance/labels';
+	import { formatAmount } from '$lib/time-entries/labels';
 	import { formatRange, rangeFor, reportYears, REPORT_RANGES } from '$lib/reports/ranges';
 	import type { ReportRangeKey } from '$lib/reports/ranges';
-	import { downloadAttendanceCsv, getAbsenceSummary, getAttendanceSummary } from '$lib/api/reports';
+	import {
+		downloadAttendanceCsv,
+		getAbsenceSummary,
+		getAttendanceSummary,
+		getBillableSummary
+	} from '$lib/api/reports';
 	import { listCorrections } from '$lib/api/attendance';
 	import { getCalendar, listAbsences } from '$lib/api/absences';
 	import { session } from '$lib/auth/session.svelte';
@@ -55,6 +64,13 @@
 	let absenceErrorKey = $state<string | null>(null);
 	let loadingAbsence = $state(true);
 
+	/** Shares `range` with the attendance band above — both are period reports, and a
+	 *  billing period rarely needs to differ from the attendance one on the same page. */
+	let billableGroupBy = $state<BillableGroupBy>('project');
+	let billable = $state<BillableSummary | null>(null);
+	let billableErrorKey = $state<string | null>(null);
+	let loadingBillable = $state(true);
+
 	let corrections = $state<CorrectionSummary[]>([]);
 	let pendingAbsences = $state<AbsenceRequestSummary[]>([]);
 	let outThisWeek = $state<AbsenceRequestSummary[]>([]);
@@ -80,6 +96,10 @@
 
 	$effect(() => {
 		void loadAbsence(year);
+	});
+
+	$effect(() => {
+		void loadBillable(range.from, range.to, billableGroupBy);
 	});
 
 	$effect(() => {
@@ -138,6 +158,19 @@
 			dashboardErrorKey = errorKey(error);
 		} finally {
 			loadingDashboard = false;
+		}
+	}
+
+	async function loadBillable(from: string, to: string, by: BillableGroupBy) {
+		loadingBillable = true;
+		billableErrorKey = null;
+
+		try {
+			billable = await getBillableSummary({ from, to, groupBy: by });
+		} catch (error) {
+			billableErrorKey = errorKey(error);
+		} finally {
+			loadingBillable = false;
 		}
 	}
 
@@ -568,6 +601,126 @@
 								</td>
 								<td class="py-3 text-right font-mono tabular-nums">
 									{days(absence.total.remainingDays)}
+								</td>
+							</tr>
+						</tfoot>
+					{/if}
+				</table>
+			</div>
+		</div>
+	{/if}
+</Card>
+
+<!-- ------------------------------------------------------------ billable time -->
+
+<Card variant="panel" as="section" class="mt-4">
+	<div class="flex flex-wrap items-start justify-between gap-3">
+		<div>
+			<h2 class="text-base font-bold tracking-tight">{$_('reports.billable.title')}</h2>
+			<p class="mt-1 font-mono text-2xs text-ink-muted">{formatRange(range, lang)}</p>
+		</div>
+	</div>
+
+	<div class="mt-4 flex flex-wrap items-center gap-4">
+		<fieldset class="flex flex-wrap items-center gap-1.5">
+			<legend class="sr-only">{$_('reports.billable.groupByLegend')}</legend>
+			{#each BILLABLE_GROUP_BY as key (key)}
+				<Button
+					size="sm"
+					variant={billableGroupBy === key ? 'primary' : 'quiet'}
+					aria-pressed={billableGroupBy === key}
+					onclick={() => (billableGroupBy = key)}
+				>
+					{$_(`reports.billable.groupBy.${key}`)}
+				</Button>
+			{/each}
+		</fieldset>
+	</div>
+
+	{#if billableErrorKey}
+		<Alert tone="warning" class="mt-3">{$_(billableErrorKey)}</Alert>
+	{/if}
+
+	{#if loadingBillable && !billable}
+		<p class="mt-4 text-sm text-ink-muted">{$_('reports.loading')}</p>
+	{:else if billable}
+		<div class="mt-5" class:opacity-60={loadingBillable}>
+			{#if billable.runningCount > 0}
+				<Alert tone="info" class="mb-3">
+					{$_('reports.billable.runningNotice', { values: { count: billable.runningCount } })}
+				</Alert>
+			{/if}
+
+			<div class="overflow-x-auto">
+				<table id="reports-billable-table" class="w-full min-w-[42rem] border-collapse text-sm">
+					<caption class="sr-only">{$_('reports.billable.caption')}</caption>
+					<thead>
+						<tr class="border-b border-border-default text-left text-2xs text-ink-muted">
+							<th scope="col" class="py-2 pr-3 font-semibold">
+								{$_(`reports.billable.groupBy.${billableGroupBy}`)}
+							</th>
+							<th scope="col" class="py-2 pr-3 text-right font-semibold">
+								{$_('reports.billable.minutes')}
+							</th>
+							<th scope="col" class="py-2 pr-3 text-right font-semibold">
+								{$_('reports.billable.billableMinutes')}
+							</th>
+							<th scope="col" class="py-2 pr-3 text-right font-semibold">
+								{$_('reports.billable.unrated')}
+							</th>
+							<th scope="col" class="py-2 text-right font-semibold">
+								{$_('reports.billable.amount')}
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each billable.rows as row (row.key ?? 'none')}
+							<tr class="border-b border-border-subtle">
+								<th scope="row" class="py-3 pr-3 text-left font-semibold">{row.label}</th>
+								<td class="py-3 pr-3 text-right font-mono tabular-nums">
+									{formatDuration(row.minutes)}
+								</td>
+								<td class="py-3 pr-3 text-right font-mono tabular-nums text-ink-muted">
+									{formatDuration(row.billableMinutes)}
+								</td>
+								<td class="py-3 pr-3 text-right font-mono tabular-nums">
+									{#if row.unratedMinutes > 0}
+										<Badge tone="warning">{formatDuration(row.unratedMinutes)}</Badge>
+									{:else}
+										<span class="text-ink-muted">—</span>
+									{/if}
+								</td>
+								<td class="py-3 text-right font-mono tabular-nums"
+									>{formatAmount(row.amount, lang)}</td
+								>
+							</tr>
+						{:else}
+							<tr>
+								<td colspan="5" class="py-4 text-sm text-ink-muted">
+									{$_('reports.billable.empty')}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+					{#if billable.rows.length}
+						<tfoot>
+							<tr class="border-t border-border-default font-semibold">
+								<th scope="row" class="py-3 pr-3 text-left">{$_('reports.total')}</th>
+								<td class="py-3 pr-3 text-right font-mono tabular-nums">
+									{formatDuration(billable.total.minutes)}
+								</td>
+								<td class="py-3 pr-3 text-right font-mono tabular-nums">
+									{formatDuration(billable.total.billableMinutes)}
+								</td>
+								<td class="py-3 pr-3 text-right font-mono tabular-nums">
+									{#if billable.total.unratedMinutes > 0}
+										{formatDuration(billable.total.unratedMinutes)}
+									{:else}
+										<span class="text-ink-muted">—</span>
+									{/if}
+								</td>
+								<td class="py-3 text-right font-mono tabular-nums">
+									{formatAmount(billable.total.amount, lang)}
 								</td>
 							</tr>
 						</tfoot>

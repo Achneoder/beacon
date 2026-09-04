@@ -9,9 +9,11 @@
 		"settings": "Settings",
 		"timesheet": "Timesheet",
 		"calendar": "Calendar",
+		"timeTracking": "Time tracking",
 		"documents": "Documents",
 		"approvals": "Approvals",
-		"reports": "Reports"
+		"reports": "Reports",
+		"projects": "Projects"
 	},
 	"shell": {
 		"navLabel": "Main navigation",
@@ -142,6 +144,21 @@
 		"documentStorageDown": "The document store is unavailable. Try again shortly.",
 		"documentVersionRace": "Another version was uploaded at the same time. Try again.",
 		"documentCategoryKey": "That key is already in use.",
+		"projectNameTaken": "A project with that name already exists.",
+		"taskNameTaken": "A task with that name already exists on this project.",
+		"projectNotFound": "We could not find that project.",
+		"taskNotFound": "We could not find that task.",
+		"projectRetired": "That project has been retired.",
+		"taskRetired": "That task has been retired.",
+		"timerAlreadyRunning": "You already have a timer running. Stop it before starting another.",
+		"timerNotRunning": "That timer is not running.",
+		"timeEntryNotFound": "We could not find that time entry.",
+		"timeEntryBothDurationAndRange": "Give either a duration or a start and end time, not both.",
+		"timeEntryDurationInvalid": "Duration must be a positive number of minutes.",
+		"timeEntryRangeRequired": "A start and an end time are both required.",
+		"timeEntryInvalidInstant": "That start or end time is not valid.",
+		"timeEntryEndBeforeStart": "The end must come after the start.",
+		"timeEntryStopTimerFirst": "Stop the timer before editing its duration.",
 		"sso": {
 			"sso_disabled": "Single sign-on is not available right now.",
 			"invalid_state": "That sign-in link has expired or was already used. Try signing in again.",
@@ -178,6 +195,8 @@
 			"attendance": "Attendance",
 			"holiday": "Time off",
 			"document": "Documents",
+			"project": "Projects",
+			"time": "Time tracking",
 			"report": "Reports"
 		},
 		"organization": {
@@ -201,6 +220,13 @@
 			"read": "See documents",
 			"write": "Upload documents",
 			"manage": "Manage every document"
+		},
+		"project": {
+			"manage": "Create and edit projects"
+		},
+		"time": {
+			"read": "See the project catalog and time entries",
+			"write": "Book time against a project"
 		},
 		"report": {
 			"read": "See reports"
@@ -227,6 +253,13 @@
 				"read": "Open the documents shared with them.",
 				"write": "Upload documents, and edit their own.",
 				"manage": "See, share and delete every document in the organization, whoever it belongs to."
+			},
+			"project": {
+				"manage": "Create, rename, price and retire projects and their tasks."
+			},
+			"time": {
+				"read": "See the project and task catalog, and read time entries.",
+				"write": "Start and stop a timer, and add or edit a manual entry. Always only for oneself."
 			},
 			"report": {
 				"read": "Open the attendance and absence reports, and export them."
@@ -627,6 +660,78 @@
 			"revoked": "Access removed."
 		}
 	},
+	"projects": {
+		"kicker": "Time tracking",
+		"title": "Projects",
+		"listTitle": "Projects",
+		"showRetired": "Show retired",
+		"loading": "Loading…",
+		"empty": "No projects yet.",
+		"name": "Name",
+		"client": "Client",
+		"description": "Description",
+		"rate": "Hourly rate",
+		"tasks": "Tasks",
+		"retired": "Retired",
+		"retire": "Retire",
+		"reactivate": "Reactivate",
+		"confirmRetire": "Retire this project? Past time entries keep naming it.",
+		"confirmRetireTask": "Retire this task? Past time entries keep naming it.",
+		"tasksTitle": "Tasks",
+		"noTasks": "No tasks yet.",
+		"taskName": "Task name",
+		"addTask": "Add task",
+		"newProject": "New project",
+		"create": "Create project",
+		"save": "Save changes",
+		"saving": "Saving…"
+	},
+	"timeTracking": {
+		"kicker": "Time tracking",
+		"title": "Time tracking",
+		"project": "Project",
+		"task": "Task",
+		"selectProject": "Select a project",
+		"noTask": "No task",
+		"note": "Note",
+		"confirmDelete": "Delete this time entry? This cannot be undone.",
+		"source": {
+			"timer": "Timer",
+			"manual": "Manual"
+		},
+		"timer": {
+			"title": "Timer",
+			"start": "Start timer",
+			"starting": "Starting…",
+			"stop": "Stop timer",
+			"stopping": "Stopping…",
+			"running": "Running",
+			"estimate": "Running estimate: {amount}",
+			"ratePreview": "Rate: {amount}/h"
+		},
+		"manual": {
+			"title": "Add time",
+			"date": "Date",
+			"modeLegend": "How to enter the time",
+			"modeDuration": "Duration",
+			"modeRange": "Start and end",
+			"durationMinutes": "Duration (minutes)",
+			"startedAt": "Start",
+			"endedAt": "End",
+			"billable": "Billable",
+			"nonBillable": "Non-billable",
+			"submit": "Add entry",
+			"saving": "Saving…"
+		},
+		"entries": {
+			"title": "My time entries",
+			"empty": "No time booked in the last 30 days.",
+			"date": "Date",
+			"duration": "Duration",
+			"amount": "Amount",
+			"delete": "Delete"
+		}
+	},
 	"reports": {
 		"kicker": "Overview",
 		"title": "Reports",
@@ -686,6 +791,23 @@
 			"remaining": "Remaining",
 			"daysUnit": "d",
 			"empty": "Nobody to report on for this year."
+		},
+		"billable": {
+			"title": "Billable time",
+			"caption": "Hours and billable amount for the selected period, for preparing invoices",
+			"groupByLegend": "Group rows by",
+			"groupBy": {
+				"project": "Project",
+				"task": "Task",
+				"client": "Client",
+				"user": "Person"
+			},
+			"minutes": "Hours",
+			"billableMinutes": "Billable",
+			"unrated": "Unrated",
+			"amount": "Amount",
+			"empty": "No time booked in this period.",
+			"runningNotice": "{count, plural, one {One entry is} other {# entries are}} still running — its amount is not counted until it stops."
 		}
 	},
 	"sso": {

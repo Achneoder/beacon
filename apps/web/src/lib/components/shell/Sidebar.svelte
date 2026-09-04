@@ -26,6 +26,9 @@
 		{ href: '/', key: 'nav.today', permission: 'attendance:read' },
 		{ href: '/timesheet', key: 'nav.timesheet', permission: 'attendance:read' },
 		{ href: '/calendar', key: 'nav.calendar', permission: 'attendance:read' },
+		// Booking time is a `time:read` screen, same reasoning as the timesheet above —
+		// a plain employee holds it and needs the catalog to book against.
+		{ href: '/time', key: 'nav.timeTracking', permission: 'time:read' },
 		{ href: '/documents', key: 'nav.documents', permission: 'document:read' },
 		// Read, not write: the default `manager` role approves time without ever
 		// booking any, and gating the screen on `attendance:write` hid it from exactly
@@ -37,6 +40,8 @@
 		// the exception to the correction above rather than another instance of it.
 		{ href: '/reports', key: 'nav.reports', permission: 'report:read' },
 		{ href: '/people', key: 'nav.people', permission: 'employee:read' },
+		// The catalog's admin screen — distinct from `/time`, which only needs to read it.
+		{ href: '/projects', key: 'nav.projects', permission: 'project:manage' },
 		{ href: '/settings/organization', key: 'nav.settings', permission: 'organization:manage' },
 		// Everyone has a profile — no permission gates your own account.
 		{ href: '/profile', key: 'nav.profile' }

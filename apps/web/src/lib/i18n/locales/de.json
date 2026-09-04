@@ -9,9 +9,11 @@
 		"settings": "Einstellungen",
 		"timesheet": "Zeitkonto",
 		"calendar": "Kalender",
+		"timeTracking": "Zeiterfassung",
 		"documents": "Dokumente",
 		"approvals": "Freigaben",
-		"reports": "Berichte"
+		"reports": "Berichte",
+		"projects": "Projekte"
 	},
 	"shell": {
 		"navLabel": "Hauptnavigation",
@@ -142,6 +144,21 @@
 		"documentStorageDown": "Der Dokumentenspeicher ist nicht erreichbar. Versuchen Sie es in Kürze erneut.",
 		"documentVersionRace": "Es wurde gleichzeitig eine weitere Version hochgeladen. Versuchen Sie es erneut.",
 		"documentCategoryKey": "Dieser Schlüssel wird bereits verwendet.",
+		"projectNameTaken": "Ein Projekt mit diesem Namen existiert bereits.",
+		"taskNameTaken": "Eine Aufgabe mit diesem Namen existiert bereits in diesem Projekt.",
+		"projectNotFound": "Dieses Projekt wurde nicht gefunden.",
+		"taskNotFound": "Diese Aufgabe wurde nicht gefunden.",
+		"projectRetired": "Dieses Projekt wurde archiviert.",
+		"taskRetired": "Diese Aufgabe wurde archiviert.",
+		"timerAlreadyRunning": "Es läuft bereits ein Timer. Stoppen Sie ihn, bevor Sie einen neuen starten.",
+		"timerNotRunning": "Dieser Timer läuft nicht.",
+		"timeEntryNotFound": "Dieser Zeiteintrag wurde nicht gefunden.",
+		"timeEntryBothDurationAndRange": "Geben Sie entweder eine Dauer oder Start- und Endzeit an, nicht beides.",
+		"timeEntryDurationInvalid": "Die Dauer muss eine positive Anzahl Minuten sein.",
+		"timeEntryRangeRequired": "Start- und Endzeit werden beide benötigt.",
+		"timeEntryInvalidInstant": "Diese Start- oder Endzeit ist ungültig.",
+		"timeEntryEndBeforeStart": "Das Ende muss nach dem Start liegen.",
+		"timeEntryStopTimerFirst": "Stoppen Sie den Timer, bevor Sie die Dauer bearbeiten.",
 		"sso": {
 			"sso_disabled": "Single Sign-on ist derzeit nicht verfügbar.",
 			"invalid_state": "Dieser Anmeldelink ist abgelaufen oder wurde bereits verwendet. Bitte melden Sie sich erneut an.",
@@ -178,6 +195,8 @@
 			"attendance": "Anwesenheit",
 			"holiday": "Abwesenheit",
 			"document": "Dokumente",
+			"project": "Projekte",
+			"time": "Zeiterfassung",
 			"report": "Auswertungen"
 		},
 		"organization": {
@@ -201,6 +220,13 @@
 			"read": "Dokumente sehen",
 			"write": "Dokumente hochladen",
 			"manage": "Alle Dokumente verwalten"
+		},
+		"project": {
+			"manage": "Projekte anlegen und bearbeiten"
+		},
+		"time": {
+			"read": "Projektkatalog und Zeiteinträge sehen",
+			"write": "Zeit auf ein Projekt buchen"
 		},
 		"report": {
 			"read": "Auswertungen sehen"
@@ -227,6 +253,13 @@
 				"read": "Die für sie freigegebenen Dokumente öffnen.",
 				"write": "Dokumente hochladen und eigene bearbeiten.",
 				"manage": "Alle Dokumente der Organisation sehen, freigeben und löschen, wem sie auch gehören."
+			},
+			"project": {
+				"manage": "Projekte und ihre Aufgaben anlegen, umbenennen, bepreisen und archivieren."
+			},
+			"time": {
+				"read": "Den Projekt- und Aufgabenkatalog sehen und Zeiteinträge lesen.",
+				"write": "Einen Timer starten und stoppen sowie einen manuellen Eintrag anlegen oder bearbeiten. Immer nur für sich selbst."
 			},
 			"report": {
 				"read": "Anwesenheits- und Abwesenheitsauswertungen öffnen und exportieren."
@@ -627,6 +660,78 @@
 			"revoked": "Zugriff entfernt."
 		}
 	},
+	"projects": {
+		"kicker": "Zeiterfassung",
+		"title": "Projekte",
+		"listTitle": "Projekte",
+		"showRetired": "Archivierte anzeigen",
+		"loading": "Wird geladen…",
+		"empty": "Noch keine Projekte.",
+		"name": "Name",
+		"client": "Kunde",
+		"description": "Beschreibung",
+		"rate": "Stundensatz",
+		"tasks": "Aufgaben",
+		"retired": "Archiviert",
+		"retire": "Archivieren",
+		"reactivate": "Reaktivieren",
+		"confirmRetire": "Dieses Projekt archivieren? Vergangene Zeiteinträge behalten den Namen.",
+		"confirmRetireTask": "Diese Aufgabe archivieren? Vergangene Zeiteinträge behalten den Namen.",
+		"tasksTitle": "Aufgaben",
+		"noTasks": "Noch keine Aufgaben.",
+		"taskName": "Name der Aufgabe",
+		"addTask": "Aufgabe hinzufügen",
+		"newProject": "Neues Projekt",
+		"create": "Projekt anlegen",
+		"save": "Änderungen speichern",
+		"saving": "Wird gespeichert…"
+	},
+	"timeTracking": {
+		"kicker": "Zeiterfassung",
+		"title": "Zeiterfassung",
+		"project": "Projekt",
+		"task": "Aufgabe",
+		"selectProject": "Projekt auswählen",
+		"noTask": "Keine Aufgabe",
+		"note": "Notiz",
+		"confirmDelete": "Diesen Zeiteintrag löschen? Dies kann nicht rückgängig gemacht werden.",
+		"source": {
+			"timer": "Timer",
+			"manual": "Manuell"
+		},
+		"timer": {
+			"title": "Timer",
+			"start": "Timer starten",
+			"starting": "Wird gestartet…",
+			"stop": "Timer stoppen",
+			"stopping": "Wird gestoppt…",
+			"running": "Läuft",
+			"estimate": "Laufende Schätzung: {amount}",
+			"ratePreview": "Satz: {amount}/Std"
+		},
+		"manual": {
+			"title": "Zeit erfassen",
+			"date": "Datum",
+			"modeLegend": "Wie die Zeit erfasst wird",
+			"modeDuration": "Dauer",
+			"modeRange": "Start und Ende",
+			"durationMinutes": "Dauer (Minuten)",
+			"startedAt": "Start",
+			"endedAt": "Ende",
+			"billable": "Abrechenbar",
+			"nonBillable": "Nicht abrechenbar",
+			"submit": "Eintrag hinzufügen",
+			"saving": "Wird gespeichert…"
+		},
+		"entries": {
+			"title": "Meine Zeiteinträge",
+			"empty": "In den letzten 30 Tagen wurde keine Zeit gebucht.",
+			"date": "Datum",
+			"duration": "Dauer",
+			"amount": "Betrag",
+			"delete": "Löschen"
+		}
+	},
 	"reports": {
 		"kicker": "Überblick",
 		"title": "Berichte",
@@ -686,6 +791,23 @@
 			"remaining": "Verbleibend",
 			"daysUnit": "T",
 			"empty": "Für dieses Jahr gibt es niemanden zu berichten."
+		},
+		"billable": {
+			"title": "Abrechenbare Zeit",
+			"caption": "Stunden und abrechenbarer Betrag für den gewählten Zeitraum, zur Rechnungsvorbereitung",
+			"groupByLegend": "Zeilen gruppieren nach",
+			"groupBy": {
+				"project": "Projekt",
+				"task": "Aufgabe",
+				"client": "Kunde",
+				"user": "Person"
+			},
+			"minutes": "Stunden",
+			"billableMinutes": "Abrechenbar",
+			"unrated": "Ohne Satz",
+			"amount": "Betrag",
+			"empty": "In diesem Zeitraum wurde keine Zeit gebucht.",
+			"runningNotice": "{count, plural, one {Ein Eintrag läuft} other {# Einträge laufen}} noch — der Betrag wird erst nach dem Stoppen gezählt."
 		}
 	},
 	"sso": {
