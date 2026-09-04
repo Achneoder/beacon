@@ -19,6 +19,9 @@ import { DocumentCategory } from './modules/documents/document-category.entity.j
 import { Document } from './modules/documents/document.entity.js';
 import { DocumentVersion } from './modules/documents/document-version.entity.js';
 import { DocumentAccess } from './modules/documents/document-access.entity.js';
+import { Project } from './modules/projects/project.entity.js';
+import { Task } from './modules/projects/task.entity.js';
+import { TimeEntry } from './modules/time-entries/time-entry.entity.js';
 import { SsoProvider } from './modules/sso/sso-provider.entity.js';
 import { SsoLoginAttempt } from './modules/sso/sso-login-attempt.entity.js';
 
@@ -49,6 +52,9 @@ export const ENTITIES = [
   Document,
   DocumentVersion,
   DocumentAccess,
+  Project,
+  Task,
+  TimeEntry,
   SsoProvider,
   SsoLoginAttempt,
 ];

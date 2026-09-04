@@ -58,6 +58,9 @@ describe('OrganizationService.onModuleInit', () => {
         'document:read',
         'document:write',
         'document:manage',
+        'project:manage',
+        'time:read',
+        'time:write',
         'report:read',
       ],
     };

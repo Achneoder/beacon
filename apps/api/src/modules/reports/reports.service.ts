@@ -4,6 +4,7 @@ import {
   dayBalance,
   datesBetween,
   fullName,
+  minutesBetween,
   summarizeOvertime,
   targetMinutesFor,
   totalsOf,
@@ -12,6 +13,9 @@ import {
   type AbsenceSummaryRow,
   type AttendanceSummary,
   type AttendanceSummaryRow,
+  type BillableGroupBy,
+  type BillableSummary,
+  type BillableSummaryRow,
   type ReportGroupBy,
   type ReportRange,
 } from '@beacon/shared';
@@ -25,6 +29,7 @@ import { toSegments } from '../attendance/attendance.service.js';
 import { Organization } from '../organizations/organization.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
+import { TimeEntry } from '../time-entries/time-entry.entity.js';
 
 /** Who is asking, and how far the guard already let them see. */
 export interface Caller {
@@ -39,6 +44,17 @@ export interface AttendanceReportFilter {
   to?: string;
   groupBy?: ReportGroupBy;
 }
+
+export interface BillableReportFilter {
+  from?: string;
+  to?: string;
+  groupBy?: BillableGroupBy;
+  projectId?: string;
+}
+
+/** The bucket a task-grouped or client-grouped row with neither falls into. */
+const NO_TASK = 'No task';
+const NO_CLIENT = 'No client';
 
 /** The bucket a person with no department falls into, named rather than dropped. */
 const UNASSIGNED = 'Unassigned';
@@ -166,6 +182,91 @@ export class ReportsService {
         pendingDays: round(sum(rows, (row) => row.pendingDays)),
         remainingDays: round(sum(rows, (row) => row.remainingDays)),
       },
+    };
+  }
+
+  /**
+   * Billable hours and amount, for someone preparing invoices.
+   *
+   * Deliberately **not** narrowed by `subjectsOf` the way `attendanceSummary` and
+   * `absenceSummary` are: every `report:read` holder sees the whole organization's
+   * billable time, because preparing an invoice is an org-wide task, not a per-team
+   * one. In the shipped `DEFAULT_ROLES` every `report:read` holder also holds
+   * `attendance:approve`, so this makes no visible difference today — it only matters
+   * for a narrower custom role holding `report:read` alone, where the un-narrowed
+   * total is the correct one.
+   *
+   * `amount` only ever sums each entry's frozen `TimeEntry.amount` — never a live
+   * estimate off a project's current rate — so a row here always matches what was
+   * actually billed. A still-running entry still contributes its live minutes to
+   * `minutes`, via the same `minutesBetween` the timesheet uses for a running segment,
+   * but nothing to `amount` until it is stopped and the amount is frozen.
+   */
+  async billableSummary(caller: Caller, filter: BillableReportFilter = {}): Promise<BillableSummary> {
+    const groupBy = filter.groupBy ?? 'project';
+    const timezone = await this.organizationTimezone(caller.organizationId);
+    const { from, to } = resolveRange(filter, localDate(timezone));
+    const range: ReportRange = { from, to, timezone };
+
+    const entries = await this.em.find(
+      TimeEntry,
+      {
+        organization: caller.organizationId,
+        localDate: { $gte: from, $lte: to },
+        ...(filter.projectId ? { project: filter.projectId } : {}),
+      },
+      { populate: ['project', 'task', 'user'] },
+    );
+
+    const now = new Date();
+    const rows = new Map<string, BillableSummaryRow>();
+    let runningCount = 0;
+
+    for (const entry of entries) {
+      const running = entry.startedAt !== null && entry.endedAt === null;
+      if (running) runningCount += 1;
+
+      const minutes = entry.durationMinutes ?? (running ? minutesBetween(entry.startedAt!, now) : 0);
+      const { key, label } = groupKeyOf(groupBy, entry);
+      const mapKey = key ?? '';
+
+      const row = rows.get(mapKey) ?? {
+        key,
+        label,
+        minutes: 0,
+        billableMinutes: 0,
+        amount: 0,
+        unratedMinutes: 0,
+        entryCount: 0,
+      };
+      row.minutes += minutes;
+      row.entryCount += 1;
+      if (entry.billable) {
+        row.billableMinutes += minutes;
+        if (entry.amount !== null) row.amount += entry.amount;
+        if (entry.rateAtEntry === null) row.unratedMinutes += minutes;
+      }
+      rows.set(mapKey, row);
+    }
+
+    const sorted = [...rows.values()]
+      .map((row) => ({ ...row, amount: round(row.amount) }))
+      .sort((left, right) => right.amount - left.amount || left.label.localeCompare(right.label));
+
+    return {
+      range,
+      groupBy,
+      rows: sorted,
+      total: {
+        key: null,
+        label: '',
+        minutes: sum(sorted, (row) => row.minutes),
+        billableMinutes: sum(sorted, (row) => row.billableMinutes),
+        amount: round(sum(sorted, (row) => row.amount)),
+        unratedMinutes: sum(sorted, (row) => row.unratedMinutes),
+        entryCount: sum(sorted, (row) => row.entryCount),
+      },
+      runningCount,
     };
   }
 
@@ -421,6 +522,28 @@ function totalRow(rows: AttendanceSummaryRow[], headcount: number): AttendanceSu
   };
 }
 
+/** Requires `project`, `task` and `user` to be populated. */
+function groupKeyOf(groupBy: BillableGroupBy, entry: TimeEntry): { key: string | null; label: string } {
+  const project = entry.project.getEntity();
+
+  switch (groupBy) {
+    case 'project':
+      return { key: project.id, label: project.name };
+    case 'task': {
+      const task = entry.task?.getEntity() ?? null;
+      return task ? { key: task.id, label: task.name } : { key: null, label: NO_TASK };
+    }
+    case 'client':
+      return project.clientName
+        ? { key: project.clientName, label: project.clientName }
+        : { key: null, label: NO_CLIENT };
+    case 'user': {
+      const user = entry.user.getEntity();
+      return { key: user.id, label: fullName(user) };
+    }
+  }
+}
+
 /**
  * The range, defaulting to the month containing today.
  *
@@ -454,7 +577,7 @@ function sum<T>(items: readonly T[], of: (item: T) => number): number {
   return items.reduce((total, item) => total + of(item), 0);
 }
 
-/** Half days are the only fraction the quota columns carry. */
-function round(days: number): number {
-  return Math.round(days * 100) / 100;
+/** Two decimals: half days are the finest fraction the quota columns carry, and money never needs a third. */
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
 }

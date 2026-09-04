@@ -24,6 +24,8 @@ import { InvitationsModule } from './modules/invitations/invitations.module.js';
 import { AttendanceModule } from './modules/attendance/attendance.module.js';
 import { AbsencesModule } from './modules/absences/absences.module.js';
 import { DocumentsModule } from './modules/documents/documents.module.js';
+import { ProjectsModule } from './modules/projects/projects.module.js';
+import { TimeEntriesModule } from './modules/time-entries/time-entries.module.js';
 import { SearchModule as SearchFeatureModule } from './modules/search/search.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { SsoModule } from './modules/sso/sso.module.js';
@@ -59,6 +61,8 @@ import { SsoModule } from './modules/sso/sso.module.js';
     AttendanceModule,
     AbsencesModule,
     DocumentsModule,
+    ProjectsModule,
+    TimeEntriesModule,
     SearchFeatureModule,
     ReportsModule,
     SsoModule,

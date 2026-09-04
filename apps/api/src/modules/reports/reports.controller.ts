@@ -1,12 +1,16 @@
 import { BadRequestException, Controller, Get, Query, StreamableFile } from '@nestjs/common';
 import {
+  isBillableGroupBy,
   isReportGroupBy,
   type AbsenceSummary,
   type AttendanceSummary,
   type AuthenticatedUser,
+  type BillableGroupBy,
+  type BillableSummary,
   type ReportGroupBy,
 } from '@beacon/shared';
 import { CurrentUser } from '../../common/auth/current-user.decorator.js';
+import { optionalUuid } from '../../common/http/optional-uuid.pipe.js';
 import { RequirePermissions } from '../../common/auth/permissions.decorator.js';
 import { ReportsService, type Caller } from './reports.service.js';
 import { attendanceCsvFilename, attendanceCsvStream } from './attendance-csv.js';
@@ -49,6 +53,23 @@ export class ReportsController {
     @Query('year') year?: string,
   ): Promise<AbsenceSummary> {
     return this.reports.absenceSummary(callerOf(user), toYear(year));
+  }
+
+  @Get('time/summary')
+  @RequirePermissions('report:read')
+  billableSummary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('groupBy') groupBy?: string,
+    @Query('projectId', optionalUuid) projectId?: string,
+  ): Promise<BillableSummary> {
+    return this.reports.billableSummary(callerOf(user), {
+      from: toDate(from, 'from'),
+      to: toDate(to, 'to'),
+      groupBy: toBillableGroupBy(groupBy),
+      projectId,
+    });
   }
 
   /**
@@ -100,6 +121,16 @@ function toDate(value: string | undefined, field: string): string | undefined {
 function toGroupBy(value?: string): ReportGroupBy | undefined {
   if (value === undefined || value === '') return undefined;
   if (!isReportGroupBy(value)) throw new BadRequestException('groupBy must be user or department');
+
+  return value;
+}
+
+/** An unknown grouping is a client bug worth naming, not one to silently default. */
+function toBillableGroupBy(value?: string): BillableGroupBy | undefined {
+  if (value === undefined || value === '') return undefined;
+  if (!isBillableGroupBy(value)) {
+    throw new BadRequestException('groupBy must be project, task, client or user');
+  }
 
   return value;
 }

@@ -146,6 +146,7 @@ describe('Reports (e2e)', () => {
       `/api/reports/attendance/summary?from=${MONDAY}&to=${FRIDAY}`,
       '/api/reports/absences/summary',
       `/api/reports/attendance/export?from=${MONDAY}&to=${FRIDAY}`,
+      `/api/reports/time/summary?from=${MONDAY}&to=${FRIDAY}`,
     ])('refuses %s to an employee, who holds no report:read', async (path) => {
       await http().get(path).set(as(staffToken)).expect(403);
     });
@@ -248,6 +249,107 @@ describe('Reports (e2e)', () => {
       const body = await summary(ownerToken, '');
 
       expect(body.range.from).toBe(`${body.range.to.slice(0, 7)}-01`);
+    });
+  });
+
+  describe('the billable summary', () => {
+    let projectId: string;
+    let taskId: string;
+
+    beforeAll(async () => {
+      const project = await http()
+        .post('/api/projects')
+        .set(as(ownerToken))
+        .send({ name: 'Migration', clientName: 'Acme Corp', hourlyRate: 100 })
+        .expect(201);
+      projectId = project.body.id;
+
+      const task = await http()
+        .post(`/api/projects/${projectId}/tasks`)
+        .set(as(ownerToken))
+        .send({ name: 'Cutover', hourlyRate: 150 })
+        .expect(201);
+      taskId = task.body.id;
+
+      // 90 minutes at the task's rate, 60 minutes at the project's own rate, and one
+      // non-billable hour that must contribute minutes but never an amount.
+      await http()
+        .post('/api/time-entries')
+        .set(as(staffToken))
+        .send({ projectId, taskId, localDate: MONDAY, durationMinutes: 90 })
+        .expect(201);
+      await http()
+        .post('/api/time-entries')
+        .set(as(staffToken))
+        .send({ projectId, localDate: TUESDAY, durationMinutes: 60 })
+        .expect(201);
+      await http()
+        .post('/api/time-entries')
+        .set(as(staffToken))
+        .send({ projectId, localDate: TUESDAY, durationMinutes: 60, billable: false })
+        .expect(201);
+    });
+
+    const billable = async (query: string) =>
+      (await http().get(`/api/reports/time/summary?${query}`).set(as(ownerToken)).expect(200)).body;
+
+    it('sums minutes and the frozen amount per project by default', async () => {
+      const body = await billable(`from=${MONDAY}&to=${FRIDAY}`);
+
+      expect(body.groupBy).toBe('project');
+      const row = body.rows.find((entry: { key: string }) => entry.key === projectId);
+      expect(row).toMatchObject({
+        label: 'Migration',
+        minutes: 90 + 60 + 60,
+        billableMinutes: 90 + 60,
+        // 150/h × 90min + 100/h × 60min = 225 + 100
+        amount: 225 + 100,
+        entryCount: 3,
+      });
+    });
+
+    it('groups by task, task-less minutes in their own bucket', async () => {
+      const body = await billable(`from=${MONDAY}&to=${FRIDAY}&groupBy=task`);
+
+      const cutover = body.rows.find((row: { key: string }) => row.key === taskId);
+      expect(cutover).toMatchObject({ label: 'Cutover', minutes: 90, amount: 225 });
+
+      const noTask = body.rows.find((row: { key: string | null }) => row.key === null);
+      expect(noTask).toMatchObject({ label: 'No task', minutes: 120 });
+    });
+
+    it('groups by the free-text client tag', async () => {
+      const body = await billable(`from=${MONDAY}&to=${FRIDAY}&groupBy=client`);
+
+      const acme = body.rows.find((row: { key: string }) => row.key === 'Acme Corp');
+      expect(acme).toMatchObject({ minutes: 90 + 60 + 60, amount: 225 + 100 });
+    });
+
+    it('groups by user', async () => {
+      const body = await billable(`from=${MONDAY}&to=${FRIDAY}&groupBy=user`);
+
+      const sam = body.rows.find((row: { label: string }) => row.label === 'Sam Tester');
+      expect(sam).toMatchObject({ minutes: 90 + 60 + 60 });
+    });
+
+    it('filters to a single project', async () => {
+      const body = await billable(`from=${MONDAY}&to=${FRIDAY}&projectId=${projectId}`);
+
+      expect(body.rows).toHaveLength(1);
+      expect(body.total.entryCount).toBe(3);
+    });
+
+    it('never lets a later rate change move an already-frozen amount', async () => {
+      const before = await billable(`from=${MONDAY}&to=${FRIDAY}&projectId=${projectId}`);
+
+      await http().patch(`/api/projects/${projectId}`).set(as(ownerToken)).send({ hourlyRate: 999 }).expect(200);
+
+      const after = await billable(`from=${MONDAY}&to=${FRIDAY}&projectId=${projectId}`);
+      expect(after.total.amount).toBe(before.total.amount);
+    });
+
+    it('refuses a grouping it does not have', async () => {
+      await http().get('/api/reports/time/summary?groupBy=department').set(as(ownerToken)).expect(400);
     });
   });
 
